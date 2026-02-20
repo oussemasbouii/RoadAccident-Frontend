@@ -1,0 +1,223 @@
+import axios from 'axios'
+import { clearAuthStorage } from '@/utils/authSecurity'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+})
+
+let isRefreshing = false
+let failedQueue: Array<any> = []
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) prom.reject(error)
+    else prom.resolve(token)
+  })
+  failedQueue = []
+}
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('accessToken')
+  if (token && config.headers) config.headers['Authorization'] = `Bearer ${token}`
+  return config
+})
+
+const extractTokens = (payload: any) => {
+  const source = payload?.data || payload || {}
+  return {
+    accessToken: source.accessToken,
+    refreshToken: source.refreshToken,
+  }
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+    const requestUrl = originalRequest?.url || ''
+    const isAuthEndpoint =
+      requestUrl.includes('/auth/signin') ||
+      requestUrl.includes('/auth/refresh') ||
+      requestUrl.includes('/auth/signout')
+    const isSignin = requestUrl.includes('/auth/signin')
+    const status = error.response?.status
+    const shouldLogVerbose =
+      import.meta.env.DEV &&
+      !(isSignin && (status === 401 || status === 403 || status === 423 || status === 500))
+
+    if (shouldLogVerbose) {
+      console.error('API Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: originalRequest?.url,
+        method: originalRequest?.method,
+        message: error.message,
+      })
+    }
+
+    if (error.response?.status === 401 && !originalRequest?._retry && !isAuthEndpoint) {
+      if (isRefreshing) {
+        return new Promise(function (resolve, reject) {
+          failedQueue.push({ resolve, reject })
+        })
+          .then((token) => {
+            originalRequest.headers['Authorization'] = `Bearer ${token}`
+            return api(originalRequest)
+          })
+          .catch((err) => Promise.reject(err))
+      }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      const refreshToken = localStorage.getItem('refreshToken')
+      const deviceId = localStorage.getItem('deviceId')
+
+      if (!refreshToken) {
+        isRefreshing = false
+        return Promise.reject(error)
+      }
+
+      try {
+        const refreshPayload = deviceId ? { refreshToken, deviceId } : { refreshToken }
+        const resp = await axios.post(`${API_BASE_URL}/auth/refresh`, refreshPayload, {
+          withCredentials: true,
+        })
+        const { accessToken, refreshToken: newRefresh } = extractTokens(resp.data)
+
+        if (!accessToken) {
+          throw new Error('Refresh succeeded but no access token was returned')
+        }
+
+        localStorage.setItem('accessToken', accessToken)
+        if (newRefresh) localStorage.setItem('refreshToken', newRefresh)
+        api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`
+        processQueue(null, accessToken)
+        return api(originalRequest)
+      } catch (err) {
+        processQueue(err, null)
+        clearAuthStorage()
+        return Promise.reject(err)
+      } finally {
+        isRefreshing = false
+      }
+    }
+
+    return Promise.reject(error)
+  }
+)
+
+// API service methods
+export const apiService = {
+  // Auth
+  auth: {
+    signin: (data: {
+      officerId: string
+      password: string
+      deviceInfo: {
+        deviceId: string
+        name: string
+        model: string
+        operatingSystem: string
+        osVersion: string
+        manufacturer: string
+      }
+    }) => api.post('/auth/signin', data),
+    signup: (data: {
+      officerId: string
+      password: string
+      center: string
+      firstName: string
+      lastName: string
+      role: string
+      phoneNumber: string
+    }) => api.post('/auth/signup', data),
+    adminSignup: (data: {
+      email: string
+      password: string
+      firstName: string
+      lastName: string
+      phoneNumber?: string
+      center?: string
+      role?: 'admin'
+    }) => api.post('/auth/admin/signup', data),
+    requestPasswordReset: (data: { email?: string; officerId?: string }) =>
+      api.post('/auth/password/forgot', data),
+    verifyPasswordResetToken: (data: { token: string; email?: string; officerId?: string }) =>
+      api.post('/auth/password/verify', data),
+    resetPassword: (data: {
+      token: string
+      newPassword: string
+      confirmPassword?: string
+      email?: string
+      officerId?: string
+    }) => api.post('/auth/password/reset', data),
+    refresh: (data: { refreshToken: string; deviceId?: string }) => api.post('/auth/refresh', data),
+    signout: () => api.post('/auth/signout'),
+  },
+
+  // Incidents
+  incidents: {
+    getAll: (page = 1, limit = 10) => api.get('/accidents/', { params: { page, limit } }),
+    getById: (id: string) => api.get(`/accidents/${id}`),
+  },
+
+  // Alerts
+  alerts: {
+    create: (data: any) => api.post('/alerts/', data),
+    getSent: () => api.get('/alerts/sent'),
+    getReceived: () => api.get('/alerts/received'),
+    acknowledge: (alertId: string) => api.post(`/alerts/${alertId}/acknowledge`),
+  },
+
+  // Reports
+  reports: {
+    getAll: (page = 1, limit = 10) => api.get('/reports', { params: { page, limit } }),
+    getById: (id: string) => api.get(`/reports/${id}`),
+    create: (data: any) => api.post('/reports', data),
+    getAnalytics: () => api.get('/reports/analytics'),
+    getStats: () => api.get('/reports/stats'),
+    getIncidentsByLocation: () => api.get('/reports/incidents-by-location'),
+  },
+
+  // Dashboard
+  dashboard: {
+    getSummary: () => api.get('/dashboard/summary'),
+    getRecentIncidents: (limit = 5) => api.get('/dashboard/recent-incidents', { params: { limit } }),
+    getSystemStatus: () => api.get('/dashboard/system-status'),
+  },
+
+  // Administration
+  admin: {
+    listOfficers: (params?: { query?: string; page?: number; limit?: number }) =>
+      api.get('/admin/officers', { params }),
+    validateOfficer: (officerId: string, data: { reason?: string; actorId?: string }) =>
+      api.post(`/admin/officers/${officerId}/validate`, data),
+    updateOfficerStatus: (
+      officerId: string,
+      data: { status: 'active' | 'blocked' | 'restricted'; reason?: string; actorId?: string; expiresAt?: string }
+    ) => api.patch(`/admin/officers/${officerId}/status`, data),
+    deleteOfficer: (officerId: string, data: { reason?: string; actorId?: string }) =>
+      api.delete(`/admin/officers/${officerId}`, { data }),
+    triggerOfficerPasswordReset: (officerId: string, data: { reason?: string; actorId?: string }) =>
+      api.post(`/admin/officers/${officerId}/password-reset`, data),
+  },
+}
+
+export default api
+
+
+
+
+
+
+
+
+
+
+
+
