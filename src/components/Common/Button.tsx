@@ -7,6 +7,7 @@ interface ButtonProps
   size?: 'sm' | 'md' | 'lg'
   children: React.ReactNode
   loading?: boolean
+  icon?: React.ReactNode
 }
 
 export default function Button({
@@ -15,6 +16,7 @@ export default function Button({
   children,
   loading = false,
   disabled = false,
+  icon,
   ...props
 }: ButtonProps) {
   const variantMap = {
@@ -36,17 +38,21 @@ export default function Button({
       variant={variantMap[variant].variant}
       color={variantMap[variant].color as any}
       size={sizeMap[size]}
-      sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none' }}
+      startIcon={loading ? <CircularProgress size={16} color="inherit" /> : icon}
+      sx={{ 
+        borderRadius: 100, // Fully rounded buttons for Material 3
+        fontWeight: 700, 
+        textTransform: 'none',
+        px: size === 'sm' ? 2 : 3,
+        py: size === 'sm' ? 0.75 : 1.25,
+        boxShadow: variant === 'primary' ? '0 4px 12px rgba(103,80,164,0.15)' : 'none',
+        '&:hover': {
+          boxShadow: variant === 'primary' ? '0 6px 16px rgba(103,80,164,0.25)' : 'none',
+        }
+      }}
       {...props}
     >
-      {loading ? (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <CircularProgress size={16} color="inherit" />
-          {children}
-        </span>
-      ) : (
-        children
-      )}
+      {children}
     </MuiButton>
   )
 }

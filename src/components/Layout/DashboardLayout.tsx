@@ -1,8 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { io } from 'socket.io-client'
-import { Box, IconButton, Paper } from '@mui/material'
-import MenuOpenIcon from '@mui/icons-material/MenuOpen'
+import { Box, useMediaQuery, useTheme, Drawer } from '@mui/material'
 import { useAppDispatch } from '../../store/store'
 import { prependIncomingAlert } from '../../features/alerts/slices/alertsSlice'
 import { prependIncomingIncident } from '../../features/incidents/slices/incidentsSlice'
@@ -11,10 +10,18 @@ import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
 const SIDEBAR_WIDTH = 280
+const COLLAPSED_SIDEBAR_WIDTH = 88
 
 export default function DashboardLayout() {
   const dispatch = useAppDispatch()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile)
+
+  // Sync sidebar state with mobile/desktop view
+  useEffect(() => {
+    setSidebarOpen(!isMobile)
+  }, [isMobile])
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken')
@@ -69,32 +76,51 @@ export default function DashboardLayout() {
     }
   }, [dispatch])
 
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
+
+  const drawerTransition = theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: sidebarOpen 
+      ? theme.transitions.duration.enteringScreen 
+      : theme.transitions.duration.leavingScreen,
+  })
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Box
+      <Drawer
+        variant={isMobile ? 'temporary' : 'permanent'}
+        open={sidebarOpen}
+        onClose={toggleSidebar}
         sx={{
-          width: sidebarOpen ? SIDEBAR_WIDTH : 0,
-          transition: 'width 200ms ease',
-          overflow: 'hidden',
+          width: sidebarOpen ? SIDEBAR_WIDTH : COLLAPSED_SIDEBAR_WIDTH,
           flexShrink: 0,
+          whiteSpace: 'nowrap',
+          boxSizing: 'border-box',
+          '& .MuiDrawer-paper': {
+            width: sidebarOpen ? SIDEBAR_WIDTH : COLLAPSED_SIDEBAR_WIDTH,
+            transition: drawerTransition,
+            overflowX: 'hidden',
+            borderRight: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.default',
+          },
         }}
-        onMouseEnter={() => setSidebarOpen(true)}
       >
-        <Sidebar onMouseLeave={() => setSidebarOpen(false)} />
-      </Box>
+        <Sidebar collapsed={!sidebarOpen} />
+      </Drawer>
 
-      {!sidebarOpen && (
-        <Paper elevation={6} sx={{ position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1400, borderRadius: '0 12px 12px 0' }}>
-          <IconButton color="primary" onClick={() => setSidebarOpen(true)} onMouseEnter={() => setSidebarOpen(true)}>
-            <MenuOpenIcon />
-          </IconButton>
-        </Paper>
-      )}
-
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <Topbar />
+      <Box 
+        sx={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          minWidth: 0,
+          width: '100%',
+        }}
+      >
+        <Topbar onMenuClick={toggleSidebar} />
         <Box component="main" sx={{ flex: 1, overflow: 'auto' }}>
-          <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1280, mx: 'auto', width: '100%' }}>
+          <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1440, mx: 'auto', width: '100%' }}>
             <Outlet />
           </Box>
         </Box>

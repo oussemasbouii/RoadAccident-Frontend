@@ -1,6 +1,7 @@
 export function clearAuthStorage() {
   localStorage.removeItem('accessToken')
   localStorage.removeItem('refreshToken')
+  localStorage.removeItem('user')
 }
 
 function decodeJwtPayload(token: string) {

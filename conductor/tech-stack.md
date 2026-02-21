@@ -24,6 +24,11 @@
 - **Zip Compression:** [jszip](https://stuk.github.io/jszip/)
 - **UUID Generation:** [uuid](https://github.com/uuidjs/uuid)
 
+## Testing
+- **Unit Testing:** [Vitest](https://vitest.dev/)
+- **UI Testing:** [@testing-library/react](https://testing-library.com/docs/react-testing-library/intro/)
+- **State Testing:** [Redux Toolkit Mock Store](https://github.com/reduxjs/redux-mock-store)
+
 ## Linting & Formatting
 - **Linter:** [ESLint 8.56.0](https://eslint.org/)
 - **Formatter:** [Prettier 3.1.1](https://prettier.io/)

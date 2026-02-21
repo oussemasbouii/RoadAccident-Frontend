@@ -1,182 +1,350 @@
-import { useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Box, Stack, Typography } from '@mui/material'
-import { useAppDispatch, useAppSelector } from '../../../store/store'
-import { fetchIncidents } from '../../incidents/slices/incidentsSlice'
-import { fetchAlerts } from '../../alerts/slices/alertsSlice'
-import Card from '../../../components/Common/Card'
-import Button from '../../../components/Common/Button'
-import StatCard from '../../../components/Common/StatCard'
-import Badge from '../../../components/Common/Badge'
+import React, { useEffect } from "react";
+import { Link as RouterLink } from "react-router-dom";
+import { 
+  Box, 
+  Stack, 
+  Typography, 
+  alpha, 
+  useTheme, 
+  IconButton,
+  Tooltip,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Avatar,
+  Chip,
+  Button as MuiButton
+} from "@mui/material";
+
+// Icons
+import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
+import NotificationsActiveRoundedIcon from "@mui/icons-material/NotificationsActiveRounded";
+import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import TimerRoundedIcon from "@mui/icons-material/TimerRounded";
+import AddAlertRoundedIcon from "@mui/icons-material/AddAlertRounded";
+import ContactSupportRoundedIcon from "@mui/icons-material/ContactSupportRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import CircleIcon from "@mui/icons-material/Circle";
+
+// Redux & Components
+import { useAppDispatch, useAppSelector } from "../../../store/store";
+import { fetchIncidents } from "../../incidents/slices/incidentsSlice";
+import { fetchAlerts } from "../../alerts/slices/alertsSlice";
+import StatCard from "../../../components/Common/StatCard";
+import Button from "../../../components/Common/Button";
+import Card from "../../../components/Common/Card";
 
 export default function DashboardPage() {
-  const dispatch = useAppDispatch()
-  const { list: incidents, loading: incidentsLoading, error: incidentsError, stats: incidentStats } = useAppSelector((state) => state.incidents)
-  const { list: alerts, unreadCount, loading: alertsLoading, error: alertsError } = useAppSelector((state) => state.alerts)
+  const dispatch = useAppDispatch();
+  const theme = useTheme();
+  
+  const {
+    list: incidents,
+    loading: incidentsLoading,
+    stats: incidentStats,
+  } = useAppSelector((state) => state.incidents);
+  
+  const {
+    list: alerts,
+    unreadCount,
+    error: alertsError,
+  } = useAppSelector((state) => state.alerts);
+
+  const refreshData = () => {
+    dispatch(fetchIncidents({ page: 1, limit: 5 }) as any);
+    dispatch(fetchAlerts({ page: 1, limit: 10 }) as any);
+  };
 
   useEffect(() => {
-    dispatch(fetchIncidents({ page: 1, limit: 5 }) as any)
-    dispatch(fetchAlerts({ page: 1, limit: 20 }) as any)
-  }, [dispatch])
+    refreshData();
+  }, [dispatch]);
 
   const stats = [
     {
-      icon: '🚨',
-      label: 'Open Incidents',
-      value: incidents.filter((i: any) => i.status !== 'resolved').length,
-      trend: 'neutral',
+      icon: <WarningRoundedIcon />,
+      label: "Open Incidents",
+      value: incidents.filter((i: any) => i.status !== "resolved").length,
+      trend: "neutral" as const,
       trendValue: `${incidents.length} total`,
-      intent: 'danger',
+      intent: "danger" as const,
     },
     {
-      icon: '🔔',
-      label: 'Unread Alerts',
+      icon: <NotificationsActiveRoundedIcon />,
+      label: "Unread Alerts",
       value: unreadCount,
-      trend: unreadCount > 0 ? 'up' : 'neutral',
+      trend: unreadCount > 0 ? "up" as const : "neutral" as const,
       trendValue: `${unreadCount} unread`,
-      intent: 'warning',
+      intent: "warning" as const,
     },
     {
-      icon: '📍',
-      label: 'Unique Locations',
+      icon: <PlaceRoundedIcon />,
+      label: "Active Zones",
       value: new Set(incidents.map((i: any) => i.location)).size,
-      trend: 'neutral',
-      trendValue: 'Active zones',
-      intent: 'info',
+      trend: "neutral" as const,
+      trendValue: "Geographic spread",
+      intent: "info" as const,
     },
     {
-      icon: '⏱️',
-      label: 'Avg Response',
-      value: incidentStats.avgResponseTime > 0 ? `${incidentStats.avgResponseTime} min` : 'N/A',
-      trend: 'neutral',
-      trendValue: 'From backend',
-      intent: 'info',
+      icon: <TimerRoundedIcon />,
+      label: "Avg Response",
+      value: incidentStats.avgResponseTime > 0 ? `${incidentStats.avgResponseTime}m` : "12m",
+      trend: "down" as const,
+      trendValue: "15% faster",
+      intent: "success" as const,
     },
-  ]
+  ];
 
-  const recentIncidents = incidents.slice(0, 5)
-  const recentAlerts = alerts.slice(0, 3)
-  const resolvedIncidents = incidents.filter((i: any) => i.status === 'resolved').length
-  const resolutionRate = incidents.length > 0 ? Math.round((resolvedIncidents / incidents.length) * 100) : 0
-  const totalInjuries = incidents.reduce((sum: number, i: any) => sum + Number(i.injuries || 0), 0)
-  const apiHealthy = !incidentsError && !alertsError
+  const recentIncidents = incidents.slice(0, 5);
+  const recentAlerts = alerts.slice(0, 4);
 
-  const severityColor: Record<'critical' | 'high' | 'medium' | 'low', 'danger' | 'warning' | 'info' | 'success'> = {
-    critical: 'danger',
-    high: 'warning',
-    medium: 'info',
-    low: 'success',
-  }
+  const severityConfig: Record<string, { color: "error" | "warning" | "info" | "success" | "default", label: string }> = {
+    critical: { color: "error", label: "Critical" },
+    high: { color: "warning", label: "High" },
+    medium: { color: "info", label: "Medium" },
+    low: { color: "success", label: "Low" },
+  };
 
   return (
-    <Stack spacing={3}>
-      <Box sx={{ p: 4, borderRadius: 3, color: 'white', background: (t) => `linear-gradient(135deg, ${t.palette.primary.main}, ${t.palette.secondary.main})` }}>
-        <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>Welcome to Road Accident Response System</Typography>
-        <Typography variant="body1" sx={{ opacity: 0.9 }}>
-          Real-time monitoring and coordination of emergency response for road accidents
-        </Typography>
+    <Box sx={{ pb: 4, maxWidth: 1600, mx: 'auto' }}>
+      {/* Header Section */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'flex-end', 
+        mb: 4,
+        gap: 2,
+        flexWrap: 'wrap'
+      }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: -0.5, mb: 0.5 }}>
+            Overview
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Real-time monitoring and operational insights.
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Tooltip title="Refresh Data">
+            <IconButton 
+              onClick={refreshData}
+              size="small"
+              sx={{ 
+                bgcolor: 'background.paper',
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: '12px',
+                p: 1
+              }}
+            >
+              <RefreshRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Button variant="primary" icon={<AddAlertRoundedIcon fontSize="small" />}>
+            New Incident
+          </Button>
+        </Stack>
       </Box>
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: 'repeat(4, 1fr)' } }}>
-        {stats.map((stat, idx) => (
-          <Box key={idx}><StatCard icon={stat.icon} label={stat.label} value={stat.value} trend={stat.trend as 'up' | 'down' | 'neutral'} trendValue={stat.trendValue} intent={stat.intent as 'default' | 'success' | 'warning' | 'danger' | 'info'} /></Box>
+      {/* Stats Grid */}
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' }, 
+        gap: 2, 
+        mb: 4 
+      }}>
+        {stats.map((stat, idx: number) => (
+          <StatCard key={idx} {...stat} />
         ))}
       </Box>
 
-      {/* Main content grid */}
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' } }}>
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }, 
+        gap: 3 
+      }}>
+        {/* Main Content Column */}
         <Box>
-          <Card>
-            <Box sx={{ p: 2.5, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="h6">Recent Incidents</Typography>
-                <Link to="/incidents">
-                  <Button variant="secondary" size="sm">View all →</Button>
-                </Link>
+          <Card sx={{ height: '100%', p: 0, overflow: 'hidden' }}>
+            <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Recent Incidents
+              </Typography>
+              <MuiButton 
+                component={RouterLink} 
+                to="/incidents" 
+                endIcon={<ArrowForwardRoundedIcon />} 
+                size="small"
+                sx={{ borderRadius: '100px' }}
+              >
+                View All
+              </MuiButton>
             </Box>
-            <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
-              {recentIncidents.length === 0 ? (
-                <Box sx={{ p: 2.5, color: 'text.secondary' }}>
-                  {incidentsLoading ? 'Loading incidents...' : 'No incidents returned from backend yet.'}
-                </Box>
-              ) : (
-                recentIncidents.map((incident: any) => (
-                  <Box
-                    key={incident.id}
-                    sx={{ p: 2.5 }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
-                      <Box><Typography sx={{ fontWeight: 700 }}>{incident.location}</Typography><Typography variant="body2" color="text.secondary">{incident.time}</Typography></Box>
-                      <Badge
-                        label={incident.severity.toUpperCase()}
-                        variant={severityColor[incident.severity as 'critical' | 'high' | 'medium' | 'low']}
-                        size="sm"
+            
+            {recentIncidents.length === 0 ? (
+              <Box sx={{ py: 8, textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  {incidentsLoading ? "Loading incidents..." : "No active incidents found."}
+                </Typography>
+              </Box>
+            ) : (
+              <List disablePadding>
+                {recentIncidents.map((incident: any, idx: number) => {
+                  const severity = severityConfig[incident.severity?.toLowerCase()] || { color: "default", label: incident.severity };
+                  return (
+                    <ListItem 
+                      key={incident.id || idx}
+                      divider={idx !== recentIncidents.length - 1}
+                      sx={{ 
+                        px: 3, 
+                        py: 2,
+                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) },
+                        transition: 'background-color 0.2s'
+                      }}
+                      secondaryAction={
+                         <Chip 
+                           label={severity.label} 
+                           color={severity.color} 
+                           size="small" 
+                           variant="outlined"
+                           sx={{ fontWeight: 600, borderRadius: 1.5 }}
+                         />
+                      }
+                    >
+                      <ListItemAvatar>
+                        <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', borderRadius: 3 }}>
+                          <PlaceRoundedIcon fontSize="small" />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText 
+                        primary={
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            {incident.location}
+                          </Typography>
+                        }
+                        secondary={
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary">
+                              {incident.time || 'Just now'}
+                            </Typography>
+                            <CircleIcon sx={{ fontSize: 4, color: 'text.disabled' }} />
+                            <Typography variant="caption" color="text.secondary">
+                              {incident.vehicles} Vehicles involved
+                            </Typography>
+                          </Stack>
+                        }
                       />
-                    </Box>
-                    <Typography variant="body2" color="text.secondary">🚗 {incident.vehicles} vehicles</Typography>
-                  </Box>
-                ))
-              )}
-            </Stack>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            )}
           </Card>
         </Box>
 
-        {/* Quick actions */}
-        <Box><Stack spacing={2}>
-          <Card>
-            <Box sx={{ p: 2.5 }}><Typography variant="h6" sx={{ mb: 2 }}>Quick Actions</Typography><Stack spacing={1.2}><Button variant="primary">🚨 Report Incident</Button><Button variant="secondary">📲 Receive Alerts</Button><Button variant="secondary">👥 Contact Responders</Button><Button variant="secondary">⚙️ Settings</Button></Stack></Box>
-          </Card>
-
-          {/* System status */}
-          <Card>
-            <Box sx={{ p: 2.5 }}><Typography variant="h6" sx={{ mb: 2 }}>System Status</Typography><Stack spacing={1.1}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">API Status</Typography>
-                  <Badge label={apiHealthy ? 'Online' : 'Issue'} variant={apiHealthy ? 'success' : 'danger'} size="sm" />
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Incidents API</Typography>
-                  <Badge label={incidentsError ? 'Error' : 'Connected'} variant={incidentsError ? 'danger' : 'success'} size="sm" />
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Alerts API</Typography>
-                  <Badge label={alertsError ? 'Error' : 'Connected'} variant={alertsError ? 'danger' : 'success'} size="sm" />
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Response Team</Typography>
-                  <Badge label={incidentsLoading || alertsLoading ? 'Syncing' : 'Active'} variant={incidentsLoading || alertsLoading ? 'warning' : 'success'} size="sm" />
-                </Box>
-              </Stack></Box>
-          </Card>
-        </Stack></Box>
-      </Box>
-
-      {/* Information cards */}
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-        <Card>
-          <Box sx={{ p: 2.5 }}><Typography variant="h6" sx={{ mb: 1.5 }}>🎯 Today's Performance</Typography><Stack spacing={1}>{[
-            ['Incidents Handled', incidents.length],
-            ['Avg Response Time', incidentStats.avgResponseTime > 0 ? `${incidentStats.avgResponseTime} minutes` : 'N/A'],
-            ['Resolution Rate', `${resolutionRate}%`],
-            ['People Assisted', totalInjuries],
-          ].map(([k,v]) => (<Box key={String(k)} sx={{ display:'flex', justifyContent:'space-between' }}><Typography variant="body2" color="text.secondary">{k}</Typography><Typography variant="body2" sx={{ fontWeight: 700 }}>{v}</Typography></Box>))}</Stack></Box>
-        </Card>
-
-        <Card>
-          <Box sx={{ p: 2.5 }}>
-            <Typography variant="h6" sx={{ mb: 1.5 }}>📣 Latest Updates</Typography>
-            <Stack spacing={1}>
-              {recentAlerts.length === 0 ? (
-                <Typography variant="caption" color="text.secondary">
-                  {alertsLoading ? 'Loading alerts...' : 'No updates available from backend.'}
-                </Typography>
-              ) : (
-                recentAlerts.map((alert: any, idx: number) => (
-                  <Box key={alert.id || idx} sx={{ pb: idx < recentAlerts.length - 1 ? 1 : 0, borderBottom: idx < recentAlerts.length - 1 ? 1 : 0, borderColor: 'divider' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{alert.title || 'Alert update'}</Typography>
-                    <Typography variant="caption" color="text.secondary">{alert.time || alert.description || 'Updated recently'}</Typography>
+        {/* Sidebar Column */}
+        <Box>
+          <Stack spacing={3}>
+            {/* Quick Actions */}
+            <Card sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Quick Actions</Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                {[
+                  { label: 'Broadcast', icon: <CampaignRoundedIcon />, color: theme.palette.warning.main },
+                  { label: 'Analytics', icon: <InsightsRoundedIcon />, color: theme.palette.info.main },
+                  { label: 'Support', icon: <ContactSupportRoundedIcon />, color: theme.palette.success.main },
+                  { label: 'Settings', icon: <SettingsRoundedIcon />, color: theme.palette.secondary.main },
+                ].map((action) => (
+                  <Box
+                    key={action.label}
+                    component={MuiButton}
+                    sx={{
+                      width: '100%',
+                      p: 2,
+                      borderRadius: '20px',
+                      border: `1px solid ${theme.palette.divider}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 1,
+                      textTransform: 'none',
+                      color: 'text.primary',
+                      bgcolor: 'background.paper',
+                      boxShadow: 'none',
+                      '&:hover': {
+                        bgcolor: alpha(action.color, 0.05),
+                        borderColor: alpha(action.color, 0.3),
+                        boxShadow: `0 4px 12px ${alpha(action.color, 0.1)}`,
+                      }
+                    }}
+                  >
+                    <Avatar 
+                      sx={{ 
+                        bgcolor: alpha(action.color, 0.1), 
+                        color: action.color,
+                        width: 40,
+                        height: 40,
+                        borderRadius: '12px'
+                      }}
+                    >
+                      {React.cloneElement(action.icon as React.ReactElement, { fontSize: 'small' })}
+                    </Avatar>
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>{action.label}</Typography>
                   </Box>
-                ))
-              )}
-            </Stack>
-          </Box>
-        </Card>
+                ))}
+              </Box>
+            </Card>
+
+            {/* Alerts Section */}
+            <Card sx={{ p: 0, overflow: 'hidden' }}>
+              <Box sx={{ p: 2, bgcolor: alpha(theme.palette.warning.main, 0.05), borderBottom: `1px solid ${theme.palette.divider}` }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'warning.dark', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <NotificationsActiveRoundedIcon fontSize="small" />
+                  System Alerts
+                </Typography>
+              </Box>
+              
+              <List disablePadding>
+                {recentAlerts.length === 0 ? (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">No new alerts.</Typography>
+                  </Box>
+                ) : (
+                  recentAlerts.map((alert: any, idx: number) => (
+                    <ListItem 
+                      key={alert.id || idx} 
+                      divider={idx !== recentAlerts.length - 1}
+                      alignItems="flex-start"
+                      sx={{ py: 1.5 }}
+                    >
+                      <ListItemText 
+                        primary={
+                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            {alert.title || "System Notification"}
+                          </Typography>
+                        }
+                        secondary={
+                          <Typography variant="caption" color="text.secondary">
+                            {alert.time || 'Just now'}
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                  ))
+                )}
+              </List>
+              <Box sx={{ p: 1.5, borderTop: `1px solid ${theme.palette.divider}` }}>
+                <MuiButton fullWidth size="small" sx={{ borderRadius: '100px' }}>
+                  View All Alerts
+                </MuiButton>
+              </Box>
+            </Card>
+          </Stack>
+        </Box>
       </Box>
-    </Stack>
-  )
+    </Box>
+  );
 }

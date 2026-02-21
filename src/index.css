@@ -1,254 +1,135 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@layer theme, base, mui, components, utilities;
+@import "tailwindcss";
 
-:root {
-  /* Material Design 3 - Light Mode */
-  --color-primary: #6750a4;
-  --color-primary-container: #eaddff;
-  --color-on-primary: #ffffff;
-  --color-on-primary-container: #21005d;
-  
-  --color-secondary: #625b71;
-  --color-secondary-container: #e8def8;
-  --color-on-secondary: #ffffff;
-  --color-on-secondary-container: #1d192b;
-  
-  --color-tertiary: #7d5260;
-  --color-tertiary-container: #ffd8e4;
-  --color-on-tertiary: #ffffff;
-  --color-on-tertiary-container: #31111d;
-  
-  --color-error: #b3261e;
-  --color-error-container: #f9dedc;
-  --color-on-error: #ffffff;
-  --color-on-error-container: #410e0b;
-  
-  --color-background: #fefbff;
-  --color-surface: #ffffff;
-  --color-surface-variant: #ece9f1;
-  --color-on-background: #1c1b1f;
-  --color-on-surface: #1c1b1f;
-  --color-on-surface-variant: #49454f;
-  
-  --color-outline: #79747e;
-  --color-outline-variant: #cac4d0;
-  
-  --color-surface-container: #f5eff7;
-  --color-surface-container-high: #ebe6f0;
-  --color-surface-container-highest: #e6e1e9;
-  --color-surface-container-low: #faf8fc;
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-dim: #ded8e0;
-  --color-surface-bright: #fef7ff;
-  
-  --color-text: #1c1b1f;
-  --color-text-variant: #49454f;
+@theme inline {
+  /* 
+    Mapping MUI CSS variables to Tailwind v4 Theme 
+    This allows us to use 'bg-primary', 'text-on-primary', etc. in Tailwind
+  */
+
+  /* Colors */
+  --color-primary: var(--mui-palette-primary-main);
+  --color-on-primary: var(--mui-palette-primary-contrastText);
+  --color-primary-container: var(--mui-palette-primary-light);
+
+  --color-secondary: var(--mui-palette-secondary-main);
+  --color-on-secondary: var(--mui-palette-secondary-contrastText);
+
+  --color-error: var(--mui-palette-error-main);
+  --color-on-error: var(--mui-palette-error-contrastText);
+
+  --color-warning: var(--mui-palette-warning-main);
+
+  --color-background: var(--mui-palette-background-default);
+  --color-surface: var(--mui-palette-background-paper);
+
+  --color-on-background: var(--mui-palette-text-primary);
+  --color-on-surface-variant: var(--mui-palette-text-secondary);
+
+  --color-outline: var(--mui-palette-divider);
+  --color-border: var(--mui-palette-divider);
+
+  /* Typography Scale (Material Design 3 / Compose) */
+  --font-display-large: 3.5625rem;
+  --font-display-medium: 2.8125rem;
+  --font-display-small: 2.25rem;
+
+  --font-headline-large: 2rem;
+  --font-headline-medium: 1.75rem;
+  --font-headline-small: 1.5rem;
+
+  --font-title-large: 1.375rem;
+  --font-title-medium: 1rem;
+  --font-title-small: 0.875rem;
+
+  --font-body-large: 1rem;
+  --font-body-medium: 0.875rem;
+  --font-body-small: 0.75rem;
+
+  --font-label-large: 0.875rem;
+  --font-label-medium: 0.75rem;
+  --font-label-small: 0.6875rem;
+
+  /* Spacing & Radii */
+  --radius-m3-xs: 4px;
+  --radius-m3-sm: 8px;
+  --radius-m3-md: 12px;
+  --radius-m3-lg: 16px;
+  --radius-m3-xl: 24px;
+  --radius-m3-full: 100px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Material Design 3 - Dark Mode (OLED optimized) */
-    --color-primary: #d0bcff;
-    --color-primary-container: #4f378b;
-    --color-on-primary: #370b1e;
-    --color-on-primary-container: #eaddff;
-    
-    --color-secondary: #ccc7d8;
-    --color-secondary-container: #48454e;
-    --color-on-secondary: #332d41;
-    --color-on-secondary-container: #e8def8;
-    
-    --color-tertiary: #f0b8d1;
-    --color-tertiary-container: #633048;
-    --color-on-tertiary: #492532;
-    --color-on-tertiary-container: #ffd8e4;
-    
-    --color-error: #f9b4ae;
-    --color-error-container: #8c1d18;
-    --color-on-error: #601410;
-    --color-on-error-container: #f9dedc;
-    
-    --color-background: #000000;
-    --color-surface: #121212;
-    --color-surface-variant: #49454f;
-    --color-on-background: #e6e1e5;
-    --color-on-surface: #e6e1e5;
-    --color-on-surface-variant: #cac4d0;
-    
-    --color-outline: #79747e;
-    --color-outline-variant: #49454f;
-    
-    --color-surface-container: #1d1b20;
-    --color-surface-container-high: #27242f;
-    --color-surface-container-highest: #32303a;
-    --color-surface-container-low: #0f0d13;
-    --color-surface-container-lowest: #000000;
-    --color-surface-dim: #0f0d13;
-    --color-surface-bright: #3a3840;
-    
-    --color-text: #e6e1e5;
-    --color-text-variant: #cac4d0;
+@layer base {
+  * {
+    border-color: var(--color-border);
+    outline-color: var(--color-outline);
+  }
+
+  html,
+  body {
+    height: 100%;
+    width: 100%;
+    background-color: var(--color-background);
+    color: var(--color-on-background);
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  #root {
+    height: 100%;
+    width: 100%;
+  }
+
+  /* Smooth Typography integration */
+  h1 {
+    font-size: var(--font-display-large);
+    font-weight: 400;
+    letter-spacing: -0.025em;
+  }
+  h2 {
+    font-size: var(--font-display-medium);
+    font-weight: 400;
+  }
+  h3 {
+    font-size: var(--font-display-small);
+    font-weight: 400;
+  }
+  h4 {
+    font-size: var(--font-headline-large);
+    font-weight: 600;
+  }
+  h5 {
+    font-size: var(--font-headline-medium);
+    font-weight: 600;
+  }
+  h6 {
+    font-size: var(--font-headline-small);
+    font-weight: 600;
   }
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@layer utilities {
+  /* Material Design 3 Elevation shadows (OLED optimized) */
+  .m3-elevation-1 {
+    box-shadow:
+      0px 1px 3px 1px rgba(0, 0, 0, 0.15),
+      0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+  }
 
-html,
-body {
-  height: 100%;
-  width: 100%;
-}
+  .m3-elevation-2 {
+    box-shadow:
+      0px 2px 6px 2px rgba(0, 0, 0, 0.15),
+      0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+  }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: var(--color-background);
-  color: var(--color-text);
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
+  /* Specific M3 Utility Classes */
+  .bg-primary-container {
+    background-color: var(--mui-palette-primary-mainChannel, #6750a4);
+    opacity: 0.12; /* M3 container style */
+  }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
-}
-
-#root {
-  height: 100%;
-  width: 100%;
-}
-
-/* Material Design 3 Typography */
-.text-display-large {
-  font-size: 57px;
-  line-height: 64px;
-  font-weight: 400;
-  letter-spacing: -0.25px;
-}
-
-.text-display-medium {
-  font-size: 45px;
-  line-height: 52px;
-  font-weight: 400;
-  letter-spacing: 0px;
-}
-
-.text-display-small {
-  font-size: 36px;
-  line-height: 44px;
-  font-weight: 400;
-  letter-spacing: 0px;
-}
-
-.text-headline-large {
-  font-size: 32px;
-  line-height: 40px;
-  font-weight: 400;
-  letter-spacing: 0px;
-}
-
-.text-headline-medium {
-  font-size: 28px;
-  line-height: 36px;
-  font-weight: 400;
-  letter-spacing: 0px;
-}
-
-.text-headline-small {
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 400;
-  letter-spacing: 0px;
-}
-
-.text-title-large {
-  font-size: 22px;
-  line-height: 28px;
-  font-weight: 500;
-  letter-spacing: 0px;
-}
-
-.text-title-medium {
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 500;
-  letter-spacing: 0.15px;
-}
-
-.text-title-small {
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
-  letter-spacing: 0.1px;
-}
-
-.text-body-large {
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-  letter-spacing: 0.5px;
-}
-
-.text-body-medium {
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 400;
-  letter-spacing: 0.25px;
-}
-
-.text-body-small {
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 400;
-  letter-spacing: 0.4px;
-}
-
-.text-label-large {
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
-  letter-spacing: 0.1px;
-}
-
-.text-label-medium {
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-}
-
-.text-label-small {
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-}
-
-/* Utility classes */
-.bg-surface {
-  background-color: var(--color-surface);
-}
-
-.text-on-surface {
-  color: var(--color-on-surface);
-}
-
-.border-outline {
-  border-color: var(--color-outline);
-}
-
-.bg-surface-variant {
-  background-color: var(--color-surface-variant);
-}
-
-.bg-surface-container {
-  background-color: var(--color-surface-container);
-}
-
-.bg-surface-container-high {
-  background-color: var(--color-surface-container-high);
+  .text-on-primary-container {
+    color: var(--mui-palette-primary-dark);
+  }
 }
