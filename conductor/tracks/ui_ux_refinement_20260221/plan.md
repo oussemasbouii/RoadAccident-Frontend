@@ -12,8 +12,8 @@
 - [x] Task: Conductor - User Manual Verification 'Feature Pages Refinement' (Protocol in workflow.md) [5817fd6]
 
 ## Phase 3: Secondary Pages Refinement (Reports, Settings)
-- [ ] Task: Refine ReportsPage with M3 filters and report cards.
-- [ ] Task: Refine Settings and AdminAccounts pages with M3 forms and tables.
+- [x] Task: Refine ReportsPage with M3 filters and report cards. [b735c0a]
+- [x] Task: Refine Settings and AdminAccounts pages with M3 forms and tables. [b735c0a]
 - [ ] Task: Conductor - User Manual Verification 'Secondary Pages Refinement' (Protocol in workflow.md)
 
 ## Phase 4: Final Polish & Mobile Optimization
