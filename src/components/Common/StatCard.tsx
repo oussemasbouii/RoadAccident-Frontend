@@ -55,13 +55,14 @@ export default function StatCard({
       <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <Box
           sx={{
-            p: 1,
-            borderRadius: '12px',
-            bgcolor: (theme) => alpha(theme.palette[colorKey].main, 0.1),
+            p: 1.25,
+            borderRadius: 'var(--radius-m3-md, 12px)',
+            bgcolor: (theme) => alpha(theme.palette[colorKey].main, 0.12),
             color: (theme) => theme.palette[colorKey].main,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            boxShadow: (theme) => `0 2px 8px ${alpha(theme.palette[colorKey].main, 0.08)}`
           }}
         >
           {React.cloneElement(icon as React.ReactElement, {

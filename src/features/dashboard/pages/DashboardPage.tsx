@@ -136,8 +136,10 @@ export default function DashboardPage() {
               sx={{ 
                 bgcolor: 'background.paper',
                 border: `1px solid ${theme.palette.divider}`,
-                borderRadius: '12px',
-                p: 1
+                borderRadius: 'var(--radius-m3-full, 100px)',
+                p: 1.25,
+                transition: 'all 0.2s',
+                '&:hover': { bgcolor: alpha(theme.palette.action.active, 0.04) }
               }}
             >
               <RefreshRoundedIcon fontSize="small" />
@@ -215,7 +217,7 @@ export default function DashboardPage() {
                       }
                     >
                       <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', borderRadius: 3 }}>
+                        <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', borderRadius: 'var(--radius-m3-md, 12px)' }}>
                           <PlaceRoundedIcon fontSize="small" />
                         </Avatar>
                       </ListItemAvatar>
@@ -264,35 +266,38 @@ export default function DashboardPage() {
                     sx={{
                       width: '100%',
                       p: 2,
-                      borderRadius: '20px',
+                      borderRadius: 'var(--radius-m3-xl, 24px)',
                       border: `1px solid ${theme.palette.divider}`,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      gap: 1,
+                      gap: 1.25,
                       textTransform: 'none',
                       color: 'text.primary',
                       bgcolor: 'background.paper',
                       boxShadow: 'none',
+                      transition: 'all 0.2s',
                       '&:hover': {
-                        bgcolor: alpha(action.color, 0.05),
+                        bgcolor: alpha(action.color, 0.08),
                         borderColor: alpha(action.color, 0.3),
                         boxShadow: `0 4px 12px ${alpha(action.color, 0.1)}`,
+                        transform: 'translateY(-2px)'
                       }
                     }}
                   >
                     <Avatar 
                       sx={{ 
-                        bgcolor: alpha(action.color, 0.1), 
+                        bgcolor: alpha(action.color, 0.12), 
                         color: action.color,
-                        width: 40,
-                        height: 40,
-                        borderRadius: '12px'
+                        width: 44,
+                        height: 44,
+                        borderRadius: 'var(--radius-m3-md, 12px)',
+                        boxShadow: `0 2px 6px ${alpha(action.color, 0.15)}`
                       }}
                     >
                       {React.cloneElement(action.icon as React.ReactElement, { fontSize: 'small' })}
                     </Avatar>
-                    <Typography variant="caption" sx={{ fontWeight: 600 }}>{action.label}</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 0.2 }}>{action.label}</Typography>
                   </Box>
                 ))}
               </Box>

@@ -1,4 +1,25 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
+import {
+  Button,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Typography,
+  alpha,
+  useTheme,
+  CircularProgress,
+  Box,
+} from '@mui/material'
+import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded'
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded'
+import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded'
+import TableChartRoundedIcon from '@mui/icons-material/TableChartRounded'
+import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded'
+import ArticleRoundedIcon from '@mui/icons-material/ArticleRounded'
+import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
+import TextSnippetRoundedIcon from '@mui/icons-material/TextSnippetRounded'
+
 import {
   exportCSV,
   exportXLSX,
@@ -17,24 +38,22 @@ interface ExportButtonProps {
 type ExportFormat = 'csv' | 'xlsx' | 'pdf' | 'docx' | 'jpg' | 'odt'
 
 export default function ExportButton({ data, filename = 'export', label = 'Export' }: ExportButtonProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [isExporting, setIsExporting] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const theme = useTheme()
+  const isOpen = Boolean(anchorEl)
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  const handleOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget)
+  }
+
+  const handleClose = () => {
+    setAnchorEl(null)
+  }
 
   const handleExport = async (format: ExportFormat) => {
     setIsExporting(true)
-    setIsOpen(false)
+    handleClose()
 
     try {
       const timestamp = new Date().toISOString().split('T')[0]
@@ -62,81 +81,94 @@ export default function ExportButton({ data, filename = 'export', label = 'Expor
       }
     } catch (error) {
       console.error('Export failed:', error)
-      alert('Export failed. Please try again.')
     } finally {
       setIsExporting(false)
     }
   }
 
-  const formats: { key: ExportFormat; label: string; icon: string }[] = [
-    { key: 'csv', label: 'CSV', icon: '📄' },
-    { key: 'xlsx', label: 'Excel', icon: '📊' },
-    { key: 'pdf', label: 'PDF', icon: '📕' },
-    { key: 'docx', label: 'Word', icon: '📝' },
-    { key: 'jpg', label: 'JPG', icon: '🖼️' },
-    { key: 'odt', label: 'ODT', icon: '📘' },
+  const formats: { key: ExportFormat; label: string; icon: React.ReactNode }[] = [
+    { key: 'csv', label: 'CSV', icon: <TextSnippetRoundedIcon fontSize="small" /> },
+    { key: 'xlsx', label: 'Excel', icon: <TableChartRoundedIcon fontSize="small" /> },
+    { key: 'pdf', label: 'PDF', icon: <PictureAsPdfRoundedIcon fontSize="small" /> },
+    { key: 'docx', label: 'Word', icon: <ArticleRoundedIcon fontSize="small" /> },
+    { key: 'jpg', label: 'JPG Image', icon: <ImageRoundedIcon fontSize="small" /> },
+    { key: 'odt', label: 'ODT Document', icon: <DescriptionRoundedIcon fontSize="small" /> },
   ]
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
+    <>
+      <Button
+        variant="contained"
+        onClick={handleOpen}
         disabled={isExporting || data.length === 0}
-        className={`
-          inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
-          transition-all duration-200 ease-in-out
-          ${data.length === 0 
-            ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500'
-            : 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-md hover:shadow-lg'
+        startIcon={isExporting ? <CircularProgress size={18} color="inherit" /> : <FileDownloadRoundedIcon />}
+        endIcon={<KeyboardArrowDownRoundedIcon sx={{ 
+          transition: 'transform 0.2s',
+          transform: isOpen ? 'rotate(180deg)' : 'none'
+        }} />}
+        sx={{
+          borderRadius: 'var(--radius-m3-full, 100px)',
+          textTransform: 'none',
+          fontWeight: 700,
+          px: 3,
+          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
+          '&:hover': {
+             boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
           }
-        `}
+        }}
       >
-        {isExporting ? (
-          <>
-            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>Exporting...</span>
-          </>
-        ) : (
-          <>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            <span>{label}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </>
-        )}
-      </button>
+        {isExporting ? 'Exporting...' : label}
+      </Button>
 
-      {/* Dropdown menu */}
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden">
-          <div className="py-1">
-            <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Select Format
-            </div>
-            {formats.map((format) => (
-              <button
-                key={format.key}
-                onClick={() => handleExport(format.key)}
-                className="w-full px-4 py-2.5 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 flex items-center gap-3 transition-colors"
-              >
-                <span className="text-base">{format.icon}</span>
-                <span>Export as {format.label}</span>
-              </button>
-            ))}
-          </div>
-          <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2 bg-slate-50 dark:bg-slate-700/50">
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              {data.length} item{data.length !== 1 ? 's' : ''} to export
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
+      <Menu
+        anchorEl={anchorEl}
+        open={isOpen}
+        onClose={handleClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        PaperProps={{
+          sx: {
+            borderRadius: 'var(--radius-m3-xl, 24px)',
+            mt: 1,
+            minWidth: 200,
+            boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+            border: '1px solid',
+            borderColor: 'divider',
+            p: 1
+          }
+        }}
+      >
+        <Box sx={{ px: 2, py: 1.5 }}>
+           <Typography variant="overline" sx={{ fontWeight: 800, color: 'text.secondary', letterSpacing: 1 }}>
+             Select Format
+           </Typography>
+        </Box>
+        {formats.map((format) => (
+          <MenuItem
+            key={format.key}
+            onClick={() => handleExport(format.key)}
+            sx={{
+              borderRadius: 'var(--radius-m3-md, 12px)',
+              py: 1.5,
+              mb: 0.5,
+              '&:last-child': { mb: 0 }
+            }}
+          >
+            <ListItemIcon sx={{ color: 'primary.main' }}>
+              {format.icon}
+            </ListItemIcon>
+            <ListItemText 
+              primary={format.label} 
+              primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+            />
+          </MenuItem>
+        ))}
+        <Box sx={{ px: 2, py: 1, mt: 1, bgcolor: alpha(theme.palette.action.active, 0.03), borderRadius: '12px' }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+            {data.length} records ready
+          </Typography>
+        </Box>
+      </Menu>
+    </>
   )
 }
