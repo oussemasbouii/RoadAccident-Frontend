@@ -123,7 +123,7 @@ export default function ReportsPage() {
           value={reportData.satisfactionScore || '4.8'} 
           trend="up" 
           trendValue="+0.2" 
-          intent="primary"
+          intent="default"
         />
         <StatCard 
           icon={<TrendingUpRoundedIcon />} 
