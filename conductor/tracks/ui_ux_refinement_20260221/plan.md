@@ -11,10 +11,10 @@
 - [x] Task: Refine IncidentsPage with M3 Data Grid and ExportButton. [628dad3]
 - [x] Task: Conductor - User Manual Verification 'Feature Pages Refinement' (Protocol in workflow.md) [5817fd6]
 
-## Phase 3: Secondary Pages Refinement (Reports, Settings)
+## Phase 3: Secondary Pages Refinement (Reports, Settings) [checkpoint: f601d64]
 - [x] Task: Refine ReportsPage with M3 filters and report cards. [b735c0a]
 - [x] Task: Refine Settings and AdminAccounts pages with M3 forms and tables. [b735c0a]
-- [ ] Task: Conductor - User Manual Verification 'Secondary Pages Refinement' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Secondary Pages Refinement' (Protocol in workflow.md) [f601d64]
 
 ## Phase 4: Final Polish & Mobile Optimization
 - [ ] Task: Global CSS/Theme Audit and Cleanup (removing legacy styles).
