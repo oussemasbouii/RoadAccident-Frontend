@@ -7,8 +7,8 @@
 - [x] Task: Conductor - User Manual Verification 'Core Layout & Navigation' (Protocol in workflow.md) [7a9d9d5]
 
 ## Phase 2: Feature Pages Refinement (Dashboard, Incidents)
-- [ ] Task: Refine DashboardPage with M3 StatCards and interactive elements.
-- [ ] Task: Refine IncidentsPage with M3 Data Grid and ExportButton.
+- [x] Task: Refine DashboardPage with M3 StatCards and interactive elements. [628dad3]
+- [x] Task: Refine IncidentsPage with M3 Data Grid and ExportButton. [628dad3]
 - [ ] Task: Conductor - User Manual Verification 'Feature Pages Refinement' (Protocol in workflow.md)
 
 ## Phase 3: Secondary Pages Refinement (Reports, Settings)
