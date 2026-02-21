@@ -1,10 +1,10 @@
 # Implementation Plan: Finish UI/UX Refinement and Branding Integration
 
-## Phase 1: Core Layout & Navigation
+## Phase 1: Core Layout & Navigation [checkpoint: 7a9d9d5]
 - [x] Task: Audit and Refine Sidebar & Topbar for M3 consistency. [baba499]
     - [x] Update Sidebar navigation items with M3 icons and active states.
-    - [x] Refine Topbar search and user menu with M3 rounded corners and elevation.
-- [ ] Task: Conductor - User Manual Verification 'Core Layout & Navigation' (Protocol in workflow.md)
+    - [x] Ref甩 Topbar search and user menu with M3 rounded corners and elevation.
+- [x] Task: Conductor - User Manual Verification 'Core Layout & Navigation' (Protocol in workflow.md) [7a9d9d5]
 
 ## Phase 2: Feature Pages Refinement (Dashboard, Incidents)
 - [ ] Task: Refine DashboardPage with M3 StatCards and interactive elements.
