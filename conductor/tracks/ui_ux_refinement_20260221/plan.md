@@ -6,10 +6,10 @@
     - [x] Ref甩 Topbar search and user menu with M3 rounded corners and elevation.
 - [x] Task: Conductor - User Manual Verification 'Core Layout & Navigation' (Protocol in workflow.md) [7a9d9d5]
 
-## Phase 2: Feature Pages Refinement (Dashboard, Incidents)
+## Phase 2: Feature Pages Refinement (Dashboard, Incidents) [checkpoint: 5817fd6]
 - [x] Task: Refine DashboardPage with M3 StatCards and interactive elements. [628dad3]
 - [x] Task: Refine IncidentsPage with M3 Data Grid and ExportButton. [628dad3]
-- [ ] Task: Conductor - User Manual Verification 'Feature Pages Refinement' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Feature Pages Refinement' (Protocol in workflow.md) [5817fd6]
 
 ## Phase 3: Secondary Pages Refinement (Reports, Settings)
 - [ ] Task: Refine ReportsPage with M3 filters and report cards.
