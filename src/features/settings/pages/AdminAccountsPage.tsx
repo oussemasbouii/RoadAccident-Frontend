@@ -12,7 +12,19 @@ import {
   TableRow,
   TextField,
   Typography,
+  alpha,
+  useTheme,
+  IconButton,
+  Tooltip,
 } from '@mui/material'
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded'
+import FilterListRoundedIcon from '@mui/icons-material/FilterListRounded'
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
+import VerifiedUserRoundedIcon from '@mui/icons-material/VerifiedUserRounded'
+import BlockRoundedIcon from '@mui/icons-material/BlockRounded'
+import LockResetRoundedIcon from '@mui/icons-material/LockResetRounded'
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
+
 import Card from '../../../components/Common/Card'
 import Badge from '../../../components/Common/Badge'
 import { apiService } from '../../../services/api'
@@ -34,6 +46,7 @@ type OfficerRecord = {
 export default function AdminAccountsPage() {
   const adminApiEnabled = import.meta.env.VITE_ENABLE_ADMIN_API === 'true'
   const currentUser = useAppSelector((s) => s.auth.user)
+  const theme = useTheme()
   const [query, setQuery] = useState('')
   const [reason, setReason] = useState('Routine administration update')
   const [loading, setLoading] = useState(false)
@@ -96,86 +109,130 @@ export default function AdminAccountsPage() {
   }
 
   return (
-    <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>Administration • Officer Accounts</Typography>
-        <Typography color="text.secondary">Validate, search, restrict, reset, and manage officer accounts.</Typography>
+    <Stack spacing={4} sx={{ pb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: -0.5 }}>Officer Accounts</Typography>
+          <Typography color="text.secondary">Validate, manage status, and secure administrative accounts.</Typography>
+        </Box>
+        <Tooltip title="Refresh Records">
+           <IconButton onClick={fetchOfficers} sx={{ bgcolor: 'background.paper', borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
+             <RefreshRoundedIcon />
+           </IconButton>
+        </Tooltip>
       </Box>
 
-      <Card>
-        <Box sx={{ p: 2.5, display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr auto' } }}>
+      <Card sx={{ p: 3 }}>
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr auto' } }}>
           <TextField
-            label="Search by name or officer ID"
+            label="Search Identification"
+            placeholder="Name or Officer ID"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             fullWidth
+            InputProps={{
+              startAdornment: <SearchRoundedIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+              sx: { borderRadius: 'var(--radius-m3-md, 12px)' }
+            }}
           />
           <TextField
-            label="Audit reason"
+            label="Audit Documentation"
+            placeholder="Reason for change"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             fullWidth
+            InputProps={{
+              startAdornment: <FilterListRoundedIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+              sx: { borderRadius: 'var(--radius-m3-md, 12px)' }
+            }}
           />
-          <Button variant="contained" onClick={fetchOfficers} disabled={loading || !adminApiEnabled}>
-            {loading ? 'Loading...' : 'Search'}
+          <Button 
+            variant="contained" 
+            onClick={fetchOfficers} 
+            disabled={loading || !adminApiEnabled}
+            sx={{ px: 4, borderRadius: 'var(--radius-m3-full, 100px)', fontWeight: 700 }}
+          >
+            {loading ? 'Processing...' : 'Search'}
           </Button>
         </Box>
       </Card>
 
       {!adminApiEnabled && (
-        <Alert severity="info">
-          Backend does not currently expose admin-management routes in your API list. This page is ready, but disabled until those endpoints are added.
+        <Alert severity="info" sx={{ borderRadius: 'var(--radius-m3-md, 12px)' }}>
+          The administration API is currently disabled (VITE_ENABLE_ADMIN_API=false). Account management actions are in read-only mode.
         </Alert>
       )}
 
-      {error && <Alert severity="error">{error}</Alert>}
-      {success && <Alert severity="success">{success}</Alert>}
+      {error && <Alert severity="error" sx={{ borderRadius: 'var(--radius-m3-md, 12px)' }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ borderRadius: 'var(--radius-m3-md, 12px)' }}>{success}</Alert>}
 
-      <Card>
-        <Box sx={{ p: 2.5, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6">Officer Accounts</Typography>
+      <Card sx={{ p: 0, overflow: 'hidden' }}>
+        <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>Account Registry</Typography>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', px: 2, py: 0.5, bgcolor: alpha(theme.palette.action.active, 0.05), borderRadius: 1 }}>
+            {officers.length} Registered Officers
+          </Typography>
         </Box>
         <Box sx={{ overflowX: 'auto' }}>
-          <Table size="small">
-            <TableHead>
+          <Table>
+            <TableHead sx={{ bgcolor: alpha(theme.palette.action.active, 0.02) }}>
               <TableRow>
-                <TableCell>Officer</TableCell>
-                <TableCell>Officer ID</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Validated</TableCell>
-                <TableCell>Center</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell sx={{ fontWeight: 700, py: 2, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Officer Entity</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>ID Status</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Validation</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Assignment</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Account Control</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {officers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                    {loading ? 'Loading officers...' : 'No officer accounts found.'}
+                  <TableCell colSpan={5} align="center" sx={{ py: 8, color: 'text.secondary' }}>
+                    {loading ? 'Loading account database...' : 'No officer accounts match your current search.'}
                   </TableCell>
                 </TableRow>
               ) : officers.map((o) => (
-                <TableRow key={safeId(o)}>
-                  <TableCell>{o.displayName || o.name || `${o.firstName || ''} ${o.lastName || ''}`.trim() || 'Unknown'}</TableCell>
-                  <TableCell>{o.officerId || safeId(o)}</TableCell>
+                <TableRow 
+                  key={safeId(o)}
+                  sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.01) } }}
+                >
+                  <TableCell sx={{ py: 2.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                       <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main', fontWeight: 800, fontSize: 13, borderRadius: '10px' }}>
+                         {(o.displayName || o.officerId || 'U')[0].toUpperCase()}
+                       </Avatar>
+                       <Box>
+                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{o.displayName || o.name || 'Unknown Officer'}</Typography>
+                         <Typography variant="caption" color="text.secondary">ID: {o.officerId || safeId(o)}</Typography>
+                       </Box>
+                    </Box>
+                  </TableCell>
                   <TableCell>
                     <Badge label={(o.status || 'active').toUpperCase()} variant={badgeVariant(o.status) as any} size="sm" />
                   </TableCell>
                   <TableCell>
-                    <Badge label={o.validated ? 'YES' : 'NO'} variant={o.validated ? 'success' : 'warning'} size="sm" />
+                    <Badge label={o.validated ? 'VALIDATED' : 'PENDING'} variant={o.validated ? 'success' : 'warning'} size="sm" />
                   </TableCell>
-                  <TableCell>{o.center || '—'}</TableCell>
+                  <TableCell sx={{ fontWeight: 500, color: 'text.secondary' }}>{o.center || 'Unassigned'}</TableCell>
                   <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
-                      <Button size="small" variant="outlined" onClick={() => doAction(() => apiService.admin.validateOfficer(safeId(o), { reason, actorId }), 'Officer account validated.')} disabled={loading || !adminApiEnabled}>
-                        Validate
-                      </Button>
+                    <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="nowrap">
+                      <Tooltip title="Validate Account">
+                        <IconButton 
+                          size="small" 
+                          color="primary"
+                          onClick={() => doAction(() => apiService.admin.validateOfficer(safeId(o), { reason, actorId }), 'Officer account validated.')} 
+                          disabled={loading || !adminApiEnabled || o.validated}
+                          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px' }}
+                        >
+                          <VerifiedUserRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
 
                       <TextField
                         select
                         size="small"
-                        defaultValue="active"
-                        sx={{ minWidth: 120 }}
+                        defaultValue={o.status || 'active'}
+                        sx={{ minWidth: 120, '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
                         onChange={(e) => {
                           if (!adminApiEnabled) return
                           const status = e.target.value as 'active' | 'blocked' | 'restricted'
@@ -191,34 +248,38 @@ export default function AdminAccountsPage() {
                         <MenuItem value="blocked">Blocked</MenuItem>
                       </TextField>
 
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() =>
-                          doAction(
-                            () => apiService.admin.triggerOfficerPasswordReset(safeId(o), { reason, actorId }),
-                            'Password reset initiated for officer.'
-                          )
-                        }
-                        disabled={loading || !adminApiEnabled}
-                      >
-                        Reset Password
-                      </Button>
+                      <Tooltip title="Reset Password">
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            doAction(
+                              () => apiService.admin.triggerOfficerPasswordReset(safeId(o), { reason, actorId }),
+                              'Password reset initiated for officer.'
+                            )
+                          }
+                          disabled={loading || !adminApiEnabled}
+                          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px' }}
+                        >
+                          <LockResetRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
 
-                      <Button
-                        size="small"
-                        color="error"
-                        variant="outlined"
-                        onClick={() =>
-                          doAction(
-                            () => apiService.admin.deleteOfficer(safeId(o), { reason, actorId }),
-                            'Officer account deleted.'
-                          )
-                        }
-                        disabled={loading || !adminApiEnabled}
-                      >
-                        Delete
-                      </Button>
+                      <Tooltip title="Delete Account">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() =>
+                            doAction(
+                              () => apiService.admin.deleteOfficer(safeId(o), { reason, actorId }),
+                              'Officer account deleted.'
+                            )
+                          }
+                          disabled={loading || !adminApiEnabled}
+                          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px' }}
+                        >
+                          <DeleteOutlineRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </Stack>
                   </TableCell>
                 </TableRow>
