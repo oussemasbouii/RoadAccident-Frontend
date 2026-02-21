@@ -1,45 +1,58 @@
-﻿import { Link, useLocation, useNavigate } from 'react-router-dom'
+import React from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   alpha,
   Avatar,
   Box,
-  Button,
   Divider,
+  IconButton,
   List,
   ListItemButton,
+  ListItemIcon,
   ListItemText,
-  Paper,
   Typography,
+  Tooltip,
 } from '@mui/material'
+import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded'
+import ReportProblemRoundedIcon from '@mui/icons-material/ReportProblemRounded'
+import NotificationsActiveRoundedIcon from '@mui/icons-material/NotificationsActiveRounded'
+import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded'
+import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded'
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
+import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded'
+
 import { RootState } from '../../store/store'
 import { logout } from '../../features/auth/slices/authSlice'
 
 interface SidebarProps {
-  onMouseLeave?: () => void
+  collapsed?: boolean
 }
 
-export default function Sidebar({ onMouseLeave }: SidebarProps) {
+export default function Sidebar({ collapsed = false }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const user = useSelector((state: RootState) => state.auth.user)
 
   const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/incidents', label: 'Accidents', icon: '🚨' },
-    { path: '/alerts', label: 'Alerts', icon: '🔔' },
-    { path: '/reports', label: 'Reports', icon: '📈' },
-    { path: '/admin/accounts', label: 'Admin Accounts', icon: '🛡️' },
-    { path: '/settings', label: 'Settings', icon: '⚙️' },
+    { path: '/dashboard', label: 'Dashboard', icon: <DashboardRoundedIcon /> },
+    { path: '/incidents', label: 'Accidents', icon: <ReportProblemRoundedIcon /> },
+    { path: '/alerts', label: 'Alerts', icon: <NotificationsActiveRoundedIcon /> },
+    { path: '/reports', label: 'Reports', icon: <BarChartRoundedIcon /> },
+    { path: '/admin/accounts', label: 'Admin Accounts', icon: <AdminPanelSettingsRoundedIcon />, role: 'admin' },
+    { path: '/settings', label: 'Settings', icon: <SettingsRoundedIcon /> },
   ]
 
+  const filteredMenuItems = menuItems.filter(item => !item.role || user?.role === item.role)
   const isActive = (path: string) => location.pathname === path
 
   const handleLogout = () => {
     dispatch(logout())
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
+    localStorage.removeItem('user')
     navigate('/login')
   }
 
@@ -47,83 +60,239 @@ export default function Sidebar({ onMouseLeave }: SidebarProps) {
     <Box
       sx={{
         height: '100%',
-        background: (theme) => `linear-gradient(180deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 45%, ${theme.palette.primary.main} 100%)`,
-        color: 'white',
+        bgcolor: 'background.default',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        transition: (theme) => theme.transitions.create(['width'], {
+          easing: theme.transitions.easing.sharp,
+          duration: theme.transitions.duration.standard,
+        }),
       }}
-      onMouseLeave={onMouseLeave}
     >
-      <Box sx={{ px: 3, py: 2.5 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-          Road Accident
-        </Typography>
-        <Typography variant="caption" sx={{ opacity: 0.8 }}>
-          Emergency Response
+      {/* Brand Header */}
+      <Box sx={{ 
+        px: collapsed ? 2.5 : 3, 
+        py: 3, 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 2,
+        minHeight: 88,
+        transition: (theme) => theme.transitions.create(['padding', 'gap'], {
+          easing: theme.transitions.easing.sharp,
+          duration: theme.transitions.duration.standard,
+        }),
+      }}>
+        <Box sx={{ 
+          p: 1.25, 
+          borderRadius: 'var(--radius-m3-md, 12px)', 
+          bgcolor: 'primary.main', 
+          color: 'white', 
+          display: 'flex',
+          boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
+          flexShrink: 0
+        }}>
+          <ReportProblemRoundedIcon />
+        </Box>
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            fontWeight: 800, 
+            letterSpacing: -0.5,
+            color: 'text.primary',
+            whiteSpace: 'nowrap',
+            opacity: collapsed ? 0 : 1,
+            visibility: collapsed ? 'hidden' : 'visible',
+            transition: (theme) => theme.transitions.create(['opacity', 'visibility'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.standard,
+            }),
+          }}
+        >
+          RoadAccident
         </Typography>
       </Box>
 
-      <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)' }} />
-
-      <Box sx={{ flex: 1, px: 1.5, py: 2 }}>
-        <Typography variant="overline" sx={{ px: 1.5, opacity: 0.75 }}>
+      {/* Navigation List */}
+      <Box sx={{ flex: 1, px: 2, py: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <Typography 
+          variant="overline" 
+          sx={{ 
+            px: 2, 
+            mb: 1.5, 
+            display: 'block', 
+            color: 'text.secondary', 
+            fontWeight: 700,
+            letterSpacing: 1.2,
+            opacity: collapsed ? 0 : 0.7,
+            visibility: collapsed ? 'hidden' : 'visible',
+            transition: (theme) => theme.transitions.create(['opacity', 'visibility'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.standard,
+            }),
+          }}
+        >
           Main Menu
         </Typography>
-        <List dense sx={{ mt: 1 }}>
-        {menuItems.map((item, index) => {
-          const isItemActive = isActive(item.path)
-          return (
-            <ListItemButton
-              key={item.path}
-              component={Link}
-              to={item.path}
-              selected={isItemActive}
-              sx={{
-                borderRadius: 2,
-                mb: 0.5,
-                color: 'white',
-                '&.Mui-selected': {
-                  bgcolor: (theme) => alpha(theme.palette.common.white, 0.22),
-                },
-                '&:hover': {
-                  bgcolor: (theme) => alpha(theme.palette.common.white, 0.12),
-                },
-              }}
-            >
-              <Typography sx={{ mr: 1.5 }}>{item.icon}</Typography>
-              <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: 14, fontWeight: 500 }} />
-            </ListItemButton>
-          )
-        })}
+
+        <List sx={{ p: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {filteredMenuItems.map((item) => {
+            const isItemActive = isActive(item.path)
+            const content = (
+              <ListItemButton
+                key={item.path}
+                component={Link}
+                to={item.path}
+                selected={isItemActive}
+                sx={{
+                  borderRadius: 100,
+                  py: 1.5,
+                  px: collapsed ? 2 : 2.5,
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  minHeight: 56,
+                  transition: (theme) => theme.transitions.create(['padding', 'background-color'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.standard,
+                  }),
+                  '&.Mui-selected': {
+                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                    color: 'primary.main',
+                    '&:hover': {
+                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.18),
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: 'primary.main',
+                      transform: 'scale(1.1)',
+                    },
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  minWidth: collapsed ? 0 : 44, 
+                  color: isItemActive ? 'primary.main' : 'text.secondary',
+                  transition: (theme) => theme.transitions.create(['min-width', 'color', 'transform'], {
+                    easing: theme.transitions.easing.sharp,
+                    duration: theme.transitions.duration.standard,
+                  }),
+                  justifyContent: 'center'
+                }}>
+                  {item.icon}
+                </ListItemIcon>
+                
+                <ListItemText 
+                  primary={item.label} 
+                  primaryTypographyProps={{ 
+                    variant: 'body2',
+                    sx: { 
+                      fontWeight: isItemActive ? 700 : 500,
+                      whiteSpace: 'nowrap',
+                      opacity: collapsed ? 0 : 1,
+                      visibility: collapsed ? 'hidden' : 'visible',
+                      transition: (theme) => theme.transitions.create(['opacity', 'visibility'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.standard,
+                      }),
+                    } 
+                  }} 
+                />
+              </ListItemButton>
+            )
+
+            return collapsed ? (
+              <Tooltip key={item.path} title={item.label} placement="right">
+                {content}
+              </Tooltip>
+            ) : content
+          })}
         </List>
       </Box>
 
-      <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)' }} />
+      <Divider sx={{ mx: collapsed ? 1 : 2, my: 1, opacity: 0.5, transition: 'margin 0.2s' }} />
 
-      <Box sx={{ p: 2 }}>
-        <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.12)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }} elevation={0}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-            <Avatar sx={{ bgcolor: 'warning.main', color: 'white', width: 34, height: 34, fontSize: 14 }}>
+      {/* User Profile Section */}
+      <Box sx={{ p: 2, mt: 'auto' }}>
+        <Box 
+          sx={{ 
+            p: 1.5, 
+            borderRadius: 'var(--radius-m3-xl, 24px)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: collapsed ? 0 : 2,
+            transition: (theme) => theme.transitions.create(['padding', 'gap'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.standard,
+            }),
+            bgcolor: (theme) => alpha(theme.palette.action.active, 0.03),
+            '&:hover': { bgcolor: (theme) => alpha(theme.palette.action.active, 0.06) }
+          }} 
+        >
+          <Tooltip title={collapsed ? user?.displayName || 'User' : ''} placement="right">
+            <Avatar 
+              sx={{ 
+                bgcolor: 'primary.main', 
+                color: 'white', 
+                width: 44, 
+                height: 44,
+                fontSize: 16,
+                fontWeight: 700,
+                flexShrink: 0,
+                boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
+              }}
+            >
               {(user?.displayName?.[0] || user?.officerId?.[0] || 'U').toUpperCase()}
             </Avatar>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography noWrap sx={{ fontSize: 13, fontWeight: 700 }}>
-                {user?.displayName || user?.officerId || 'Officer'}
-              </Typography>
-              <Typography noWrap sx={{ fontSize: 11, opacity: 0.85 }}>
-                ID: {user?.officerId || 'N/A'}
-              </Typography>
-            </Box>
+          </Tooltip>
+          
+          <Box sx={{ 
+            minWidth: 0, 
+            flex: 1,
+            opacity: collapsed ? 0 : 1,
+            visibility: collapsed ? 'hidden' : 'visible',
+            transition: (theme) => theme.transitions.create(['opacity', 'visibility'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.standard,
+            }),
+          }}>
+            <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, color: 'text.primary' }}>
+              {user?.displayName || user?.officerId || 'Officer'}
+            </Typography>
+            <Typography noWrap sx={{ fontSize: 11, color: 'text.secondary', opacity: 0.8 }}>
+              {user?.role?.toUpperCase() || 'OFFICER'}
+            </Typography>
           </Box>
 
-          <Button fullWidth size="small" variant="outlined" sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.4)', mb: 1 }} onClick={() => navigate('/settings')}>
-            Open Settings
-          </Button>
-          <Button fullWidth size="small" variant="contained" color="error" onClick={handleLogout}>
-            Sign Out
-          </Button>
-        </Paper>
+          {!collapsed && (
+            <Tooltip title="Sign Out">
+              <IconButton
+                onClick={handleLogout}
+                sx={{
+                  color: 'error.main',
+                  '&:hover': { bgcolor: (theme) => alpha(theme.palette.error.main, 0.08) }
+                }}
+              >
+                <LogoutRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+        
+        {collapsed && (
+          <Tooltip title="Sign Out" placement="right">
+            <IconButton
+              onClick={handleLogout}
+              sx={{
+                width: '100%',
+                borderRadius: 3,
+                mt: 1,
+                py: 1.5,
+                color: 'error.main',
+                '&:hover': { bgcolor: (theme) => alpha(theme.palette.error.main, 0.08) }
+              }}
+            >
+              <LogoutRoundedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
     </Box>
   )
