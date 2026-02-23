@@ -17,6 +17,6 @@
 - [x] Task: Conductor - User Manual Verification 'Secondary Pages Refinement' (Protocol in workflow.md) [f601d64]
 
 ## Phase 4: Final Polish & Mobile Optimization
-- [ ] Task: Global CSS/Theme Audit and Cleanup (removing legacy styles).
+- [~] Task: Global CSS/Theme Audit and Cleanup (removing legacy styles).
 - [ ] Task: Responsive Design Review and Touch Target Optimization across all pages.
 - [ ] Task: Conductor - User Manual Verification 'Final Polish & Mobile Optimization' (Protocol in workflow.md)

@@ -1,8 +1,29 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
-import { Alert, Box, Button, Card, Stack, TextField, Typography } from '@mui/material'
+import { 
+  Alert, 
+  Box, 
+  Stack, 
+  TextField, 
+  Typography, 
+  useTheme, 
+  alpha, 
+  Fade, 
+  Container,
+  InputAdornment,
+  Link,
+  Grid
+} from '@mui/material'
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
+import EmailRoundedIcon from '@mui/icons-material/EmailRounded'
+import LocalPhoneRoundedIcon from '@mui/icons-material/LocalPhoneRounded'
+import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded'
+import LockRoundedIcon from '@mui/icons-material/LockRounded'
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import { apiService } from '@/services/api'
 import { INSTITUTIONAL_DOMAIN, isInstitutionalEmail } from '@/utils/authValidation'
+import { useThemeMode } from '../../../themeMode'
+import { Button, Card } from '@/components/Common'
 
 export default function AdminSignupPage() {
   const navigate = useNavigate()
@@ -16,6 +37,9 @@ export default function AdminSignupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  const theme = useTheme()
+  const { mode } = useThemeMode()
 
   const emailIsInstitutional = useMemo(() => isInstitutionalEmail(email), [email])
 
@@ -61,51 +85,204 @@ export default function AdminSignupPage() {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, background: (t) => `linear-gradient(115deg, ${t.palette.primary.main}, ${t.palette.secondary.main})` }}>
-      <Card sx={{ width: '100%', maxWidth: 540, p: 4 }}>
-        <Stack spacing={2.25} component="form" onSubmit={handleSubmit}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800 }}>Create Administrator Account</Typography>
-            <Typography color="text.secondary" sx={{ mt: .5 }}>
-              Institutional email only: <strong>@{INSTITUTIONAL_DOMAIN}</strong>
-            </Typography>
+    <Box sx={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column',
+      bgcolor: mode === 'dark' ? 'background.default' : alpha(theme.palette.primary.main, 0.02),
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Background patterns */}
+      <Box sx={{ 
+        position: 'absolute', 
+        inset: 0, 
+        backgroundImage: `radial-gradient(${alpha(theme.palette.primary.main, 0.1)} 1px, transparent 1px)`, 
+        backgroundSize: '32px 32px',
+        opacity: mode === 'dark' ? 0.3 : 0.6,
+        pointerEvents: 'none'
+      }} />
+
+      <Container maxWidth="md" sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', py: 6, position: 'relative', zIndex: 1 }}>
+        <Fade in timeout={800}>
+          <Box sx={{ width: '100%' }}>
+            <Card sx={{ 
+              p: { xs: 4, md: 6 },
+              boxShadow: mode === 'dark' 
+                ? '0 24px 80px rgba(0,0,0,0.8)' 
+                : '0 24px 80px rgba(103,80,164,0.12)',
+            }}>
+              <Stack spacing={5} component="form" onSubmit={handleSubmit}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 800, mb: 1.5 }}>
+                    Create Administrator Account
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Join the emergency services network. 
+                    Institutional email required: <strong>@{INSTITUTIONAL_DOMAIN}</strong>
+                  </Typography>
+                </Box>
+
+                <Grid container spacing={2.5}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField 
+                      label="First Name" 
+                      value={firstName} 
+                      onChange={(e) => setFirstName(e.target.value)} 
+                      fullWidth 
+                      required 
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField 
+                      label="Last Name" 
+                      value={lastName} 
+                      onChange={(e) => setLastName(e.target.value)} 
+                      fullWidth 
+                      required 
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Institutional Email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      fullWidth
+                      error={email.length > 0 && !emailIsInstitutional}
+                      helperText={email.length > 0 && !emailIsInstitutional ? `Must end with @${INSTITUTIONAL_DOMAIN}` : ''}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <EmailRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <TextField 
+                      label="Phone Number" 
+                      value={phoneNumber} 
+                      onChange={(e) => setPhoneNumber(e.target.value)} 
+                      fullWidth 
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LocalPhoneRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField 
+                      label="Center / Station" 
+                      value={center} 
+                      onChange={(e) => setCenter(e.target.value)} 
+                      fullWidth 
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <BusinessRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <TextField 
+                      label="Password" 
+                      type="password" 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                      fullWidth 
+                      required 
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LockRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField 
+                      label="Confirm Password" 
+                      type="password" 
+                      value={confirmPassword} 
+                      onChange={(e) => setConfirmPassword(e.target.value)} 
+                      fullWidth 
+                      required 
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LockRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+                </Grid>
+
+                {error && <Alert severity="error" variant="filled" sx={{ borderRadius: 2 }}>{error}</Alert>}
+                {success && <Alert severity="success" variant="filled" sx={{ borderRadius: 2 }}>{success}</Alert>}
+
+                <Stack spacing={2}>
+                  <Button type="submit" loading={loading} size="lg">
+                    Create Admin Account
+                  </Button>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
+                    <Link 
+                      component={RouterLink} 
+                      to="/login" 
+                      sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 0.5, 
+                        fontWeight: 700, 
+                        textDecoration: 'none',
+                        color: 'text.secondary',
+                        '&:hover': { color: 'primary.main' }
+                      }}
+                    >
+                      <ArrowBackRoundedIcon sx={{ fontSize: 18 }} />
+                      Back to Sign In
+                    </Link>
+                  </Box>
+                </Stack>
+              </Stack>
+            </Card>
           </Box>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
-            <TextField label="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} fullWidth required />
-            <TextField label="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} fullWidth required />
-          </Stack>
-
-          <TextField
-            label="Institutional email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            fullWidth
-            error={email.length > 0 && !emailIsInstitutional}
-            helperText={email.length > 0 && !emailIsInstitutional ? `Email must end with @${INSTITUTIONAL_DOMAIN}` : 'Use your official institutional email.'}
-          />
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
-            <TextField label="Phone number" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} fullWidth />
-            <TextField label="Center" value={center} onChange={(e) => setCenter(e.target.value)} fullWidth />
-          </Stack>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
-            <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth required />
-            <TextField label="Confirm password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} fullWidth required />
-          </Stack>
-
-          {error && <Alert severity="error">{error}</Alert>}
-          {success && <Alert severity="success">{success}</Alert>}
-
-          <Button type="submit" variant="contained" size="large" disabled={loading}>
-            {loading ? 'Creating account...' : 'Create Admin Account'}
-          </Button>
-          <Button component={RouterLink} to="/login" variant="text">Back to Sign In</Button>
-        </Stack>
-      </Card>
+        </Fade>
+      </Container>
     </Box>
   )
 }
