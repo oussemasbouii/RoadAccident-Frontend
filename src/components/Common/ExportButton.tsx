@@ -106,11 +106,12 @@ export default function ExportButton({ data, filename = 'export', label = 'Expor
           transition: 'transform 0.2s',
           transform: isOpen ? 'rotate(180deg)' : 'none'
         }} />}
+        size="small"
         sx={{
           borderRadius: 'var(--radius-m3-full, 100px)',
           textTransform: 'none',
           fontWeight: 700,
-          px: 3,
+          px: 2,
           boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
           '&:hover': {
              boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.3)}`,

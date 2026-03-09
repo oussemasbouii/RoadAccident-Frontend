@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { Provider } from 'react-redux'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Provider, useSelector } from 'react-redux'
 import { Toaster } from 'react-hot-toast'
-import store from './store/store'
+import store, { RootState } from './store/store'
 import LoginPage from './features/auth/pages/LoginPage'
 import AdminSignupPage from './features/auth/pages/AdminSignupPage'
 import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage'
@@ -14,6 +14,7 @@ import AlertsPage from './features/alerts/pages/AlertsPage'
 import ReportsPage from './features/reports/pages/ReportsPage'
 import SettingsPage from './features/settings/pages/SettingsPage'
 import AdminAccountsPage from './features/settings/pages/AdminAccountsPage'
+import RealtimeSync from './components/RealtimeSync'
 import { clearAuthStorage, isTokenExpired } from './utils/authSecurity'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -36,9 +37,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuth ? <>{children}</> : <Navigate to="/login" replace />
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const user = useSelector((state: RootState) => state.auth.user)
+  const isAdmin = user?.role === 'admin'
+  return isAdmin ? <>{children}</> : <Navigate to="/dashboard" replace />
+}
+
 function App() {
   return (
     <Provider store={store}>
+      <RealtimeSync />
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -58,7 +66,7 @@ function App() {
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />
-            <Route path="admin/accounts" element={<AdminAccountsPage />} />
+            <Route path="admin/accounts" element={<AdminRoute><AdminAccountsPage /></AdminRoute>} />
             <Route index element={<Navigate to="/dashboard" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />

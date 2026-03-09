@@ -1,4 +1,9 @@
 import axios from 'axios'
+import { 
+  AccidentReport, 
+  CreateAccidentResponse, 
+  CreateAccidentErrorResponse 
+} from '@/types/accident'
 import { clearAuthStorage } from '@/utils/authSecurity'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
@@ -21,7 +26,21 @@ const processQueue = (error: any, token: string | null = null) => {
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken')
-  if (token && config.headers) config.headers['Authorization'] = `Bearer ${token}`
+  
+  // Debug: Log token status
+  if (import.meta.env.DEV) {
+    console.log('🔍 API Request:', {
+      url: config.url,
+      method: config.method,
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : 'null'
+    })
+  }
+  
+  if (token && config.headers) {
+    config.headers['Authorization'] = `Bearer ${token}`
+  }
   return config
 })
 
@@ -79,6 +98,9 @@ api.interceptors.response.use(
 
       if (!refreshToken) {
         isRefreshing = false
+        if (import.meta.env.DEV) {
+          console.error('❌ No refresh token available, cannot refresh access token')
+        }
         return Promise.reject(error)
       }
 
@@ -137,7 +159,8 @@ export const apiService = {
       phoneNumber: string
     }) => api.post('/auth/signup', data),
     adminSignup: (data: {
-      email: string
+      officerId?: string
+      email?: string
       password: string
       firstName: string
       lastName: string
@@ -162,6 +185,15 @@ export const apiService = {
 
   // Incidents
   incidents: {
+    getAll: (page = 1, limit = 10) => api.get('/accidents/', { params: { page, limit } }),
+    getById: (id: string) => api.get(`/accidents/${id}`),
+    create: (data: Record<string, unknown>) => api.post<CreateAccidentResponse>('/accidents/', data),
+    update: (id: string, data: Record<string, unknown>) => api.put(`/accidents/${id}`, data),
+  },
+
+  // Accidents
+  accidents: {
+    create: (data: AccidentReport) => api.post<CreateAccidentResponse>('/accidents/', data),
     getAll: (page = 1, limit = 10) => api.get('/accidents/', { params: { page, limit } }),
     getById: (id: string) => api.get(`/accidents/${id}`),
   },
@@ -189,6 +221,24 @@ export const apiService = {
     getSummary: () => api.get('/dashboard/summary'),
     getRecentIncidents: (limit = 5) => api.get('/dashboard/recent-incidents', { params: { limit } }),
     getSystemStatus: () => api.get('/dashboard/system-status'),
+  },
+
+  // Users
+  users: {
+    getMe: () => api.get('/users/me'),
+    updateMe: (data: Record<string, unknown>) => api.patch('/users/me', data),
+    list: (params?: { search?: string; page?: number; limit?: number }) =>
+      api.get('/users/', { params: { search: params?.search, page: params?.page, limit: params?.limit } }),
+    getById: (id: string) => api.get(`/users/${id}`),
+    update: (id: string, data: Record<string, unknown>) => api.patch(`/users/${id}`, data),
+    updateStatus: (
+      id: string,
+      data: { isValid?: boolean; isFrozen?: boolean; reason?: string }
+    ) => api.patch(`/users/${id}/status`, data),
+    updatePassword: (id: string, data: { newPassword: string }) => api.patch(`/users/${id}/password`, data),
+    revokeSessions: (id: string) => api.post(`/users/${id}/sessions/revoke`),
+    // Check user status by officerId (for login assistance)
+    checkStatus: (officerId: string) => api.get(`/users/status/${officerId}`),
   },
 
   // Administration

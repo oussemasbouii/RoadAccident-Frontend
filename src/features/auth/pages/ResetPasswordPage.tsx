@@ -155,15 +155,16 @@ export default function ResetPasswordPage() {
                       }}
                       sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
                     />
-                    <Button 
-                      type="button" 
-                      variant="secondary" 
-                      onClick={handleVerifyToken} 
-                      disabled={loading || !token || !identifier}
-                      sx={{ whiteSpace: 'nowrap', py: 1.75 }}
-                    >
-                      Verify
-                    </Button>
+                    <Box sx={{ whiteSpace: 'nowrap', pt: 0.5 }}>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handleVerifyToken}
+                        disabled={loading || !token || !identifier}
+                      >
+                        Verify
+                      </Button>
+                    </Box>
                   </Box>
 
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

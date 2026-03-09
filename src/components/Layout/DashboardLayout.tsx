@@ -1,11 +1,9 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { io } from 'socket.io-client'
-import { Box, useMediaQuery, useTheme, Drawer } from '@mui/material'
-import { useAppDispatch } from '../../store/store'
-import { prependIncomingAlert } from '../../features/alerts/slices/alertsSlice'
-import { prependIncomingIncident } from '../../features/incidents/slices/incidentsSlice'
-import { prependIncomingReport } from '../../features/reports/slices/reportsSlice'
+import { Box, useMediaQuery, useTheme, Drawer, Alert, Collapse, IconButton, alpha, Typography, Stack } from '@mui/material'
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
+import WarningRoundedIcon from '@mui/icons-material/WarningRounded'
+import { useAppSelector } from '../../store/store'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
@@ -13,68 +11,32 @@ const SIDEBAR_WIDTH = 280
 const COLLAPSED_SIDEBAR_WIDTH = 88
 
 export default function DashboardLayout() {
-  const dispatch = useAppDispatch()
+  const location = useLocation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile)
+  const [showWarning, setShowWarning] = useState(true)
+  
+  // Get user from Redux store
+  const user = useAppSelector((state) => state.auth.user)
+  
+  // Check if user account is restricted
+  const isRestricted = user?.isFrozen === true
+  
+  // Check if we navigated here with a warning state
+  const navigationWarning = location.state?.accountWarning
 
   // Sync sidebar state with mobile/desktop view
   useEffect(() => {
     setSidebarOpen(!isMobile)
   }, [isMobile])
-
+  
+  // Show warning on navigation
   useEffect(() => {
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
-
-    const socket = io('https://micladevops.com', {
-      path: '/api/v2/socket.io',
-      transports: ['websocket', 'polling'],
-      auth: { token },
-    })
-
-    const onNotification = (payload: any) => {
-      const data = payload?.data || payload?.alert || payload?.incident || payload?.report || payload
-      const type = (payload?.type || data?.type || '').toString().toLowerCase()
-
-      const isAlertLike =
-        type.includes('alert') ||
-        Boolean(data?.alertId) ||
-        (typeof data?.latitude === 'number' && typeof data?.longitude === 'number')
-
-      const isIncidentLike =
-        type.includes('incident') ||
-        type.includes('accident') ||
-        Boolean(data?.incidentId || data?.accidentId) ||
-        data?.status === 'active' || data?.status === 'responded' || data?.status === 'resolved'
-
-      const isReportLike =
-        type.includes('report') ||
-        Boolean(data?.reportId) ||
-        (typeof data?.title === 'string' && type.includes('analytics'))
-
-      if (isAlertLike) dispatch(prependIncomingAlert(data))
-      if (isIncidentLike) dispatch(prependIncomingIncident(data))
-      if (isReportLike) dispatch(prependIncomingReport(data))
+    if (navigationWarning === 'restricted') {
+      setShowWarning(true)
     }
-
-    socket.on('notification', onNotification)
-    socket.on('action:alert:send', onNotification)
-    socket.on('alert', onNotification)
-    socket.on('incident', onNotification)
-    socket.on('accident', onNotification)
-    socket.on('report', onNotification)
-
-    return () => {
-      socket.off('notification', onNotification)
-      socket.off('action:alert:send', onNotification)
-      socket.off('alert', onNotification)
-      socket.off('incident', onNotification)
-      socket.off('accident', onNotification)
-      socket.off('report', onNotification)
-      socket.disconnect()
-    }
-  }, [dispatch])
+  }, [navigationWarning])
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
 
@@ -96,6 +58,7 @@ export default function DashboardLayout() {
           flexShrink: 0,
           whiteSpace: 'nowrap',
           boxSizing: 'border-box',
+          zIndex: 1000, // Lower z-index than the AddIncidentDrawer
           '& .MuiDrawer-paper': {
             width: sidebarOpen ? SIDEBAR_WIDTH : COLLAPSED_SIDEBAR_WIDTH,
             transition: drawerTransition,
@@ -119,6 +82,49 @@ export default function DashboardLayout() {
         }}
       >
         <Topbar onMenuClick={toggleSidebar} />
+        
+        {/* Restricted Account Warning Banner */}
+        <Collapse in={isRestricted && showWarning}>
+          <Alert 
+            severity="warning"
+            icon={<WarningRoundedIcon />}
+            sx={{ 
+              borderRadius: 0,
+              py: 1.5,
+              px: 2,
+              bgcolor: alpha(theme.palette.warning.main, 0.1),
+              borderLeft: `4px solid ${theme.palette.warning.main}`,
+              '& .MuiAlert-icon': { 
+                color: theme.palette.warning.main,
+                fontSize: 24,
+              },
+              '& .MuiAlert-message': { width: '100%' },
+            }}
+            action={
+              <IconButton
+                size="small"
+                onClick={() => setShowWarning(false)}
+                sx={{ 
+                  color: theme.palette.warning.main,
+                  '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.1) }
+                }}
+              >
+                <CloseRoundedIcon fontSize="small" />
+              </IconButton>
+            }
+          >
+            <Stack spacing={0.5}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: theme.palette.warning.dark }}>
+                Your Account is Temporarily Restricted
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Your account has been restricted. You can still view data but some actions may be limited. 
+                Please contact an administrator for assistance.
+              </Typography>
+            </Stack>
+          </Alert>
+        </Collapse>
+        
         <Box component="main" sx={{ flex: 1, overflow: 'auto' }}>
           <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1440, mx: 'auto', width: '100%' }}>
             <Outlet />

@@ -65,9 +65,9 @@ export default function StatCard({
             boxShadow: (theme) => `0 2px 8px ${alpha(theme.palette[colorKey].main, 0.08)}`
           }}
         >
-          {React.cloneElement(icon as React.ReactElement, {
-            fontSize: "small",
-          })}
+          {React.isValidElement(icon)
+            ? React.cloneElement(icon as React.ReactElement, { fontSize: "small" })
+            : <Box component="span" sx={{ fontSize: '1.25rem', lineHeight: 1 }}>{icon}</Box>}
         </Box>
 
         {trend && trendValue && (

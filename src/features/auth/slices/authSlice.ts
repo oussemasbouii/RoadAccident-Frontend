@@ -9,6 +9,9 @@ export interface AuthUser {
   center?: string
   role?: 'admin' | 'dispatch' | 'officer' | string
   phoneNumber?: string
+  isValid?: boolean
+  isFrozen?: boolean
+  validated?: boolean
 }
 
 interface AuthState {

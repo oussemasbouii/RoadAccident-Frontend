@@ -9,6 +9,19 @@ export interface Alert {
   severity: 'critical' | 'high' | 'medium' | 'low'
   time: string
   read: boolean
+  direction: 'received' | 'sent'
+  senderId?: string
+  latitude?: number
+  longitude?: number
+  comment?: string
+  recipients?: Array<{
+    id?: string
+    recipientId?: string
+    acknowledged?: boolean
+    acknowledgedAt?: string
+  }>
+  recipientCount?: number
+  acknowledgedCount?: number
 }
 
 interface AlertsState {
@@ -20,40 +33,81 @@ interface AlertsState {
   page: number
 }
 
-function toUiAlert(raw: any): Alert {
-  const timestamp = raw?.time || raw?.timestamp
+function inferSeverity(comment: string): Alert['severity'] {
+  const text = comment.toLowerCase()
+  if (text.includes('fatal') || text.includes('dead') || text.includes('critical')) return 'critical'
+  if (text.includes('urgent') || text.includes('high') || text.includes('severe')) return 'high'
+  if (text.includes('minor') || text.includes('low')) return 'low'
+  return 'medium'
+}
+
+function inferType(comment: string): Alert['type'] {
+  const text = comment.toLowerCase()
+  if (text.includes('rain') || text.includes('storm') || text.includes('weather') || text.includes('fog')) return 'weather'
+  if (text.includes('traffic') || text.includes('congestion') || text.includes('jam')) return 'traffic'
+  if (text.includes('system') || text.includes('server') || text.includes('platform')) return 'system'
+  return 'hazard'
+}
+
+function toUiAlert(raw: any, direction: 'received' | 'sent' = 'received'): Alert {
+  const timestamp = raw?.createdAt || raw?.time || raw?.timestamp
   const formattedTime = typeof timestamp === 'number'
     ? new Date(timestamp).toLocaleString()
-    : (timestamp || 'Just now')
+    : (timestamp ? new Date(timestamp).toLocaleString() : 'Just now')
+
+  const recipients = Array.isArray(raw?.recipients) ? raw.recipients : []
+  const acknowledgedCount = recipients.filter((r: any) => Boolean(r?.acknowledged)).length
+  const recipientCount = recipients.length
+  const comment = String(raw?.comment || raw?.description || raw?.title || '').trim()
+  const latitude = Number(raw?.latitude)
+  const longitude = Number(raw?.longitude)
+  const readFromRecipient = recipients.some((r: any) => Boolean(r?.acknowledged))
+  const read = direction === 'sent'
+    ? true
+    : Boolean(raw?.read ?? raw?.seen ?? raw?.acknowledged ?? readFromRecipient)
+  const senderId = raw?.senderId ? String(raw.senderId) : ''
+  const senderLabel = senderId ? `Sender ${senderId}` : 'Unknown sender'
+  const title = raw?.title
+    ? String(raw.title)
+    : direction === 'sent'
+      ? 'Sent Alert'
+      : `Alert from ${senderLabel}`
+  const locationLine = Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? `Location: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+    : ''
+  const description = [comment, locationLine].filter(Boolean).join(' | ')
 
   return {
     id: String(raw?.id || raw?.alertId || crypto.randomUUID()),
     type: (['traffic', 'weather', 'hazard', 'system'].includes(raw?.type)
       ? raw.type
-      : 'hazard') as Alert['type'],
-    title: raw?.title || raw?.comment || 'Incoming Alert',
-    description:
-      raw?.description ||
-      raw?.comment ||
-      (raw?.latitude && raw?.longitude
-        ? `Location: ${raw.latitude}, ${raw.longitude}`
-        : 'Alert received from backend'),
+      : inferType(comment || '')) as Alert['type'],
+    title,
+    description: description || 'Alert received from backend',
     severity: (['critical', 'high', 'medium', 'low'].includes(raw?.severity)
       ? raw.severity
-      : 'medium') as Alert['severity'],
+      : inferSeverity(comment || '')) as Alert['severity'],
     time: formattedTime,
-    read: Boolean(raw?.read ?? raw?.seen ?? false),
+    read,
+    direction,
+    senderId: senderId || undefined,
+    latitude: Number.isFinite(latitude) ? latitude : undefined,
+    longitude: Number.isFinite(longitude) ? longitude : undefined,
+    comment: comment || undefined,
+    recipients,
+    recipientCount,
+    acknowledgedCount,
   }
 }
 
-function extractAlertList(payload: any): Alert[] {
+function extractAlertList(payload: any, direction: 'received' | 'sent'): Alert[] {
   const root = payload?.data ?? payload
   const list = Array.isArray(root)
     ? root
     : Array.isArray(root?.data)
       ? root.data
       : []
-  return list.map(toUiAlert)
+  return list.map((item: any) => toUiAlert(item, direction))
 }
 
 function extractPaginationMeta(payload: any) {
@@ -106,7 +160,12 @@ export const fetchUnreadCount = createAsyncThunk(
 
 export const createAlert = createAsyncThunk(
   'alerts/createAlert',
-  async (data: Partial<Alert>, { rejectWithValue }) => {
+  async (data: {
+    recipientIds: string[]
+    latitude: number
+    longitude: number
+    comment: string
+  }, { rejectWithValue }) => {
     try {
       const response = await apiService.alerts.create(data)
       return response.data
@@ -152,16 +211,18 @@ const alertsSlice = createSlice({
     })
     builder.addCase(fetchAlerts.fulfilled, (state, action) => {
       state.loading = false
-      const received = extractAlertList(action.payload?.received)
-      const sent = extractAlertList(action.payload?.sent).map((item) => ({ ...item, read: true }))
-      const merged = [...received, ...sent]
-      const byId = new Map<string, Alert>()
-      merged.forEach((item) => byId.set(item.id, item))
-      state.list = Array.from(byId.values())
+      const received = extractAlertList(action.payload?.received, 'received')
+      const sent = extractAlertList(action.payload?.sent, 'sent').map((item) => ({ ...item, read: true }))
+      state.list = [...received, ...sent].sort((a, b) => {
+        const t1 = new Date(a.time).getTime()
+        const t2 = new Date(b.time).getTime()
+        if (Number.isFinite(t1) && Number.isFinite(t2)) return t2 - t1
+        return 0
+      })
       const { total, page } = extractPaginationMeta(action.payload?.received)
       state.total = total
       state.page = page
-      state.unreadCount = state.list.filter((a) => !a.read).length
+      state.unreadCount = received.filter((a) => !a.read).length
     })
     builder.addCase(fetchAlerts.rejected, (state, action) => {
       state.loading = false
@@ -173,7 +234,7 @@ const alertsSlice = createSlice({
       state.error = null
     })
     builder.addCase(fetchUnreadCount.fulfilled, (state, action) => {
-      const list = extractAlertList(action.payload)
+      const list = extractAlertList(action.payload, 'received')
       state.unreadCount = list.filter((a) => !a.read).length
     })
     builder.addCase(fetchUnreadCount.rejected, (state, action) => {
@@ -182,13 +243,16 @@ const alertsSlice = createSlice({
 
     // Create alert
     builder.addCase(createAlert.pending, (state) => {
+      state.loading = true
       state.error = null
     })
     builder.addCase(createAlert.fulfilled, (state, action) => {
-      state.list.unshift(toUiAlert(action.payload?.data ?? action.payload))
-      state.unreadCount += 1
+      state.loading = false
+      const createdRaw = action.payload?.alert ?? action.payload?.data?.alert ?? action.payload?.data ?? action.payload
+      if (createdRaw) state.list.unshift(toUiAlert(createdRaw, 'sent'))
     })
     builder.addCase(createAlert.rejected, (state, action) => {
+      state.loading = false
       state.error = action.payload as string
     })
 

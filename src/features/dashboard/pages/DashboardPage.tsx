@@ -23,10 +23,7 @@ import NotificationsActiveRoundedIcon from "@mui/icons-material/NotificationsAct
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
 import TimerRoundedIcon from "@mui/icons-material/TimerRounded";
 import AddAlertRoundedIcon from "@mui/icons-material/AddAlertRounded";
-import ContactSupportRoundedIcon from "@mui/icons-material/ContactSupportRounded";
-import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
-import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CircleIcon from "@mui/icons-material/Circle";
@@ -36,7 +33,6 @@ import { useAppDispatch, useAppSelector } from "../../../store/store";
 import { fetchIncidents } from "../../incidents/slices/incidentsSlice";
 import { fetchAlerts } from "../../alerts/slices/alertsSlice";
 import StatCard from "../../../components/Common/StatCard";
-import Button from "../../../components/Common/Button";
 import Card from "../../../components/Common/Card";
 
 export default function DashboardPage() {
@@ -64,13 +60,24 @@ export default function DashboardPage() {
     refreshData();
   }, [dispatch]);
 
+  const totalIncidents = incidents.length
+  const openIncidents = incidents.filter((i: any) => i.status !== "resolved").length
+  const resolvedIncidents = incidents.filter((i: any) => i.status === "resolved").length
+  const criticalIncidents = incidents.filter((i: any) => i.severity?.toLowerCase() === "critical").length
+  const highIncidents = incidents.filter((i: any) => i.severity?.toLowerCase() === "high").length
+  const priorityIncidents = criticalIncidents + highIncidents
+  const totalInjuries = incidents.reduce((sum: number, i: any) => sum + Number(i.injuries || 0), 0)
+  const avgInjuriesPerIncident = totalIncidents > 0 ? (totalInjuries / totalIncidents).toFixed(1) : "0.0"
+  const activeZones = new Set(incidents.map((i: any) => i.location).filter(Boolean)).size
+  const resolutionRate = totalIncidents > 0 ? Math.round((resolvedIncidents / totalIncidents) * 100) : 0
+
   const stats = [
     {
       icon: <WarningRoundedIcon />,
       label: "Open Incidents",
-      value: incidents.filter((i: any) => i.status !== "resolved").length,
-      trend: "neutral" as const,
-      trendValue: `${incidents.length} total`,
+      value: openIncidents,
+      trend: openIncidents > resolvedIncidents ? "up" as const : "neutral" as const,
+      trendValue: `${resolutionRate}% resolved`,
       intent: "danger" as const,
     },
     {
@@ -78,23 +85,23 @@ export default function DashboardPage() {
       label: "Unread Alerts",
       value: unreadCount,
       trend: unreadCount > 0 ? "up" as const : "neutral" as const,
-      trendValue: `${unreadCount} unread`,
+      trendValue: unreadCount > 0 ? "Requires attention" : "All caught up",
       intent: "warning" as const,
     },
     {
       icon: <PlaceRoundedIcon />,
       label: "Active Zones",
-      value: new Set(incidents.map((i: any) => i.location)).size,
+      value: activeZones,
       trend: "neutral" as const,
-      trendValue: "Geographic spread",
+      trendValue: `${priorityIncidents} priority cases`,
       intent: "info" as const,
     },
     {
       icon: <TimerRoundedIcon />,
       label: "Avg Response",
       value: incidentStats.avgResponseTime > 0 ? `${incidentStats.avgResponseTime}m` : "12m",
-      trend: "down" as const,
-      trendValue: "15% faster",
+      trend: incidentStats.avgResponseTime > 0 && incidentStats.avgResponseTime <= 12 ? "down" as const : "neutral" as const,
+      trendValue: `${avgInjuriesPerIncident} injuries/incident`,
       intent: "success" as const,
     },
   ];
@@ -145,9 +152,6 @@ export default function DashboardPage() {
               <RefreshRoundedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Button variant="primary" icon={<AddAlertRoundedIcon fontSize="small" />}>
-            New Incident
-          </Button>
         </Stack>
       </Box>
 
@@ -252,17 +256,42 @@ export default function DashboardPage() {
           <Stack spacing={3}>
             {/* Quick Actions */}
             <Card sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Quick Actions</Typography>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Quick Access</Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
                 {[
-                  { label: 'Broadcast', icon: <CampaignRoundedIcon />, color: theme.palette.warning.main },
-                  { label: 'Analytics', icon: <InsightsRoundedIcon />, color: theme.palette.info.main },
-                  { label: 'Support', icon: <ContactSupportRoundedIcon />, color: theme.palette.success.main },
-                  { label: 'Settings', icon: <SettingsRoundedIcon />, color: theme.palette.secondary.main },
+                  {
+                    label: 'Active Incidents',
+                    sublabel: `${openIncidents} open`,
+                    to: '/incidents',
+                    icon: <WarningRoundedIcon />,
+                    color: theme.palette.error.main
+                  },
+                  {
+                    label: 'Unread Alerts',
+                    sublabel: `${unreadCount} pending`,
+                    to: '/alerts',
+                    icon: <NotificationsActiveRoundedIcon />,
+                    color: theme.palette.warning.main
+                  },
+                  {
+                    label: 'Analytics',
+                    sublabel: 'Reports view',
+                    to: '/reports',
+                    icon: <InsightsRoundedIcon />,
+                    color: theme.palette.info.main
+                  },
+                  {
+                    label: 'Create Alert',
+                    sublabel: 'Broadcast now',
+                    to: '/alerts',
+                    icon: <AddAlertRoundedIcon />,
+                    color: theme.palette.success.main
+                  },
                 ].map((action) => (
-                  <Box
+                  <MuiButton
                     key={action.label}
-                    component={MuiButton}
+                    component={RouterLink}
+                    to={action.to}
                     sx={{
                       width: '100%',
                       p: 2,
@@ -298,7 +327,10 @@ export default function DashboardPage() {
                       {React.cloneElement(action.icon as React.ReactElement, { fontSize: 'small' })}
                     </Avatar>
                     <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 0.2 }}>{action.label}</Typography>
-                  </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
+                      {action.sublabel}
+                    </Typography>
+                  </MuiButton>
                 ))}
               </Box>
             </Card>

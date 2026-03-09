@@ -21,7 +21,6 @@ import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded'
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
-import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded'
 
 import { RootState } from '../../store/store'
 import { logout } from '../../features/auth/slices/authSlice'
@@ -41,12 +40,15 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
     { path: '/incidents', label: 'Accidents', icon: <ReportProblemRoundedIcon /> },
     { path: '/alerts', label: 'Alerts', icon: <NotificationsActiveRoundedIcon /> },
     { path: '/reports', label: 'Reports', icon: <BarChartRoundedIcon /> },
-    { path: '/admin/accounts', label: 'Admin Accounts', icon: <AdminPanelSettingsRoundedIcon />, role: 'admin' },
+    { path: '/admin/accounts', label: 'User Accounts', icon: <AdminPanelSettingsRoundedIcon />, role: 'admin' },
     { path: '/settings', label: 'Settings', icon: <SettingsRoundedIcon /> },
   ]
 
   const filteredMenuItems = menuItems.filter(item => !item.role || user?.role === item.role)
-  const isActive = (path: string) => location.pathname === path
+  const isActive = (path: string) => {
+    if (path === '/dashboard') return location.pathname === '/dashboard'
+    return location.pathname === path || location.pathname.startsWith(`${path}/`)
+  }
 
   const handleLogout = () => {
     dispatch(logout())
@@ -239,7 +241,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                 boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
               }}
             >
-              {(user?.displayName?.[0] || user?.officerId?.[0] || 'U').toUpperCase()}
+              {((user?.displayName?.[0]) || (user?.officerId?.[0]) || 'U').toUpperCase()}
             </Avatar>
           </Tooltip>
           
@@ -257,7 +259,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
               {user?.displayName || user?.officerId || 'Officer'}
             </Typography>
             <Typography noWrap sx={{ fontSize: 11, color: 'text.secondary', opacity: 0.8 }}>
-              {user?.role?.toUpperCase() || 'OFFICER'}
+              {(user?.role || 'officer').toUpperCase()}
             </Typography>
           </Box>
 

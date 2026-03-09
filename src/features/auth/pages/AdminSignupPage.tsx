@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { 
   Alert, 
@@ -12,22 +12,21 @@ import {
   Container,
   InputAdornment,
   Link,
-  Grid
+  GridLegacy as Grid
 } from '@mui/material'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
-import EmailRoundedIcon from '@mui/icons-material/EmailRounded'
+import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded'
 import LocalPhoneRoundedIcon from '@mui/icons-material/LocalPhoneRounded'
 import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded'
 import LockRoundedIcon from '@mui/icons-material/LockRounded'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import { apiService } from '@/services/api'
-import { INSTITUTIONAL_DOMAIN, isInstitutionalEmail } from '@/utils/authValidation'
 import { useThemeMode } from '../../../themeMode'
 import { Button, Card } from '@/components/Common'
 
 export default function AdminSignupPage() {
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const [officerId, setOfficerId] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -41,15 +40,13 @@ export default function AdminSignupPage() {
   const theme = useTheme()
   const { mode } = useThemeMode()
 
-  const emailIsInstitutional = useMemo(() => isInstitutionalEmail(email), [email])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setSuccess(null)
 
-    if (!emailIsInstitutional) {
-      setError(`Only institutional emails are allowed (@${INSTITUTIONAL_DOMAIN}).`)
+    if (!officerId.trim()) {
+      setError('Officer ID is required.')
       return
     }
 
@@ -66,16 +63,16 @@ export default function AdminSignupPage() {
     try {
       setLoading(true)
       await apiService.auth.adminSignup({
-        email: email.trim(),
+        officerId: officerId.trim(),
         password,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        phoneNumber: phoneNumber.trim() || undefined,
-        center: center.trim() || undefined,
+        phoneNumber: phoneNumber.trim(),
+        center: center.trim(),
         role: 'admin',
       })
 
-      setSuccess('Administrator account created successfully. You can now sign in.')
+      setSuccess('Administrator account created successfully. You can now sign in with this Officer ID.')
       setTimeout(() => navigate('/login'), 1200)
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to create administrator account.')
@@ -118,78 +115,23 @@ export default function AdminSignupPage() {
                     Create Administrator Account
                   </Typography>
                   <Typography color="text.secondary">
-                    Join the emergency services network. 
-                    Institutional email required: <strong>@{INSTITUTIONAL_DOMAIN}</strong>
+                    Register a new admin. They will sign in with the Officer ID below.
                   </Typography>
                 </Box>
 
                 <Grid container spacing={2.5}>
                   <Grid item xs={12} sm={6}>
-                    <TextField 
-                      label="First Name" 
-                      value={firstName} 
-                      onChange={(e) => setFirstName(e.target.value)} 
-                      fullWidth 
-                      required 
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <PersonRoundedIcon fontSize="small" color="primary" />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField 
-                      label="Last Name" 
-                      value={lastName} 
-                      onChange={(e) => setLastName(e.target.value)} 
-                      fullWidth 
-                      required 
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <PersonRoundedIcon fontSize="small" color="primary" />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
-                    />
-                  </Grid>
-                  
-                  <Grid item xs={12}>
                     <TextField
-                      label="Institutional Email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      label="Officer ID"
+                      value={officerId}
+                      onChange={(e) => setOfficerId(e.target.value)}
                       required
                       fullWidth
-                      error={email.length > 0 && !emailIsInstitutional}
-                      helperText={email.length > 0 && !emailIsInstitutional ? `Must end with @${INSTITUTIONAL_DOMAIN}` : ''}
+                      placeholder="e.g. ADMIN-01 or admin@institution.gov"
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <EmailRoundedIcon fontSize="small" color="primary" />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <TextField 
-                      label="Phone Number" 
-                      value={phoneNumber} 
-                      onChange={(e) => setPhoneNumber(e.target.value)} 
-                      fullWidth 
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <LocalPhoneRoundedIcon fontSize="small" color="primary" />
+                            <BadgeRoundedIcon fontSize="small" color="primary" />
                           </InputAdornment>
                         ),
                       }}
@@ -197,15 +139,65 @@ export default function AdminSignupPage() {
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField 
-                      label="Center / Station" 
-                      value={center} 
-                      onChange={(e) => setCenter(e.target.value)} 
-                      fullWidth 
+                    <TextField
+                      label="Center / Station"
+                      value={center}
+                      onChange={(e) => setCenter(e.target.value)}
+                      fullWidth
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
                             <BusinessRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="First Name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      fullWidth
+                      required
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Last Name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      fullWidth
+                      required
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonRoundedIcon fontSize="small" color="primary" />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Phone Number"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      fullWidth
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LocalPhoneRoundedIcon fontSize="small" color="primary" />
                           </InputAdornment>
                         ),
                       }}
