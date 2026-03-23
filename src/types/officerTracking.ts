@@ -1,5 +1,6 @@
 export interface OfficerLocation {
   id: string
+  userId?: string
   officerId?: string
   name?: string
   role?: string
@@ -8,6 +9,7 @@ export interface OfficerLocation {
   longitude: number
   updatedAt?: string
   lastSeen?: number
+  serverTs?: number
   accuracy?: number
   source?: string
 }

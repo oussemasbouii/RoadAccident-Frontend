@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { io, Socket } from 'socket.io-client'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import {
   Box,
@@ -24,19 +23,10 @@ import OfficerTrackingMap from '@/components/Common/OfficerTrackingMap'
 import type { OfficerLocation } from '@/types/officerTracking'
 import { useAppSelector } from '@/store/store'
 import { Card, Button } from '@/components/Common'
-import { getDeviceId, getRefreshToken } from '@/utils/tokenStore'
+import { getRefreshToken } from '@/utils/tokenStore'
+import { connectSharedSocket } from '@/services/socketClient'
+import { applyLocationUpdate, buildStateFromSnapshot } from './officerTracking.utils'
 
-const RAW_SOCKET_URL =
-  import.meta.env.VITE_SOCKET_BASE_URL ||
-  import.meta.env.VITE_SOCKET_URL ||
-  ''
-const SOCKET_BASE_URL = RAW_SOCKET_URL.startsWith('http') ? RAW_SOCKET_URL : ''
-const SOCKET_PATH =
-  import.meta.env.VITE_SOCKET_PATH ||
-  (RAW_SOCKET_URL.startsWith('/') ? RAW_SOCKET_URL : '/api/v2/socket.io')
-const FALLBACK_SOCKET_PATHS = import.meta.env.VITE_SOCKET_PATH
-  ? [SOCKET_PATH]
-  : ['/api/v2/socket.io', '/socket.io']
 const TRACKING_EVENTS = {
   subscribe: 'request:admin:tracking:subscribe',
   unsubscribe: 'request:admin:tracking:unsubscribe',
@@ -45,34 +35,7 @@ const TRACKING_EVENTS = {
 }
 
 const STALE_THRESHOLD_MS = 1000 * 60 * 5
-
-function normalizeOfficerLocation(payload: any): OfficerLocation | null {
-  const data = payload?.data || payload?.location || payload
-  const latitude = Number(data?.lat ?? data?.latitude)
-  const longitude = Number(data?.lng ?? data?.longitude)
-
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
-
-  const id = String(data?.userId || data?.officerId || data?.id || data?._id || `${latitude}-${longitude}`)
-
-  const ts = Number(data?.ts)
-  const updatedAt =
-    Number.isFinite(ts) ? new Date(ts).toISOString() : new Date().toISOString()
-
-  return {
-    id,
-    officerId: data?.officerId,
-    name: data?.name,
-    role: data?.role,
-    status: data?.status,
-    latitude,
-    longitude,
-    updatedAt,
-    lastSeen: Date.now(),
-    accuracy: Number(data?.accuracy),
-    source: data?.source,
-  }
-}
+const SUBSCRIBE_ACK_TIMEOUT_MS = 5000
 
 function formatRelativeTime(lastSeen?: number) {
   if (!lastSeen) return 'Unknown'
@@ -91,14 +54,14 @@ export default function OfficerTrackingPage() {
   const [officerMap, setOfficerMap] = useState<Record<string, OfficerLocation>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [socketStatus, setSocketStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected')
+  const [subscriptionStatus, setSubscriptionStatus] = useState<'idle' | 'pending' | 'subscribed' | 'warning'>('idle')
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'live' | 'stale'>('all')
   const [sortMode, setSortMode] = useState<'recent' | 'name'>('recent')
-  const [autoFit, setAutoFit] = useState(true)
   const [lastInitCount, setLastInitCount] = useState<number | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const tsMapRef = useRef<Map<string, number>>(new Map())
-  const pathIndexRef = useRef(0)
+  const subscribeAckTimerRef = useRef<number | null>(null)
 
   const officers = useMemo(() => Object.values(officerMap), [officerMap])
   const filteredOfficers = useMemo(() => {
@@ -138,72 +101,51 @@ export default function OfficerTrackingPage() {
   useEffect(() => {
     if (!token) return
 
-    pathIndexRef.current = 0
-
     const refreshToken = getRefreshToken()
-    const effectiveToken = refreshToken || token
+    if (!refreshToken) return
 
-    const createSocket = (path: string) =>
-      io(SOCKET_BASE_URL || undefined, {
-        path,
-        transports: ['websocket', 'polling'],
-        auth: {
-          token: effectiveToken,
-          accessToken: token,
-          refreshToken,
-          deviceId: getDeviceId(),
-        },
-      })
+    const socket = connectSharedSocket(refreshToken)
+    if (!socket) return
 
-    let socket: Socket = createSocket(FALLBACK_SOCKET_PATHS[pathIndexRef.current] || SOCKET_PATH)
+    const clearSubscribeAckTimer = () => {
+      if (subscribeAckTimerRef.current !== null) {
+        window.clearTimeout(subscribeAckTimerRef.current)
+        subscribeAckTimerRef.current = null
+      }
+    }
 
     const subscribe = () => {
+      clearSubscribeAckTimer()
+      setSubscriptionStatus('pending')
+      subscribeAckTimerRef.current = window.setTimeout(() => {
+        setSubscriptionStatus((prev) => (prev === 'pending' ? 'warning' : prev))
+      }, SUBSCRIBE_ACK_TIMEOUT_MS)
+
       socket.emit(TRACKING_EVENTS.subscribe, null, (ack: { acknowledged?: boolean }) => {
+        clearSubscribeAckTimer()
+        setSubscriptionStatus(ack?.acknowledged ? 'subscribed' : 'warning')
         if (import.meta.env.DEV) {
           console.log('[Tracking] Subscribed:', Boolean(ack?.acknowledged))
         }
       })
     }
 
-    socket.on('connect', () => {
+    const onConnect = () => {
       setSocketStatus('connected')
-      tsMapRef.current.clear()
       subscribe()
-    })
-    socket.on('disconnect', () => setSocketStatus('disconnected'))
-    socket.on('connect_error', (err) => {
-      const nextIndex = pathIndexRef.current + 1
-      if (nextIndex < FALLBACK_SOCKET_PATHS.length) {
-        pathIndexRef.current = nextIndex
-        if (import.meta.env.DEV) {
-          console.log('[Tracking] Socket path failed, retrying:', FALLBACK_SOCKET_PATHS[nextIndex], err?.message)
-        }
-        socket.disconnect()
-        socket = createSocket(FALLBACK_SOCKET_PATHS[pathIndexRef.current])
-        socket.on('connect', () => {
-          setSocketStatus('connected')
-          tsMapRef.current.clear()
-          subscribe()
-        })
-        socket.on('disconnect', () => setSocketStatus('disconnected'))
-        socket.on('connect_error', () => setSocketStatus('error'))
-        socket.on(TRACKING_EVENTS.init, onInit)
-        socket.on(TRACKING_EVENTS.update, onUpdate)
-        return
+    }
+    const onDisconnect = () => {
+      setSocketStatus('disconnected')
+      setSubscriptionStatus('idle')
+      clearSubscribeAckTimer()
+    }
+    const onConnectError = (err: Error) => {
+      if (import.meta.env.DEV) {
+        console.log('[Tracking] Socket connect error:', err?.message)
       }
       setSocketStatus('error')
-    })
-
-    const upsertLocation = (payload: any) => {
-      const normalized = normalizeOfficerLocation(payload)
-      if (!normalized) return
-      const incomingTs = Number(payload?.ts ?? payload?.data?.ts)
-      const lastTs = tsMapRef.current.get(normalized.id) ?? 0
-      if (Number.isFinite(incomingTs) && incomingTs <= lastTs) return
-      if (Number.isFinite(incomingTs)) {
-        tsMapRef.current.set(normalized.id, incomingTs)
-      }
-      setOfficerMap((prev) => ({ ...prev, [normalized.id]: normalized }))
+      setSubscriptionStatus('warning')
+      clearSubscribeAckTimer()
     }
 
     const onInit = (payload: { locations?: any[] }) => {
@@ -212,27 +154,44 @@ export default function OfficerTrackingPage() {
       }
       const locations = Array.isArray(payload?.locations) ? payload.locations : []
       setLastInitCount(locations.length)
-      locations.forEach((loc) => upsertLocation(loc))
+
+      const receivedAt = Date.now()
+      const snapshot = buildStateFromSnapshot(locations, receivedAt)
+      tsMapRef.current = snapshot.tsMap
+      setOfficerMap(snapshot.officerMap)
+      setSelectedId((prev) => (prev && snapshot.officerMap[prev] ? prev : null))
+
     }
 
     const onUpdate = (payload: any) => {
       if (import.meta.env.DEV) {
         console.log('[Tracking] Update payload:', payload)
       }
-      upsertLocation(payload)
+      const receivedAt = Date.now()
+      setOfficerMap((prev) => applyLocationUpdate(prev, tsMapRef.current, payload, receivedAt).officerMap)
     }
+    socket.on('connect', onConnect)
+    socket.on('disconnect', onDisconnect)
+    socket.on('connect_error', onConnectError)
     socket.on(TRACKING_EVENTS.init, onInit)
     socket.on(TRACKING_EVENTS.update, onUpdate)
+    if (socket.connected) {
+      onConnect()
+    }
 
     return () => {
+      clearSubscribeAckTimer()
       socket.emit(TRACKING_EVENTS.unsubscribe, null, (ack: { acknowledged?: boolean }) => {
         if (import.meta.env.DEV) {
           console.log('[Tracking] Unsubscribed:', Boolean(ack?.acknowledged))
         }
       })
+      socket.off('connect', onConnect)
+      socket.off('disconnect', onDisconnect)
+      socket.off('connect_error', onConnectError)
       socket.off(TRACKING_EVENTS.init, onInit)
       socket.off(TRACKING_EVENTS.update, onUpdate)
-      socket.disconnect()
+      setSubscriptionStatus('idle')
     }
   }, [token])
 
@@ -254,11 +213,22 @@ export default function OfficerTrackingPage() {
     })
   }
 
+  const handleMapReady = useCallback((map: mapboxgl.Map) => {
+    mapRef.current = map
+  }, [])
+
   const statusChip = socketStatus === 'connected'
     ? { label: 'Live', color: 'success', icon: <WifiTetheringRoundedIcon fontSize="small" /> }
     : socketStatus === 'error'
       ? { label: 'Error', color: 'error', icon: <SignalWifiOffRoundedIcon fontSize="small" /> }
       : { label: 'Offline', color: 'warning', icon: <SignalWifiOffRoundedIcon fontSize="small" /> }
+  const subscribeChip = subscriptionStatus === 'subscribed'
+    ? { label: 'Subscribed', color: 'success' as const }
+    : subscriptionStatus === 'pending'
+      ? { label: 'Subscribing', color: 'warning' as const }
+      : subscriptionStatus === 'warning'
+        ? { label: 'Subscribe Warning', color: 'warning' as const }
+        : { label: 'Not Subscribed', color: 'default' as const }
 
   return (
     <Stack spacing={3}>
@@ -278,13 +248,20 @@ export default function OfficerTrackingPage() {
             <Typography color="text.secondary">
               Live overview of officer locations, activity status, and last known updates.
             </Typography>
-            {socketStatus !== 'connected' && (
+            {(socketStatus !== 'connected' || subscriptionStatus === 'warning') && (
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
                 <InfoRoundedIcon fontSize="small" color="warning" />
                 <Typography variant="caption" color="text.secondary">
-                  Realtime stream is {socketStatus}. The list will update once the socket reconnects.
+                  {socketStatus !== 'connected'
+                    ? `Realtime stream is ${socketStatus}. The list will update once the socket reconnects.`
+                    : 'Subscribe acknowledgement is delayed or failed. Updates are still being processed.'}
                 </Typography>
               </Stack>
+            )}
+            {lastInitCount !== null && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                Last snapshot officers: {lastInitCount}
+              </Typography>
             )}
           </Box>
           <Stack direction="row" spacing={1} alignItems="center">
@@ -292,6 +269,11 @@ export default function OfficerTrackingPage() {
               icon={statusChip.icon}
               label={statusChip.label}
               color={statusChip.color as any}
+              variant="outlined"
+            />
+            <Chip
+              label={subscribeChip.label}
+              color={subscribeChip.color}
               variant="outlined"
             />
             <Button variant="secondary" size="sm" onClick={handleFitBounds} icon={<MyLocationRoundedIcon />}>
@@ -373,12 +355,7 @@ export default function OfficerTrackingPage() {
               officers={officers}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              onReady={(map) => {
-                mapRef.current = map
-                if (autoFit && officers.length > 0) {
-                  handleFitBounds()
-                }
-              }}
+              onReady={handleMapReady}
             />
           </Box>
         </Card>
@@ -432,12 +409,6 @@ export default function OfficerTrackingPage() {
               <Stack direction="row" spacing={1}>
                 <Chip size="small" label={`${staleCount} stale`} color={staleCount ? 'warning' : 'default'} />
                 <Chip size="small" label={`${liveCount} live`} color="success" />
-                <Chip
-                  size="small"
-                  label={autoFit ? 'Auto-fit ON' : 'Auto-fit OFF'}
-                  onClick={() => setAutoFit((prev) => !prev)}
-                  variant={autoFit ? 'filled' : 'outlined'}
-                />
               </Stack>
             </Stack>
           </Card>
@@ -460,7 +431,9 @@ export default function OfficerTrackingPage() {
                     color: 'text.secondary',
                   }}
                 >
-                  No officers match your filters yet.
+                  {officers.length === 0
+                    ? 'No active tracked officers.'
+                    : 'No officers match your current filters.'}
                 </Box>
               )}
 
@@ -498,10 +471,10 @@ export default function OfficerTrackingPage() {
                   />
                   <Stack spacing={0.5}>
                     <Typography sx={{ fontWeight: 700 }}>
-                      {officer.name || officer.officerId || officer.id}
+                      {officer.name || 'Unknown officer'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {officer.officerId && officer.name ? officer.officerId : officer.role || 'Officer'}
+                      {officer.role || 'Officer'}
                     </Typography>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Chip
@@ -532,10 +505,10 @@ export default function OfficerTrackingPage() {
             {selectedOfficer ? (
               <Stack spacing={0.5}>
                 <Typography sx={{ fontWeight: 700 }}>
-                  {selectedOfficer.name || selectedOfficer.officerId || selectedOfficer.id}
+                  {selectedOfficer.name || 'Unknown officer'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {selectedOfficer.officerId || selectedOfficer.role || 'Officer'}
+                  {selectedOfficer.role || 'Officer'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Last known: {selectedOfficer.latitude.toFixed(5)}, {selectedOfficer.longitude.toFixed(5)}

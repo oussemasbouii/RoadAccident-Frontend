@@ -1,12 +1,11 @@
 import { useEffect } from 'react'
-import { io, Socket } from 'socket.io-client'
 import { useAppDispatch, useAppSelector } from '../store/store'
 import { prependIncomingAlert } from '../features/alerts/slices/alertsSlice'
 import { prependIncomingIncident } from '../features/incidents/slices/incidentsSlice'
 import { prependIncomingReport } from '../features/reports/slices/reportsSlice'
+import { connectSharedSocket } from '@/services/socketClient'
+import { getRefreshToken } from '@/utils/tokenStore'
 
-const SOCKET_BASE_URL = import.meta.env.VITE_SOCKET_BASE_URL || 'https://micladevops.com'
-const SOCKET_PATH = import.meta.env.VITE_SOCKET_PATH || '/api/v2/socket.io'
 const SOCKET_EVENTS = ['notification', 'action:alert:send', 'alert', 'incident', 'accident', 'report'] as const
 
 function classifyAndDispatch(payload: any, dispatch: ReturnType<typeof useAppDispatch>) {
@@ -41,11 +40,11 @@ export default function RealtimeSync() {
   useEffect(() => {
     if (!token) return
 
-    const socket: Socket = io(SOCKET_BASE_URL, {
-      path: SOCKET_PATH,
-      transports: ['websocket', 'polling'],
-      auth: { token },
-    })
+    const refreshToken = getRefreshToken()
+    if (!refreshToken) return
+
+    const socket = connectSharedSocket(refreshToken)
+    if (!socket) return
 
     const onNotification = (payload: any) => classifyAndDispatch(payload, dispatch)
 
@@ -53,7 +52,6 @@ export default function RealtimeSync() {
 
     return () => {
       SOCKET_EVENTS.forEach((eventName) => socket.off(eventName, onNotification))
-      socket.disconnect()
     }
   }, [dispatch, token])
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Box, Typography, alpha, useTheme } from '@mui/material'
@@ -14,6 +14,11 @@ interface OfficerTrackingMapProps {
 
 const DEFAULT_CENTER: [number, number] = [10.1815, 36.8065]
 const DEFAULT_ZOOM = 6
+const SOURCE_ID = 'officer-tracking-source'
+const OFFICERS_LAYER_ID = 'officer-tracking-points'
+const SELECTED_LAYER_ID = 'officer-tracking-selected'
+const INTERPOLATION_DURATION_MS = 600
+const SNAP_EPSILON = 0.00001
 
 function statusColor(status?: string) {
   const normalized = (status || '').toLowerCase()
@@ -23,25 +28,32 @@ function statusColor(status?: string) {
   return '#3b82f6'
 }
 
-function buildPopupHtml(officer: OfficerLocation) {
-  const title = officer.name || officer.officerId || officer.id
-  const subtitle = officer.officerId && officer.name ? officer.officerId : officer.role
-  const status = officer.status ? officer.status.toUpperCase() : 'UNKNOWN'
-  const updated = officer.updatedAt ? new Date(officer.updatedAt).toLocaleString() : 'Unknown'
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
 
-  const safeTitle = String(title || 'Officer').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const safeSubtitle = String(subtitle || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const safeStatus = String(status).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function popupFromProps(properties: Record<string, unknown>) {
+  const title = escapeHtml(properties.name || properties.officerId || properties.id || 'Officer')
+  const subtitleRaw = properties.role
+  const subtitle = escapeHtml(subtitleRaw || '')
+  const status = escapeHtml(String(properties.status || 'UNKNOWN').toUpperCase())
+  const updated = properties.updatedAt ? new Date(String(properties.updatedAt)).toLocaleString() : 'Unknown'
 
   return `
     <div style="min-width:180px;font-family:Inter,system-ui,sans-serif">
-      <div style="font-weight:700;margin-bottom:4px">${safeTitle}</div>
-      ${safeSubtitle ? `<div style="font-size:12px;opacity:0.7;margin-bottom:6px">${safeSubtitle}</div>` : ''}
-      <div style="font-size:12px"><strong>Status:</strong> ${safeStatus}</div>
-      <div style="font-size:12px;margin-top:4px"><strong>Updated:</strong> ${updated}</div>
+      <div style="font-weight:700;margin-bottom:4px">${title}</div>
+      ${subtitle ? `<div style="font-size:12px;opacity:0.7;margin-bottom:6px">${subtitle}</div>` : ''}
+      <div style="font-size:12px"><strong>Status:</strong> ${status}</div>
+      <div style="font-size:12px;margin-top:4px"><strong>Updated:</strong> ${escapeHtml(updated)}</div>
     </div>
   `
 }
+
+type PointState = { lng: number; lat: number }
+type GeoJSONSourceLike = mapboxgl.GeoJSONSource & { setData: (data: GeoJSON.FeatureCollection) => void }
 
 export default function OfficerTrackingMap({
   officers,
@@ -52,14 +64,71 @@ export default function OfficerTrackingMap({
   const theme = useTheme()
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map())
+  const popupRef = useRef<mapboxgl.Popup | null>(null)
+  const onReadyRef = useRef(onReady)
+  const onSelectRef = useRef(onSelect)
+  const metaByIdRef = useRef<Map<string, OfficerLocation>>(new Map())
+  const currentByIdRef = useRef<Map<string, PointState>>(new Map())
+  const targetByIdRef = useRef<Map<string, PointState>>(new Map())
+  const animationFrameRef = useRef<number | null>(null)
+  const lastFrameRef = useRef<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const officersById = useMemo(() => {
-    const map = new Map<string, OfficerLocation>()
-    officers.forEach((officer) => map.set(officer.id, officer))
-    return map
-  }, [officers])
+  useEffect(() => {
+    onReadyRef.current = onReady
+  }, [onReady])
+
+  useEffect(() => {
+    onSelectRef.current = onSelect
+  }, [onSelect])
+
+  const buildFeatureCollection = () => {
+    const features: GeoJSON.Feature[] = []
+    currentByIdRef.current.forEach((coords, id) => {
+      const officer = metaByIdRef.current.get(id)
+      if (!officer) return
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [coords.lng, coords.lat],
+        },
+        properties: {
+          id: officer.id,
+          name: officer.name || '',
+          officerId: officer.officerId || '',
+          role: officer.role || '',
+          status: officer.status || '',
+          updatedAt: officer.updatedAt || '',
+          color: statusColor(officer.status),
+          accuracy: Number.isFinite(officer.accuracy) ? officer.accuracy : '',
+        },
+      })
+    })
+
+    return {
+      type: 'FeatureCollection',
+      features,
+    } as GeoJSON.FeatureCollection
+  }
+
+  const updateSourceData = () => {
+    const map = mapRef.current
+    if (!map) return
+    const source = map.getSource(SOURCE_ID) as GeoJSONSourceLike | undefined
+    if (!source) return
+    source.setData(buildFeatureCollection())
+  }
+
+  const ensureSelectedFilter = () => {
+    const map = mapRef.current
+    if (!map || !map.getLayer(SELECTED_LAYER_ID)) return
+    if (selectedId) {
+      map.setFilter(SELECTED_LAYER_ID, ['==', ['get', 'id'], selectedId])
+      return
+    }
+    map.setFilter(SELECTED_LAYER_ID, ['==', ['get', 'id'], '__none__'])
+  }
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
@@ -79,61 +148,136 @@ export default function OfficerTrackingMap({
     })
     mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
     mapRef.current.on('error', () => setError('Failed to load map tiles.'))
+    mapRef.current.on('load', () => {
+      const map = mapRef.current
+      if (!map) return
+      if (map.getSource(SOURCE_ID)) return
 
-    if (onReady) onReady(mapRef.current)
+      map.addSource(SOURCE_ID, {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [],
+        },
+      })
+
+      map.addLayer({
+        id: OFFICERS_LAYER_ID,
+        type: 'circle',
+        source: SOURCE_ID,
+        paint: {
+          'circle-radius': 6,
+          'circle-color': ['coalesce', ['get', 'color'], '#3b82f6'],
+          'circle-stroke-color': theme.palette.common.white,
+          'circle-stroke-width': 2,
+          'circle-opacity': 0.95,
+        },
+      })
+
+      map.addLayer({
+        id: SELECTED_LAYER_ID,
+        type: 'circle',
+        source: SOURCE_ID,
+        paint: {
+          'circle-radius': 12,
+          'circle-color': ['coalesce', ['get', 'color'], '#3b82f6'],
+          'circle-opacity': 0.2,
+        },
+        filter: ['==', ['get', 'id'], '__none__'],
+      })
+
+      map.on('mouseenter', OFFICERS_LAYER_ID, () => {
+        map.getCanvas().style.cursor = 'pointer'
+      })
+      map.on('mouseleave', OFFICERS_LAYER_ID, () => {
+        map.getCanvas().style.cursor = ''
+      })
+      map.on('click', OFFICERS_LAYER_ID, (event) => {
+        const feature = event.features?.[0]
+        const props = (feature?.properties || {}) as Record<string, unknown>
+        const id = String(props.id || '')
+        if (!id) return
+
+        onSelectRef.current?.(id)
+        popupRef.current?.remove()
+        popupRef.current = new mapboxgl.Popup({ offset: 16 })
+          .setLngLat((feature?.geometry as GeoJSON.Point).coordinates as [number, number])
+          .setHTML(popupFromProps(props))
+          .addTo(map)
+      })
+
+      ensureSelectedFilter()
+      updateSourceData()
+      onReadyRef.current?.(map)
+    })
 
     return () => {
+      popupRef.current?.remove()
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [onReady])
+  }, [])
 
   useEffect(() => {
-    if (!mapRef.current) return
-    const map = mapRef.current
-    const markers = markersRef.current
-
+    const nextIds = new Set<string>()
     officers.forEach((officer) => {
-      const existing = markers.get(officer.id)
-      const color = statusColor(officer.status)
-
-      if (existing) {
-        existing.setLngLat([officer.longitude, officer.latitude])
-        const el = existing.getElement() as HTMLDivElement
-        el.style.background = color
-        el.style.boxShadow = officer.id === selectedId ? `0 0 0 6px ${alpha(color, 0.2)}` : 'none'
-        return
+      nextIds.add(officer.id)
+      metaByIdRef.current.set(officer.id, officer)
+      targetByIdRef.current.set(officer.id, { lng: officer.longitude, lat: officer.latitude })
+      if (!currentByIdRef.current.has(officer.id)) {
+        currentByIdRef.current.set(officer.id, { lng: officer.longitude, lat: officer.latitude })
       }
+    })
 
-      const el = document.createElement('div')
-      el.style.width = '12px'
-      el.style.height = '12px'
-      el.style.borderRadius = '999px'
-      el.style.background = color
-      el.style.boxShadow = officer.id === selectedId ? `0 0 0 6px ${alpha(color, 0.2)}` : 'none'
-      el.style.border = `2px solid ${theme.palette.common.white}`
-      el.style.cursor = 'pointer'
+    Array.from(currentByIdRef.current.keys()).forEach((id) => {
+      if (!nextIds.has(id)) {
+        currentByIdRef.current.delete(id)
+        targetByIdRef.current.delete(id)
+        metaByIdRef.current.delete(id)
+      }
+    })
 
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([officer.longitude, officer.latitude])
-        .setPopup(new mapboxgl.Popup({ offset: 16 }).setHTML(buildPopupHtml(officer)))
-        .addTo(map)
+    const animate = (ts: number) => {
+      const last = lastFrameRef.current ?? ts
+      const dt = Math.max(1, ts - last)
+      lastFrameRef.current = ts
+      const alphaStep = Math.min(1, dt / INTERPOLATION_DURATION_MS)
+      let hasMovement = false
 
-      el.addEventListener('click', () => {
-        onSelect?.(officer.id)
-        marker.togglePopup()
+      currentByIdRef.current.forEach((current, id) => {
+        const target = targetByIdRef.current.get(id)
+        if (!target) return
+        const nextLng = current.lng + (target.lng - current.lng) * alphaStep
+        const nextLat = current.lat + (target.lat - current.lat) * alphaStep
+        const lngDone = Math.abs(target.lng - nextLng) <= SNAP_EPSILON
+        const latDone = Math.abs(target.lat - nextLat) <= SNAP_EPSILON
+        current.lng = lngDone ? target.lng : nextLng
+        current.lat = latDone ? target.lat : nextLat
+        if (!lngDone || !latDone) hasMovement = true
       })
 
-      markers.set(officer.id, marker)
-    })
-
-    markers.forEach((marker, id) => {
-      if (!officersById.has(id)) {
-        marker.remove()
-        markers.delete(id)
+      updateSourceData()
+      if (hasMovement) {
+        animationFrameRef.current = requestAnimationFrame(animate)
+      } else {
+        animationFrameRef.current = null
+        lastFrameRef.current = null
       }
-    })
-  }, [officers, officersById, onSelect, selectedId, theme.palette.common.white])
+    }
+
+    if (animationFrameRef.current === null) {
+      animationFrameRef.current = requestAnimationFrame(animate)
+    }
+    updateSourceData()
+  }, [officers])
+
+  useEffect(() => {
+    ensureSelectedFilter()
+  }, [selectedId])
 
   return (
     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>

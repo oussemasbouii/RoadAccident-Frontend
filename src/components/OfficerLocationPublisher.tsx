@@ -1,13 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { io, Socket } from 'socket.io-client'
 import { useAppSelector } from '@/store/store'
-import { getAccessToken, getDeviceId, getRefreshToken } from '@/utils/tokenStore'
+import { getRefreshToken } from '@/utils/tokenStore'
+import { connectSharedSocket } from '@/services/socketClient'
 
-const SOCKET_BASE_URL = import.meta.env.VITE_SOCKET_BASE_URL || 'https://micladevops.com'
-const SOCKET_PATH = import.meta.env.VITE_SOCKET_PATH || '/api/v2/socket.io'
 const LOCATION_EVENT = 'request:location:update'
 
-const LOCATION_INTERVAL_MS = 5000
 const MIN_EMIT_INTERVAL_MS = 3000
 const MIN_DISTANCE_METERS = 20
 const MAX_ACCURACY_METERS = 50
@@ -17,7 +14,6 @@ export default function OfficerLocationPublisher() {
   const token = useAppSelector((state) => state.auth.token)
   const user = useAppSelector((state) => state.auth.user)
 
-  const socketRef = useRef<Socket | null>(null)
   const lastSentRef = useRef<{ lat: number; lng: number; at: number } | null>(null)
   const watchIdRef = useRef<number | null>(null)
 
@@ -26,22 +22,17 @@ export default function OfficerLocationPublisher() {
     // Publish for all authenticated users
 
     const refreshToken = getRefreshToken()
-    const effectiveToken = refreshToken || getAccessToken() || token
+    if (!refreshToken) return
 
-    const socket = io(SOCKET_BASE_URL, {
-      path: SOCKET_PATH,
-      transports: ['websocket', 'polling'],
-      auth: {
-        token: effectiveToken,
-        accessToken: getAccessToken(),
-        refreshToken,
-        deviceId: getDeviceId(),
-      },
-    })
-    socketRef.current = socket
+    const socket = connectSharedSocket(refreshToken)
+    if (!socket) return
+
+    const onConnect = () => console.log('[OfficerLocation] socket connected')
+    const onConnectError = (err: Error) => console.log('[OfficerLocation] socket error', err?.message)
+
     if (import.meta.env.DEV) {
-      socket.on('connect', () => console.log('[OfficerLocation] socket connected'))
-      socket.on('connect_error', (err) => console.log('[OfficerLocation] socket error', err?.message))
+      socket.on('connect', onConnect)
+      socket.on('connect_error', onConnectError)
     }
 
     const canUseGeo = typeof navigator !== 'undefined' && 'geolocation' in navigator
@@ -85,8 +76,10 @@ export default function OfficerLocationPublisher() {
         navigator.geolocation.clearWatch(watchIdRef.current)
         watchIdRef.current = null
       }
-      socket.disconnect()
-      socketRef.current = null
+      if (import.meta.env.DEV) {
+        socket.off('connect', onConnect)
+        socket.off('connect_error', onConnectError)
+      }
     }
   }, [token, user?.role])
 

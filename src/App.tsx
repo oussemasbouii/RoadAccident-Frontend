@@ -17,6 +17,7 @@ import AdminAccountsPage from './features/settings/pages/AdminAccountsPage'
 import OfficerTrackingPage from './features/admin/pages/OfficerTrackingPage'
 import OfficerLocationPublisher from './components/OfficerLocationPublisher'
 import RealtimeSync from './components/RealtimeSync'
+import SocketConnectionManager from './components/SocketConnectionManager'
 import { clearAuthStorage, isTokenExpired } from './utils/authSecurity'
 import { getAccessToken, setAccessToken, setRefreshToken } from './utils/tokenStore'
 import { apiService } from './services/api'
@@ -115,6 +116,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <Provider store={store}>
+      <SocketConnectionManager />
       <RealtimeSync />
       <OfficerLocationPublisher />
       <Router>
