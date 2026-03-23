@@ -297,6 +297,8 @@ export default function ReportsPage() {
             data={reportExportData}
             filename={`officer-briefing-${timeRange}`}
             label="Export Briefing"
+            title="Officer Briefing"
+            variant="report"
           />
         </Stack>
       </Box>

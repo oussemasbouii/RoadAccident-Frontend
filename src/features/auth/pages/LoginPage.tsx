@@ -32,6 +32,7 @@ import { AuthUser } from '../slices/authSlice'
 import { setUser, setToken } from '../slices/authSlice'
 import { useThemeMode } from '../../../themeMode'
 import { clearAuthStorage } from '@/utils/authSecurity'
+import { getDeviceId, setAccessToken, setDeviceId, setRefreshToken } from '@/utils/tokenStore'
 import { Button, Card } from '@/components/Common'
 
 function mapLoginError(err: any): { message: string; isBlocked?: boolean; isRestricted?: boolean } {
@@ -122,6 +123,10 @@ function mapLoginError(err: any): { message: string; isBlocked?: boolean; isRest
     return { message: 'Server error during password verification. Please try again later.' }
   }
 
+  if (status && status >= 500) {
+    return { message: 'Server error while signing in. Please try again in a few minutes.' }
+  }
+
   if (
     status === 423 ||
     msg.includes('blocked') ||
@@ -135,15 +140,19 @@ function mapLoginError(err: any): { message: string; isBlocked?: boolean; isRest
     return { message: 'Invalid credentials. Please check your officer ID and password.' }
   }
 
+  if (!status && (msg.includes('network') || msg.includes('failed to fetch'))) {
+    return { message: 'Network error. Check your connection and try again.' }
+  }
+
   return { message: payload?.message || err?.message || 'Login failed' }
 }
 
 function getDeviceInfo() {
   const ua = navigator.userAgent || ''
-  const existingDeviceId = localStorage.getItem('deviceId')
+  const existingDeviceId = getDeviceId()
   const deviceId = existingDeviceId || `web-${Math.random().toString(36).slice(2, 10)}`
   if (!existingDeviceId) {
-    localStorage.setItem('deviceId', deviceId)
+    setDeviceId(deviceId)
   }
 
   return {
@@ -196,8 +205,8 @@ export default function LoginPage() {
         throw new Error('Login failed: No access token received')
       }
 
-      localStorage.setItem('accessToken', accessToken)
-      if (refreshToken) localStorage.setItem('refreshToken', refreshToken)
+      setAccessToken(accessToken)
+      if (refreshToken) setRefreshToken(refreshToken)
       
       const backendUser = tokenPayload?.user || tokenPayload?.officer || {}
       const firstName = backendUser?.firstName || ''
@@ -342,7 +351,7 @@ export default function LoginPage() {
       center: 'DEV CENTER',
     }
 
-    localStorage.setItem('accessToken', devToken)
+    setAccessToken(devToken)
     dispatch(setToken(devToken))
     dispatch(setUser(devUser))
     navigate('/')

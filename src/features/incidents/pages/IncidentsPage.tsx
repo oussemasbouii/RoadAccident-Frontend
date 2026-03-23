@@ -123,6 +123,8 @@ export default function IncidentsPage() {
           data={displayedIncidents || []}
           filename="incidents"
           label="Export Records"
+          title="Incident Operations"
+          variant="incidents"
         />
       </Box>
 

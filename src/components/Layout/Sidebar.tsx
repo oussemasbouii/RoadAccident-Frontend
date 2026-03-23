@@ -19,11 +19,13 @@ import ReportProblemRoundedIcon from '@mui/icons-material/ReportProblemRounded'
 import NotificationsActiveRoundedIcon from '@mui/icons-material/NotificationsActiveRounded'
 import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded'
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded'
+import LocationSearchingRoundedIcon from '@mui/icons-material/LocationSearchingRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 
 import { RootState } from '../../store/store'
 import { logout } from '../../features/auth/slices/authSlice'
+import { clearAuthStorage } from '../../utils/authSecurity'
 
 interface SidebarProps {
   collapsed?: boolean
@@ -41,6 +43,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
     { path: '/alerts', label: 'Alerts', icon: <NotificationsActiveRoundedIcon /> },
     { path: '/reports', label: 'Reports', icon: <BarChartRoundedIcon /> },
     { path: '/admin/accounts', label: 'User Accounts', icon: <AdminPanelSettingsRoundedIcon />, role: 'admin' },
+    { path: '/admin/officer-tracking', label: 'Officer Tracking', icon: <LocationSearchingRoundedIcon />, role: 'admin' },
     { path: '/settings', label: 'Settings', icon: <SettingsRoundedIcon /> },
   ]
 
@@ -52,9 +55,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
 
   const handleLogout = () => {
     dispatch(logout())
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('user')
+    clearAuthStorage()
     navigate('/login')
   }
 

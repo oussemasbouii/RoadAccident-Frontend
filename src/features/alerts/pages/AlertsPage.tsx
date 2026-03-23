@@ -263,7 +263,13 @@ export default function AlertsPage() {
           <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>Alerts Operations</Typography>
           <Typography color="text.secondary">Send location alerts, track delivery, and acknowledge received alerts</Typography>
         </Box>
-        <ExportButton data={alerts || []} filename="alerts-operations" label="Export Alerts" />
+        <ExportButton
+          data={alerts || []}
+          filename="alerts-operations"
+          label="Export Alerts"
+          title="Alert Operations"
+          variant="alerts"
+        />
       </Box>
 
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: 'repeat(4, 1fr)' } }}>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { Provider, useSelector } from 'react-redux'
+import { Provider, useDispatch, useSelector } from 'react-redux'
 import { Toaster } from 'react-hot-toast'
 import store, { RootState } from './store/store'
 import LoginPage from './features/auth/pages/LoginPage'
@@ -14,23 +14,92 @@ import AlertsPage from './features/alerts/pages/AlertsPage'
 import ReportsPage from './features/reports/pages/ReportsPage'
 import SettingsPage from './features/settings/pages/SettingsPage'
 import AdminAccountsPage from './features/settings/pages/AdminAccountsPage'
+import OfficerTrackingPage from './features/admin/pages/OfficerTrackingPage'
+import OfficerLocationPublisher from './components/OfficerLocationPublisher'
 import RealtimeSync from './components/RealtimeSync'
 import { clearAuthStorage, isTokenExpired } from './utils/authSecurity'
+import { getAccessToken, setAccessToken, setRefreshToken } from './utils/tokenStore'
+import { apiService } from './services/api'
+import { setUser } from './features/auth/slices/authSlice'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [isAuth, setIsAuth] = useState(false)
   const [loading, setLoading] = useState(true)
+  const dispatch = useDispatch()
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken')
-    if (!token || isTokenExpired(token)) {
-      clearAuthStorage()
-      setIsAuth(false)
-      setLoading(false)
-      return
+    let mounted = true
+    const useRefreshCookie = import.meta.env.VITE_USE_REFRESH_COOKIE === 'true'
+    const token = getAccessToken()
+    if (token && !isTokenExpired(token)) {
+      if (mounted) {
+        setIsAuth(true)
+        setLoading(false)
+      }
+      apiService.users.getMe()
+        .then((resp) => {
+          const user = resp.data?.data ?? resp.data
+          if (mounted) dispatch(setUser(user))
+        })
+        .catch(() => {
+          // ignore user fetch errors here; auth remains valid
+        })
+      return () => {
+        mounted = false
+      }
     }
-    setIsAuth(true)
-    setLoading(false)
+
+    if (!useRefreshCookie) {
+      clearAuthStorage()
+      if (mounted) {
+        dispatch(setUser(null))
+        setIsAuth(false)
+        setLoading(false)
+      }
+      return () => {
+        mounted = false
+      }
+    }
+
+    apiService.auth
+      .refresh()
+      .then((resp) => {
+        const payload = resp.data?.data || resp.data || {}
+        const { accessToken, refreshToken } = payload
+        if (accessToken && !isTokenExpired(accessToken)) {
+          setAccessToken(accessToken)
+          if (refreshToken) setRefreshToken(refreshToken)
+          if (mounted) setIsAuth(true)
+          apiService.users.getMe()
+            .then((resp) => {
+              const user = resp.data?.data ?? resp.data
+              if (mounted) dispatch(setUser(user))
+            })
+            .catch(() => {
+              // ignore user fetch errors here; auth remains valid
+            })
+        } else {
+          clearAuthStorage()
+          if (mounted) {
+            dispatch(setUser(null))
+            setIsAuth(false)
+          }
+        }
+      })
+      .catch(() => {
+        clearAuthStorage()
+        if (mounted) {
+          dispatch(setUser(null))
+          setIsAuth(false)
+        }
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
   }, [])
 
   if (loading) return <div className="flex items-center justify-center h-screen bg-surface">Loading...</div>
@@ -47,6 +116,7 @@ function App() {
   return (
     <Provider store={store}>
       <RealtimeSync />
+      <OfficerLocationPublisher />
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -67,6 +137,7 @@ function App() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="admin/accounts" element={<AdminRoute><AdminAccountsPage /></AdminRoute>} />
+            <Route path="admin/officer-tracking" element={<AdminRoute><OfficerTrackingPage /></AdminRoute>} />
             <Route index element={<Navigate to="/dashboard" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />

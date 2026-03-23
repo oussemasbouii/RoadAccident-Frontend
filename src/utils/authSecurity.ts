@@ -1,10 +1,10 @@
+import { clearTokens } from './tokenStore'
+
 export function clearAuthStorage() {
   if (import.meta.env.DEV) {
     console.trace('🗑️ clearAuthStorage called - clearing auth tokens')
   }
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('refreshToken')
-  localStorage.removeItem('user')
+  clearTokens()
 }
 
 function decodeJwtPayload(token: string) {

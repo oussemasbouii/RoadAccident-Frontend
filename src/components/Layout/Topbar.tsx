@@ -32,6 +32,7 @@ import { logout } from '../../features/auth/slices/authSlice'
 import { fetchAlerts, markAlertAsRead } from '../../features/alerts/slices/alertsSlice'
 import { apiService } from '../../services/api'
 import { useThemeMode } from '../../themeMode'
+import { clearAuthStorage } from '../../utils/authSecurity'
 
 interface TopbarProps {
   onMenuClick?: () => void
@@ -115,9 +116,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
 
   const handleLogout = () => {
     dispatch(logout())
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('user')
+    clearAuthStorage()
     navigate('/login')
   }
 

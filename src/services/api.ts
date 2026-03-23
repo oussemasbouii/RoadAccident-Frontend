@@ -5,6 +5,7 @@ import {
   CreateAccidentErrorResponse 
 } from '@/types/accident'
 import { clearAuthStorage } from '@/utils/authSecurity'
+import { getAccessToken, getDeviceId, getRefreshToken, setAccessToken, setRefreshToken } from '@/utils/tokenStore'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -25,19 +26,7 @@ const processQueue = (error: any, token: string | null = null) => {
 }
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken')
-  
-  // Debug: Log token status
-  if (import.meta.env.DEV) {
-    console.log('🔍 API Request:', {
-      url: config.url,
-      method: config.method,
-      hasToken: !!token,
-      tokenLength: token?.length,
-      tokenPreview: token ? `${token.substring(0, 20)}...` : 'null'
-    })
-  }
-  
+  const token = getAccessToken()
   if (token && config.headers) {
     config.headers['Authorization'] = `Bearer ${token}`
   }
@@ -93,19 +82,19 @@ api.interceptors.response.use(
       originalRequest._retry = true
       isRefreshing = true
 
-      const refreshToken = localStorage.getItem('refreshToken')
-      const deviceId = localStorage.getItem('deviceId')
+      const refreshToken = getRefreshToken()
+      const deviceId = getDeviceId()
+      const useRefreshCookie = import.meta.env.VITE_USE_REFRESH_COOKIE === 'true'
 
-      if (!refreshToken) {
+      if (!refreshToken && !useRefreshCookie) {
         isRefreshing = false
-        if (import.meta.env.DEV) {
-          console.error('❌ No refresh token available, cannot refresh access token')
-        }
         return Promise.reject(error)
       }
 
       try {
-        const refreshPayload = deviceId ? { refreshToken, deviceId } : { refreshToken }
+        const refreshPayload = refreshToken
+          ? (deviceId ? { refreshToken, deviceId } : { refreshToken })
+          : {}
         const resp = await axios.post(`${API_BASE_URL}/auth/refresh`, refreshPayload, {
           withCredentials: true,
         })
@@ -115,8 +104,8 @@ api.interceptors.response.use(
           throw new Error('Refresh succeeded but no access token was returned')
         }
 
-        localStorage.setItem('accessToken', accessToken)
-        if (newRefresh) localStorage.setItem('refreshToken', newRefresh)
+        setAccessToken(accessToken)
+        if (newRefresh) setRefreshToken(newRefresh)
         api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`
         processQueue(null, accessToken)
         return api(originalRequest)
@@ -179,7 +168,7 @@ export const apiService = {
       email?: string
       officerId?: string
     }) => api.post('/auth/password/reset', data),
-    refresh: (data: { refreshToken: string; deviceId?: string }) => api.post('/auth/refresh', data),
+    refresh: (data: { refreshToken?: string; deviceId?: string } = {}) => api.post('/auth/refresh', data),
     signout: () => api.post('/auth/signout'),
   },
 
@@ -245,6 +234,7 @@ export const apiService = {
   admin: {
     listOfficers: (params?: { query?: string; page?: number; limit?: number }) =>
       api.get('/admin/officers', { params }),
+    getOfficerLocations: () => api.get('/admin/officers/locations'),
     validateOfficer: (officerId: string, data: { reason?: string; actorId?: string }) =>
       api.post(`/admin/officers/${officerId}/validate`, data),
     updateOfficerStatus: (

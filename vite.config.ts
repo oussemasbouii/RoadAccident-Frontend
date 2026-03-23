@@ -19,6 +19,7 @@ export default defineConfig({
   server: {
     port: 5273,
     strictPort: false,
+    hmr: false,
     proxy: {
       "/api": {
         // Proxy API calls to the mobile backend (production/dev endpoint)

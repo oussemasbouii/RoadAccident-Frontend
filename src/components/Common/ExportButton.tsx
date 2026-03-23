@@ -27,17 +27,43 @@ import {
   exportDOCXFromRows,
   exportJPGFromRows,
   exportODTFromRows,
+  exportReportCSV,
+  exportReportXLSX,
+  exportReportPDF,
+  exportReportDOCX,
+  exportReportJPG,
+  exportReportODT,
+  exportAlertsCSV,
+  exportAlertsXLSX,
+  exportAlertsPDF,
+  exportAlertsDOCX,
+  exportAlertsJPG,
+  exportAlertsODT,
+  exportIncidentsCSV,
+  exportIncidentsXLSX,
+  exportIncidentsPDF,
+  exportIncidentsDOCX,
+  exportIncidentsJPG,
+  exportIncidentsODT,
 } from '../../utils/exporters'
 
 interface ExportButtonProps {
   data: any[]
   filename?: string
   label?: string
+  variant?: 'default' | 'report' | 'alerts' | 'incidents'
+  title?: string
 }
 
 type ExportFormat = 'csv' | 'xlsx' | 'pdf' | 'docx' | 'jpg' | 'odt'
 
-export default function ExportButton({ data, filename = 'export', label = 'Export' }: ExportButtonProps) {
+export default function ExportButton({
+  data,
+  filename = 'export',
+  label = 'Export',
+  variant = 'default',
+  title,
+}: ExportButtonProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [isExporting, setIsExporting] = useState(false)
   const theme = useTheme()
@@ -58,25 +84,74 @@ export default function ExportButton({ data, filename = 'export', label = 'Expor
     try {
       const timestamp = new Date().toISOString().split('T')[0]
       const baseFilename = `${filename}-${timestamp}`
+      const reportTitle = title || label
 
       switch (format) {
         case 'csv':
-          exportCSV(data, `${baseFilename}.csv`)
+          if (variant === 'report') {
+            exportReportCSV(data, `${baseFilename}.csv`)
+          } else if (variant === 'alerts') {
+            exportAlertsCSV(data, `${baseFilename}.csv`)
+          } else if (variant === 'incidents') {
+            exportIncidentsCSV(data, `${baseFilename}.csv`)
+          } else {
+            exportCSV(data, `${baseFilename}.csv`)
+          }
           break
         case 'xlsx':
-          exportXLSX(data, `${baseFilename}.xlsx`, 'Sheet1')
+          if (variant === 'report') {
+            exportReportXLSX(data, `${baseFilename}.xlsx`)
+          } else if (variant === 'alerts') {
+            exportAlertsXLSX(data, `${baseFilename}.xlsx`)
+          } else if (variant === 'incidents') {
+            exportIncidentsXLSX(data, `${baseFilename}.xlsx`)
+          } else {
+            exportXLSX(data, `${baseFilename}.xlsx`, 'Sheet1')
+          }
           break
         case 'pdf':
-          exportPDFFromRows(data, `${baseFilename}.pdf`, label)
+          if (variant === 'report') {
+            await exportReportPDF(data, `${baseFilename}.pdf`, reportTitle)
+          } else if (variant === 'alerts') {
+            await exportAlertsPDF(data, `${baseFilename}.pdf`, reportTitle)
+          } else if (variant === 'incidents') {
+            await exportIncidentsPDF(data, `${baseFilename}.pdf`, reportTitle)
+          } else {
+            exportPDFFromRows(data, `${baseFilename}.pdf`, reportTitle)
+          }
           break
         case 'docx':
-          await exportDOCXFromRows(data, `${baseFilename}.docx`)
+          if (variant === 'report') {
+            await exportReportDOCX(data, `${baseFilename}.docx`, reportTitle)
+          } else if (variant === 'alerts') {
+            await exportAlertsDOCX(data, `${baseFilename}.docx`, reportTitle)
+          } else if (variant === 'incidents') {
+            await exportIncidentsDOCX(data, `${baseFilename}.docx`, reportTitle)
+          } else {
+            await exportDOCXFromRows(data, `${baseFilename}.docx`)
+          }
           break
         case 'jpg':
-          await exportJPGFromRows(data, `${baseFilename}.jpg`, label)
+          if (variant === 'report') {
+            await exportReportJPG(data, `${baseFilename}.jpg`, reportTitle)
+          } else if (variant === 'alerts') {
+            await exportAlertsJPG(data, `${baseFilename}.jpg`, reportTitle)
+          } else if (variant === 'incidents') {
+            await exportIncidentsJPG(data, `${baseFilename}.jpg`, reportTitle)
+          } else {
+            await exportJPGFromRows(data, `${baseFilename}.jpg`, reportTitle)
+          }
           break
         case 'odt':
-          await exportODTFromRows(data, `${baseFilename}.odt`)
+          if (variant === 'report') {
+            await exportReportODT(data, `${baseFilename}.odt`, reportTitle)
+          } else if (variant === 'alerts') {
+            await exportAlertsODT(data, `${baseFilename}.odt`, reportTitle)
+          } else if (variant === 'incidents') {
+            await exportIncidentsODT(data, `${baseFilename}.odt`, reportTitle)
+          } else {
+            await exportODTFromRows(data, `${baseFilename}.odt`)
+          }
           break
       }
     } catch (error) {

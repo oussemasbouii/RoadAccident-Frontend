@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit'
+import { getAccessToken, setAccessToken, clearTokens } from '../../../utils/tokenStore'
 
 export interface AuthUser {
   id: string
@@ -21,18 +22,9 @@ interface AuthState {
   error: string | null
 }
 
-const getUserFromStorage = (): AuthUser | null => {
-  const user = localStorage.getItem('user')
-  try {
-    return user ? JSON.parse(user) : null
-  } catch {
-    return null
-  }
-}
-
 const initialState: AuthState = {
-  user: getUserFromStorage(),
-  token: localStorage.getItem('accessToken'),
+  user: null,
+  token: getAccessToken(),
   isLoading: false,
   error: null,
 }
@@ -43,15 +35,10 @@ const authSlice = createSlice({
   reducers: {
     setUser: (state, action) => {
       state.user = action.payload
-      if (action.payload) {
-        localStorage.setItem('user', JSON.stringify(action.payload))
-      } else {
-        localStorage.removeItem('user')
-      }
     },
     setToken: (state, action) => {
       state.token = action.payload
-      localStorage.setItem('accessToken', action.payload)
+      setAccessToken(action.payload)
     },
     setLoading: (state, action) => {
       state.isLoading = action.payload
@@ -62,9 +49,7 @@ const authSlice = createSlice({
     logout: (state) => {
       state.user = null
       state.token = null
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('user')
+      clearTokens()
     },
   },
 })
