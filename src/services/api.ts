@@ -230,6 +230,18 @@ export const apiService = {
     checkStatus: (officerId: string) => api.get(`/users/status/${officerId}`),
   },
 
+  // Chat
+  chat: {
+    status: (userIds: string[]) =>
+      api.get('/chat/status', { params: { userIds: userIds.join(',') } }),
+  },
+
+  // Calls
+  calls: {
+    initiate: (data: { calleeId: string; roomId: string; callType: 'audio' | 'video' }) =>
+      api.post('/calls/initiate', data),
+  },
+
   // Administration
   admin: {
     listOfficers: (params?: { query?: string; page?: number; limit?: number }) =>
@@ -245,6 +257,21 @@ export const apiService = {
       api.delete(`/admin/officers/${officerId}`, { data }),
     triggerOfficerPasswordReset: (officerId: string, data: { reason?: string; actorId?: string }) =>
       api.post(`/admin/officers/${officerId}/password-reset`, data),
+  },
+
+  // Attachments
+  attachments: {
+    requestUpload: (data: { filename: string; mimeType: string; fileType: 'IMAGE'; size: number }) =>
+      api.post('/attachments/request-upload', data),
+    confirmUpload: (data: {
+      clientId: string
+      key: string
+      filename: string
+      mimeType: string
+      fileType: 'IMAGE'
+      size: number
+    }) => api.post('/attachments/confirm-upload', data),
+    getDownload: (id: string) => api.get(`/attachments/${id}`),
   },
 }
 

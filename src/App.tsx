@@ -15,9 +15,13 @@ import ReportsPage from './features/reports/pages/ReportsPage'
 import SettingsPage from './features/settings/pages/SettingsPage'
 import AdminAccountsPage from './features/settings/pages/AdminAccountsPage'
 import OfficerTrackingPage from './features/admin/pages/OfficerTrackingPage'
+import CommsHubPage from './features/communications/pages/CommsHubPage'
 import OfficerLocationPublisher from './components/OfficerLocationPublisher'
 import RealtimeSync from './components/RealtimeSync'
+import ChatRealtimeManager from './components/ChatRealtimeManager'
+import ChatDockManager from './components/ChatDockManager'
 import SocketConnectionManager from './components/SocketConnectionManager'
+import CallManager from './components/CallManager'
 import { clearAuthStorage, isTokenExpired } from './utils/authSecurity'
 import { getAccessToken, setAccessToken, setRefreshToken } from './utils/tokenStore'
 import { apiService } from './services/api'
@@ -114,12 +118,27 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  function AuthenticatedServices() {
+    const user = useSelector((state: RootState) => state.auth.user)
+    const token = useSelector((state: RootState) => state.auth.token)
+    const isAuthed = Boolean(user || token)
+    if (!isAuthed) return null
+    return (
+      <>
+        <ChatRealtimeManager />
+        <ChatDockManager />
+        <CallManager />
+        <OfficerLocationPublisher />
+      </>
+    )
+  }
+
   return (
     <Provider store={store}>
-      <SocketConnectionManager />
-      <RealtimeSync />
-      <OfficerLocationPublisher />
       <Router>
+        <SocketConnectionManager />
+        <RealtimeSync />
+        <AuthenticatedServices />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/admin-signup" element={<AdminSignupPage />} />
@@ -137,6 +156,7 @@ function App() {
             <Route path="incidents" element={<IncidentsPage />} />
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="communications" element={<CommsHubPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="admin/accounts" element={<AdminRoute><AdminAccountsPage /></AdminRoute>} />
             <Route path="admin/officer-tracking" element={<AdminRoute><OfficerTrackingPage /></AdminRoute>} />

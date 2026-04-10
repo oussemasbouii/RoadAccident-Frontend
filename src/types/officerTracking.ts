@@ -3,6 +3,7 @@ export interface OfficerLocation {
   userId?: string
   officerId?: string
   name?: string
+  phoneNumber?: string
   role?: string
   status?: string
   latitude: number

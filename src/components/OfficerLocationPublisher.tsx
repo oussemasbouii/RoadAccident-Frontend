@@ -5,9 +5,9 @@ import { connectSharedSocket } from '@/services/socketClient'
 
 const LOCATION_EVENT = 'request:location:update'
 
-const MIN_EMIT_INTERVAL_MS = 3000
-const MIN_DISTANCE_METERS = 20
-const MAX_ACCURACY_METERS = 50
+const MIN_EMIT_INTERVAL_MS = 2000
+const MIN_DISTANCE_METERS = 5
+const MAX_ACCURACY_METERS = 150
 const MAX_LOCATION_AGE_MS = 30000
 
 export default function OfficerLocationPublisher() {
@@ -65,10 +65,19 @@ export default function OfficerLocationPublisher() {
       if (import.meta.env.DEV) console.log('[OfficerLocation] geolocation error', err?.message)
     }
 
+    const requestOnce = () => {
+      navigator.geolocation.getCurrentPosition(handlePosition, handleError, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 15000,
+      })
+    }
+
+    requestOnce()
     watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, {
-      enableHighAccuracy: false,
-      maximumAge: 10000,
-      timeout: 10000,
+      enableHighAccuracy: true,
+      maximumAge: 5000,
+      timeout: 15000,
     })
 
     return () => {

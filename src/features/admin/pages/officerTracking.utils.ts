@@ -24,12 +24,14 @@ export function normalizeTrackingPayload(payload: any, receivedAt = Date.now()):
   const updatedAt = new Date(lastSeen).toISOString()
   const officerName = typeof data?.officerName === 'string' ? data.officerName.trim() : undefined
   const name = officerName || data?.name
+  const phoneNumber = data?.phoneNumber || data?.phone
 
   return {
     id,
     userId: canonicalUserId ? String(canonicalUserId) : undefined,
     officerId: data?.officerId,
     name,
+    phoneNumber,
     role: data?.role,
     status: data?.status,
     latitude,

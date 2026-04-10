@@ -17,6 +17,7 @@ const DEFAULT_ZOOM = 6
 const SOURCE_ID = 'officer-tracking-source'
 const OFFICERS_LAYER_ID = 'officer-tracking-points'
 const SELECTED_LAYER_ID = 'officer-tracking-selected'
+const LABEL_LAYER_ID = 'officer-tracking-labels'
 const INTERPOLATION_DURATION_MS = 600
 const SNAP_EPSILON = 0.00001
 
@@ -37,17 +38,12 @@ function escapeHtml(value: unknown) {
 
 function popupFromProps(properties: Record<string, unknown>) {
   const title = escapeHtml(properties.name || properties.officerId || properties.id || 'Officer')
-  const subtitleRaw = properties.role
-  const subtitle = escapeHtml(subtitleRaw || '')
-  const status = escapeHtml(String(properties.status || 'UNKNOWN').toUpperCase())
   const updated = properties.updatedAt ? new Date(String(properties.updatedAt)).toLocaleString() : 'Unknown'
 
   return `
-    <div style="min-width:180px;font-family:Inter,system-ui,sans-serif">
-      <div style="font-weight:700;margin-bottom:4px">${title}</div>
-      ${subtitle ? `<div style="font-size:12px;opacity:0.7;margin-bottom:6px">${subtitle}</div>` : ''}
-      <div style="font-size:12px"><strong>Status:</strong> ${status}</div>
-      <div style="font-size:12px;margin-top:4px"><strong>Updated:</strong> ${escapeHtml(updated)}</div>
+    <div style="min-width:180px;font-family:Inter,system-ui,sans-serif;color:#000000">
+      <div style="font-weight:700;margin-bottom:6px">${title}</div>
+      <div style="font-size:12px"><strong>Updated:</strong> ${escapeHtml(updated)}</div>
     </div>
   `
 }
@@ -97,6 +93,7 @@ export default function OfficerTrackingMap({
           id: officer.id,
           name: officer.name || '',
           officerId: officer.officerId || '',
+          phoneNumber: officer.phoneNumber || '',
           role: officer.role || '',
           status: officer.status || '',
           updatedAt: officer.updatedAt || '',
@@ -145,8 +142,10 @@ export default function OfficerTrackingMap({
       style: 'mapbox://styles/mapbox/streets-v12',
       center: DEFAULT_CENTER,
       zoom: DEFAULT_ZOOM,
+      attributionControl: false,
     })
     mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
+    mapRef.current.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right')
     mapRef.current.on('error', () => setError('Failed to load map tiles.'))
     mapRef.current.on('load', () => {
       const map = mapRef.current
@@ -184,6 +183,24 @@ export default function OfficerTrackingMap({
           'circle-opacity': 0.2,
         },
         filter: ['==', ['get', 'id'], '__none__'],
+      })
+
+      map.addLayer({
+        id: LABEL_LAYER_ID,
+        type: 'symbol',
+        source: SOURCE_ID,
+        layout: {
+          'text-field': ['coalesce', ['get', 'name'], ['get', 'officerId'], 'Officer'],
+          'text-size': 12,
+          'text-offset': [0, 1.5],
+          'text-anchor': 'top',
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#0f172a',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 1.2,
+        },
       })
 
       map.on('mouseenter', OFFICERS_LAYER_ID, () => {
@@ -277,10 +294,37 @@ export default function OfficerTrackingMap({
 
   useEffect(() => {
     ensureSelectedFilter()
+    const map = mapRef.current
+    if (!map || !selectedId) return
+    const coords = currentByIdRef.current.get(selectedId)
+    const meta = metaByIdRef.current.get(selectedId)
+    if (!coords || !meta) return
+    popupRef.current?.remove()
+    popupRef.current = new mapboxgl.Popup({ offset: 16 })
+      .setLngLat([coords.lng, coords.lat])
+      .setHTML(
+        popupFromProps({
+          id: meta.id,
+          name: meta.name,
+          officerId: meta.officerId,
+          role: meta.role,
+          status: meta.status,
+          updatedAt: meta.updatedAt,
+          phoneNumber: meta.phoneNumber,
+        })
+      )
+      .addTo(map)
   }, [selectedId])
 
   return (
-    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+    <Box
+      sx={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        '& .mapboxgl-ctrl-attrib a[href*="mapbox.com/feedback"]': { display: 'none' },
+      }}
+    >
       <Box ref={mapContainer} sx={{ width: '100%', height: '100%' }} />
       {error && (
         <Box

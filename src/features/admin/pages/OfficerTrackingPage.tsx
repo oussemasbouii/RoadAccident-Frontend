@@ -5,6 +5,7 @@ import {
   Chip,
   Divider,
   Stack,
+  Autocomplete,
   TextField,
   Typography,
   alpha,
@@ -67,11 +68,19 @@ export default function OfficerTrackingPage() {
   const filteredOfficers = useMemo(() => {
     if (!query.trim()) return officers
     const needle = query.trim().toLowerCase()
-    return officers.filter((officer) =>
-      [officer.name, officer.officerId, officer.role, officer.id]
+    return officers.filter((officer) => {
+      const haystack = [
+        officer.name,
+        officer.officerId,
+        officer.role,
+        officer.userId,
+        officer.id,
+      ]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle))
-    )
+        .map((value) => String(value).toLowerCase())
+        .join(' ')
+      return haystack.includes(needle)
+    })
   }, [officers, query])
   const visibleOfficers = useMemo(() => {
     if (statusFilter === 'all') return filteredOfficers
@@ -97,6 +106,17 @@ export default function OfficerTrackingPage() {
     [officers]
   )
   const liveCount = Math.max(0, officers.length - staleCount)
+
+  const searchOptions = useMemo(() => {
+    return officers
+      .map((officer) => {
+        const label = officer.name || 'Unknown'
+        const idLabel = officer.officerId || officer.userId || officer.id
+        return idLabel ? `${label} · ${idLabel}` : label
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b))
+  }, [officers])
 
   useEffect(() => {
     if (!token) return
@@ -258,11 +278,6 @@ export default function OfficerTrackingPage() {
                 </Typography>
               </Stack>
             )}
-            {lastInitCount !== null && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-                Last snapshot officers: {lastInitCount}
-              </Typography>
-            )}
           </Box>
           <Stack direction="row" spacing={1} alignItems="center">
             <Chip
@@ -330,13 +345,13 @@ export default function OfficerTrackingPage() {
           <Box
             sx={{
               position: 'absolute',
-              top: 16,
-              left: 16,
+              top: 28,
+              left: 28,
               zIndex: 2,
-              bgcolor: alpha(theme.palette.background.paper, 0.9),
-              borderRadius: 2,
+              bgcolor: alpha(theme.palette.background.paper, 0.92),
+              borderRadius: 999,
               px: 1.5,
-              py: 1,
+              py: 0.75,
               boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
               backdropFilter: 'blur(8px)',
               display: 'flex',
@@ -371,11 +386,18 @@ export default function OfficerTrackingPage() {
             </Stack>
 
             <Stack spacing={1.5} sx={{ mt: 2 }}>
-              <TextField
-                size="small"
-                placeholder="Search by name, officer ID, or role..."
+              <Autocomplete
+                freeSolo
+                options={searchOptions}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onInputChange={(_, value) => setQuery(value)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    size="small"
+                    placeholder="Search by name, officer ID, or role..."
+                  />
+                )}
               />
 
               <Stack direction="row" spacing={1} alignItems="center">
@@ -474,7 +496,7 @@ export default function OfficerTrackingPage() {
                       {officer.name || 'Unknown officer'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {officer.role || 'Officer'}
+                      {officer.officerId || officer.userId || officer.role || 'Officer'}
                     </Typography>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Chip
@@ -487,13 +509,16 @@ export default function OfficerTrackingPage() {
                         Updated {formatRelativeTime(officer.lastSeen)}
                       </Typography>
                       {Number.isFinite(officer.accuracy) && (
-                        <Chip size="small" label={`±${Math.round(officer.accuracy!)}m`} variant="outlined" />
+                        <Chip size="small" label={`+/-${Math.round(officer.accuracy!)}m`} variant="outlined" />
                       )}
                     </Stack>
+                    <Typography variant="caption" color="text.secondary">
+                      Last seen: {officer.lastSeen ? new Date(officer.lastSeen).toLocaleString() : 'Unknown'}
+                    </Typography>
                   </Stack>
                 </Box>
               )
-              })}
+            })}
             </Stack>
           </Card>
 
@@ -509,6 +534,9 @@ export default function OfficerTrackingPage() {
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {selectedOfficer.role || 'Officer'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Contact: {selectedOfficer.phoneNumber || selectedOfficer.officerId || 'Not available'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Last known: {selectedOfficer.latitude.toFixed(5)}, {selectedOfficer.longitude.toFixed(5)}
@@ -538,3 +566,4 @@ export default function OfficerTrackingPage() {
     </Stack>
   )
 }
+

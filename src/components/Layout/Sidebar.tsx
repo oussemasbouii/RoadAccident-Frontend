@@ -20,6 +20,7 @@ import NotificationsActiveRoundedIcon from '@mui/icons-material/NotificationsAct
 import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded'
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded'
 import LocationSearchingRoundedIcon from '@mui/icons-material/LocationSearchingRounded'
+import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 
@@ -42,6 +43,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
     { path: '/incidents', label: 'Accidents', icon: <ReportProblemRoundedIcon /> },
     { path: '/alerts', label: 'Alerts', icon: <NotificationsActiveRoundedIcon /> },
     { path: '/reports', label: 'Reports', icon: <BarChartRoundedIcon /> },
+    { path: '/communications', label: 'Chat', icon: <ForumRoundedIcon /> },
     { path: '/admin/accounts', label: 'User Accounts', icon: <AdminPanelSettingsRoundedIcon />, role: 'admin' },
     { path: '/admin/officer-tracking', label: 'Officer Tracking', icon: <LocationSearchingRoundedIcon />, role: 'admin' },
     { path: '/settings', label: 'Settings', icon: <SettingsRoundedIcon /> },
