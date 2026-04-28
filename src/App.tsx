@@ -20,6 +20,7 @@ import OfficerLocationPublisher from './components/OfficerLocationPublisher'
 import RealtimeSync from './components/RealtimeSync'
 import ChatRealtimeManager from './components/ChatRealtimeManager'
 import ChatDockManager from './components/ChatDockManager'
+import CommandBar from './components/CommandBar'
 import SocketConnectionManager from './components/SocketConnectionManager'
 import CallManager from './components/CallManager'
 import { clearAuthStorage, isTokenExpired } from './utils/authSecurity'
@@ -127,6 +128,7 @@ function App() {
       <>
         <ChatRealtimeManager />
         <ChatDockManager />
+        <CommandBar />
         <CallManager />
         <OfficerLocationPublisher />
       </>

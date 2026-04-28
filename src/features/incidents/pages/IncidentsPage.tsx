@@ -320,7 +320,10 @@ export default function IncidentsPage() {
                       variant="primary"
                       size="sm"
                       icon={<EditRoundedIcon sx={{ fontSize: 16 }} />}
-                      onClick={() => handleOpenEditDrawer(incident.id)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        handleOpenEditDrawer(incident.id)
+                      }}
                       loading={drawerLoading && editingIncidentId === incident.id}
                       disabled={drawerLoading && editingIncidentId !== incident.id}
                       aria-label={`Edit incident ${incident.id}`}
@@ -354,6 +357,7 @@ export default function IncidentsPage() {
           await dispatch(createIncident(payload) as any).unwrap()
         }}
       />
+
     </Stack>
   )
 }

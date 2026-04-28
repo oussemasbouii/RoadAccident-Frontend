@@ -11,6 +11,7 @@ type ChatState = {
   openThreads: string[]
   minimizedThreads: Record<string, boolean>
   typingByPeer: Record<string, number>
+  muteByPeer: Record<string, number>
 }
 
 const initialState: ChatState = {
@@ -23,6 +24,7 @@ const initialState: ChatState = {
   openThreads: [],
   minimizedThreads: {},
   typingByPeer: {},
+  muteByPeer: {},
 }
 
 type AddMessagePayload = {
@@ -79,10 +81,16 @@ export const chatSlice = createSlice({
         state.messagesByPeer[peerId].push(message)
       }
 
+      // Check if sender is muted
+      const isSenderMuted = state.muteByPeer[message.senderId] && state.muteByPeer[message.senderId] > Date.now()
+
       if (incoming && (forcePopup || state.activePeerId !== peerId)) {
-        state.unreadByPeer[peerId] = (state.unreadByPeer[peerId] || 0) + 1
-        if (!state.activePopups.includes(peerId)) {
-          state.activePopups = [peerId, ...state.activePopups].slice(0, 3)
+        // Only increment unread count and add to popups if not muted
+        if (!isSenderMuted) {
+          state.unreadByPeer[peerId] = (state.unreadByPeer[peerId] || 0) + 1
+          if (!state.activePopups.includes(peerId)) {
+            state.activePopups = [peerId, ...state.activePopups].slice(0, 3)
+          }
         }
       }
     },
@@ -136,6 +144,18 @@ export const chatSlice = createSlice({
             return
           }
           messages[index].status = status
+          
+          // When marking as seen, also mark all previous unseen messages from the same sender as seen
+          if (status === 'seen') {
+            const senderId = messages[index].senderId
+            for (let i = index - 1; i >= 0; i -= 1) {
+              const prev = messages[i]
+              if (prev.senderId !== senderId) break // Stop at different sender
+              if (prev.status === 'failed') continue
+              if (prev.status === 'seen') continue
+              prev.status = 'seen'
+            }
+          }
           return
         }
       }
@@ -158,7 +178,93 @@ export const chatSlice = createSlice({
     clearTyping(state, action: PayloadAction<{ peerId: string }>) {
       delete state.typingByPeer[action.payload.peerId]
     },
-  dismissPopup(state, action: PayloadAction<{ peerId: string }>) {
+    setMute(state, action: PayloadAction<{ peerId: string; until: number }>) {
+      state.muteByPeer[action.payload.peerId] = action.payload.until
+      // Persist to localStorage
+      try {
+        const existingMutes = JSON.parse(localStorage.getItem('chatMutes') || '{}')
+        existingMutes[action.payload.peerId] = action.payload.until
+        localStorage.setItem('chatMutes', JSON.stringify(existingMutes))
+      } catch (error) {
+        console.warn('Failed to persist mute settings:', error)
+      }
+    },
+    clearMute(state, action: PayloadAction<{ peerId: string }>) {
+      delete state.muteByPeer[action.payload.peerId]
+      // Remove from localStorage
+      try {
+        const existingMutes = JSON.parse(localStorage.getItem('chatMutes') || '{}')
+        delete existingMutes[action.payload.peerId]
+        localStorage.setItem('chatMutes', JSON.stringify(existingMutes))
+      } catch (error) {
+        console.warn('Failed to remove mute settings:', error)
+      }
+    },
+    loadPersistedMutes(state) {
+      try {
+        const persistedMutes = JSON.parse(localStorage.getItem('chatMutes') || '{}')
+        const now = Date.now()
+        // Only load mutes that haven't expired
+        Object.entries(persistedMutes).forEach(([peerId, until]) => {
+          if (typeof until === 'number' && until > now) {
+            state.muteByPeer[peerId] = until
+          }
+        })
+      } catch (error) {
+        console.warn('Failed to load persisted mute settings:', error)
+      }
+    },
+    cleanupExpiredMutes(state) {
+      const now = Date.now()
+      const expiredPeers: string[] = []
+
+      Object.entries(state.muteByPeer).forEach(([peerId, until]) => {
+        if (until <= now) {
+          expiredPeers.push(peerId)
+        }
+      })
+
+      expiredPeers.forEach(peerId => {
+        delete state.muteByPeer[peerId]
+      })
+
+      // Update localStorage
+      if (expiredPeers.length > 0) {
+        try {
+          const existingMutes = JSON.parse(localStorage.getItem('chatMutes') || '{}')
+          expiredPeers.forEach(peerId => delete existingMutes[peerId])
+          localStorage.setItem('chatMutes', JSON.stringify(existingMutes))
+        } catch (error) {
+          console.warn('Failed to cleanup expired mutes:', error)
+        }
+      }
+    },
+    toggleReaction(
+      state,
+      action: PayloadAction<{ peerId: string; messageId: string; emoji: string; userId: string }>
+    ) {
+      const { peerId, messageId, emoji, userId } = action.payload
+      const messages = state.messagesByPeer[peerId]
+      if (!messages) return
+      const idx = messages.findIndex((m) => m.id === messageId)
+      if (idx < 0) return
+      const current = messages[idx]
+      const reactions = { ...(current.reactions || {}) }
+      // Only one reaction per user per message: remove user from all emojis first.
+      Object.keys(reactions).forEach((key) => {
+        reactions[key] = reactions[key].filter((id) => id !== userId)
+        if (reactions[key].length === 0) {
+          delete reactions[key]
+        }
+      })
+      // Toggle off if the same emoji is selected again.
+      const existing = (current.reactions?.[emoji] || []).includes(userId)
+      if (!existing) {
+        reactions[emoji] = [...(reactions[emoji] || []), userId]
+      }
+      messages[idx] = { ...current, reactions }
+    },
+    dismissPopup(state, action: PayloadAction<{ peerId: string }>) {
     state.activePopups = state.activePopups.filter((id) => id !== action.payload.peerId)
   },
     clearPopups(state) {
@@ -182,6 +288,11 @@ export const {
   clearPopups,
   setTyping,
   clearTyping,
+  setMute,
+  clearMute,
+  loadPersistedMutes,
+  cleanupExpiredMutes,
+  toggleReaction,
 } = chatSlice.actions
 
 export default chatSlice.reducer

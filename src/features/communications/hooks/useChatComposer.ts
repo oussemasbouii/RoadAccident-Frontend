@@ -69,23 +69,33 @@ export function useChatComposer({ peer, currentUserId, messages }: UseChatCompos
       senderId,
       receivers: [receiverId],
       text: draft.trim() || pendingAttachment?.filename || 'Attachment',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: new Date().toISOString(),
       status: 'sending',
       attachment: pendingAttachment || undefined,
     }
     dispatch(addMessage({ peerId: receiverId, message: optimistic, incoming: false }))
 
     const emitSend = () => {
+      if (import.meta.env.DEV) {
+        console.log('[Chat] emitting message:send', {
+          messageId,
+          to: receiverId,
+          content: payload.message.content.substring(0, 50),
+        })
+      }
       socket.emit('request:message:send', payload, (ack: { acknowledged?: boolean; error?: string }) => {
         if (ack?.acknowledged) {
+          if (import.meta.env.DEV) {
+            console.log('[Chat] message:send acknowledged', messageId)
+          }
           setDraft('')
           setPendingAttachment(null)
           dispatch(updateMessageStatus({ messageId, status: 'sent' }))
         } else {
-          dispatch(updateMessageStatus({ messageId, status: 'failed' }))
           if (import.meta.env.DEV) {
-            console.warn('[Chat] send failed', ack?.error || 'unknown error', payload)
+            console.warn('[Chat] message:send failed', ack?.error || 'unknown error', messageId)
           }
+          dispatch(updateMessageStatus({ messageId, status: 'failed' }))
         }
       })
     }

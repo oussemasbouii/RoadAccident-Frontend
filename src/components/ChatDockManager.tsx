@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Box, Portal } from '@mui/material'
 import { useAppDispatch, useAppSelector } from '@/store/store'
@@ -29,9 +29,21 @@ export default function ChatDockManager() {
   const contacts = useAppSelector((state) => state.chat.contacts)
   const messagesByPeer = useAppSelector((state) => state.chat.messagesByPeer)
   const typingByPeer = useAppSelector((state) => state.chat.typingByPeer)
+  const unreadByPeer = useAppSelector((state) => state.chat.unreadByPeer)
+  const activePeerId = useAppSelector((state) => state.chat.activePeerId)
+  const activeCall = useAppSelector((state) => state.call.activeCall)
   const currentUserId =
     me?.id || decodeJwtSub(getRefreshToken()) || decodeJwtSub(getAccessToken()) || null
   const isChatRoute = location.pathname.includes('/communications')
+  const [isTabVisible, setIsTabVisible] = useState<boolean>(document.visibilityState === 'visible')
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      setIsTabVisible(document.visibilityState === 'visible')
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
   useEffect(() => {
     if (!currentUserId) return
@@ -41,8 +53,9 @@ export default function ChatDockManager() {
     const socket = connectSharedSocket(token)
     if (!socket) return
 
-    openThreads.forEach((peerId) => {
+    openThreads.forEach((peerId: string) => {
       if (minimizedThreads[peerId]) return
+      if (!isTabVisible) return
       const peerMessages = messagesByPeer[peerId] || []
       const lastIncoming = [...peerMessages].reverse().find((msg) => msg.senderId !== currentUserId)
       if (!lastIncoming) return
@@ -55,9 +68,9 @@ export default function ChatDockManager() {
         () => undefined
       )
     })
-  }, [openThreads, minimizedThreads, messagesByPeer, currentUserId])
+  }, [openThreads, minimizedThreads, messagesByPeer, currentUserId, isTabVisible])
 
-  if (!currentUserId || isChatRoute) return null
+  if (!currentUserId || isChatRoute || activeCall) return null
 
   return (
     <Portal>
@@ -73,11 +86,12 @@ export default function ChatDockManager() {
           alignItems: 'flex-end',
         }}
       >
-        {openThreads.map((peerId) => {
+        {openThreads.map((peerId: string) => {
           const peer = contacts[peerId]
           if (!peer) return null
           const messages = messagesByPeer[peerId] || []
           const isMinimized = Boolean(minimizedThreads[peerId])
+          const unreadCount = unreadByPeer[peerId] || 0
           return (
             <ChatWindow
               key={peerId}
@@ -85,6 +99,8 @@ export default function ChatDockManager() {
               messages={messages}
               currentUserId={currentUserId}
               isMinimized={isMinimized}
+              isActive={activePeerId === peerId}
+              unreadCount={unreadCount}
               typing={Boolean(typingByPeer[peerId])}
               onMinimize={() => {
                 dispatch(minimizeThread({ peerId, minimized: !isMinimized }))
@@ -95,8 +111,9 @@ export default function ChatDockManager() {
               onFocus={() => {
                 dispatch(focusThread({ peerId }))
               }}
-              onCall={() => {
+              onCall={(type) => {
                 const roomId = crypto.randomUUID()
+                const callId = `call-${Date.now()}-${crypto.randomUUID()}`
                 dispatch(startOutgoingCall({
                   peer: {
                     id: peer.id,
@@ -104,8 +121,9 @@ export default function ChatDockManager() {
                     officerId: peer.officerId,
                     role: peer.role,
                   },
-                  callType: 'audio',
+                  callType: type,
                   roomId,
+                  callId,
                 }))
               }}
             />

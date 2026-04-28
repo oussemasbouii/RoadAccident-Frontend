@@ -457,7 +457,14 @@ export default function AlertsPage() {
                   }}
                   secondaryAction={
                     alert.direction === 'received' && !alert.read ? (
-                      <Button variant="secondary" size="sm" onClick={() => handleAcknowledge(alert.id)}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleAcknowledge(alert.id)
+                        }}
+                      >
                         Acknowledge
                       </Button>
                     ) : undefined
@@ -512,6 +519,7 @@ export default function AlertsPage() {
           </List>
         )}
       </Card>
+
     </Stack>
   )
 }

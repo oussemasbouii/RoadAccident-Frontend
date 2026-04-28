@@ -26,4 +26,5 @@ export type ChatMessage = {
   receivers?: string[]
   status?: ChatMessageStatus
   attachment?: ChatAttachment
+  reactions?: Record<string, string[]>
 }

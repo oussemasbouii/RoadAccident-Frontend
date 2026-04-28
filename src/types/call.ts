@@ -1,6 +1,6 @@
 export type CallType = 'audio' | 'video'
 
-export type CallStatus = 'idle' | 'outgoing' | 'ringing' | 'in_call' | 'ended' | 'failed'
+export type CallStatus = 'idle' | 'outgoing' | 'ringing' | 'in_call' | 'answered' | 'missed' | 'ended' | 'failed'
 
 export type CallPeer = {
   id: string
@@ -17,5 +17,9 @@ export type CallSession = {
   status: CallStatus
   peer: CallPeer
   startedAt?: number
+  endedAt?: number
   error?: string
+  direction?: 'incoming' | 'outgoing'
+  localTrack?: any
+  remoteTracks?: any[]
 }

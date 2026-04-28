@@ -232,15 +232,15 @@ export default function DashboardPage() {
                           </Typography>
                         }
                         secondary={
-                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                            <Typography variant="caption" color="text.secondary">
+                          <Box component="span" sx={{display: 'flex', gap: 1, alignItems: 'center', mt: 0.5}}>
+                            <Typography component="span" variant="caption" color="text.secondary">
                               {incident.time || 'Just now'}
                             </Typography>
                             <CircleIcon sx={{ fontSize: 4, color: 'text.disabled' }} />
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography component="span" variant="caption" color="text.secondary">
                               {incident.vehicles} Vehicles involved
                             </Typography>
-                          </Stack>
+                          </Box>
                         }
                       />
                     </ListItem>
@@ -364,7 +364,7 @@ export default function DashboardPage() {
                           </Typography>
                         }
                         secondary={
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography component="span" variant="caption" color="text.secondary">
                             {alert.time || 'Just now'}
                           </Typography>
                         }
