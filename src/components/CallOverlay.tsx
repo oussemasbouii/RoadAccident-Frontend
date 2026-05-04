@@ -10,6 +10,7 @@ import { useAppSelector } from '@/store/store'
 import { Button } from '@/components/Common'
 import { useCallTimer } from '@/hooks/useCallTimer'
 import type { CallPeer, CallStatus } from '@/types/call'
+import { isUuidLike, shortIdentifier } from '@/utils/callUtils'
 
 type Props = {
   onAccept: () => void
@@ -31,17 +32,6 @@ const STATUS_LABELS: Record<CallStatus, string> = {
   missed: 'Missed call',
   ended: 'Call ended',
   failed: 'Call failed',
-}
-
-function isUuidLike(value?: string | null) {
-  if (!value) return false
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim())
-}
-
-function shortIdentifier(value?: string | null) {
-  if (!value) return ''
-  const trimmed = value.trim()
-  return trimmed.length <= 8 ? trimmed : trimmed.slice(-6)
 }
 
 function formatRole(value?: string | null) {

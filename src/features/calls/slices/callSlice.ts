@@ -26,7 +26,7 @@ export const callSlice = createSlice({
         callType,
         status: 'outgoing',
         direction: 'outgoing' as const,
-        callId: callId || `call-${Date.now()}-${crypto.randomUUID()}`,
+        callId,
         roomId,
         startedAt: Date.now(),
       }
@@ -58,7 +58,18 @@ export const callSlice = createSlice({
         console.log('[Redux] setCallSession - no activeCall')
         return
       }
-      if (action.payload.callId && state.activeCall.callId && action.payload.callId !== state.activeCall.callId) {
+      const canAdoptBackendCallId =
+        state.activeCall.direction === 'outgoing' &&
+        action.payload.callId &&
+        action.payload.roomId &&
+        state.activeCall.roomId === action.payload.roomId
+
+      if (
+        action.payload.callId &&
+        state.activeCall.callId &&
+        action.payload.callId !== state.activeCall.callId &&
+        !canAdoptBackendCallId
+      ) {
         console.log('[Redux] setCallSession ignored - callId mismatch', {
           activeCallId: state.activeCall.callId,
           payloadCallId: action.payload.callId,
@@ -89,10 +100,6 @@ export const callSlice = createSlice({
       }
       console.log('[Redux] activeCall set to', state.activeCall)
     },
-    answerCall(state) {
-      if (!state.activeCall) return
-      state.activeCall.status = 'answered' as CallStatus
-    },
     markCallMissed(state) {
       if (!state.activeCall) return
       const missedCall = {
@@ -101,33 +108,6 @@ export const callSlice = createSlice({
         endedAt: Date.now(),
       }
       state.callHistory.unshift(missedCall)
-      if (state.callHistory.length > 50) {
-        state.callHistory = state.callHistory.slice(0, 50)
-      }
-      state.activeCall = null
-    },
-    declineCall(state) {
-      if (!state.activeCall) return
-      const missedCall = {
-        ...state.activeCall,
-        status: 'missed' as CallStatus,
-        endedAt: Date.now(),
-      }
-      state.callHistory.unshift(missedCall)
-      if (state.callHistory.length > 50) {
-        state.callHistory = state.callHistory.slice(0, 50)
-      }
-      state.activeCall = null
-    },
-    endCall(state) {
-      if (!state.activeCall) return
-      // Add completed call to history
-      const completedCall = {
-        ...state.activeCall,
-        status: 'ended' as CallStatus,
-        endedAt: Date.now(),
-      }
-      state.callHistory.unshift(completedCall)
       if (state.callHistory.length > 50) {
         state.callHistory = state.callHistory.slice(0, 50)
       }

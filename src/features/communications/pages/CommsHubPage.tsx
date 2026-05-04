@@ -45,6 +45,7 @@ import type { ChatContact, ChatMessage } from '@/types/chat'
 import type { CallSession } from '@/types/call'
 import AttachmentLightbox from '@/components/AttachmentLightbox'
 import { useChatComposer } from '@/features/communications/hooks/useChatComposer'
+import { decodeJwtSub } from '@/utils/callUtils'
 
 const QUICK_REPLIES = ['On my way', 'Need backup', 'ETA 5 min', 'Scene secured', 'Call me']
 const REACTION_OPTIONS = ['✅', '⚠️', '👀', '👍', '❗', '❓', '🙏']
@@ -68,18 +69,6 @@ function formatMessageTime(value?: string) {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-function decodeJwtSub(token?: string | null): string | null {
-  if (!token) return null
-  const parts = token.split('.')
-  if (parts.length !== 3) return null
-  try {
-    const payload = JSON.parse(atob(parts[1]))
-    return payload?.sub ? String(payload.sub) : null
-  } catch {
-    return null
-  }
 }
 
 function getDateKey(timestamp: number) {
@@ -1209,5 +1198,4 @@ export default function CommsHubPage() {
     </Box>
   )
 }
-
 

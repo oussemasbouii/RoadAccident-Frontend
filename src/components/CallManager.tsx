@@ -13,40 +13,7 @@ import CallOverlay from '@/components/CallOverlay'
 import { useLiveKitAudio } from '@/hooks/useLiveKitAudio'
 import { useCallRingtone } from '@/hooks/useCallRingtone'
 import type { CallType } from '@/types/call'
-
-function decodeJwtSub(token?: string | null): string | null {
-  if (!token) return null
-  const parts = token.split('.')
-  if (parts.length !== 3) return null
-  try {
-    const payload = JSON.parse(atob(parts[1]))
-    return payload?.sub ? String(payload.sub) : null
-  } catch {
-    return null
-  }
-}
-
-async function requestMicrophonePermission(contextLabel: string) {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    console.warn(`[CallFlow] ${contextLabel} - mediaDevices.getUserMedia is unavailable`)
-    return false
-  }
-
-  console.log(`[CallFlow] ${contextLabel} - requesting microphone permission`)
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-    stream.getTracks().forEach((track) => track.stop())
-    console.log(`[CallFlow] ${contextLabel} - microphone permission granted`)
-    return true
-  } catch (error) {
-    console.error(`[CallFlow] ${contextLabel} - microphone permission denied`, error)
-    return false
-  }
-}
-
-function hasLiveKitUrl() {
-  return Boolean(import.meta.env.VITE_LIVEKIT_URL?.trim())
-}
+import { decodeJwtSub, hasLiveKitUrl, requestMicrophonePermission } from '@/utils/callUtils'
 
 export default function CallManager() {
   const dispatch = useAppDispatch()
@@ -133,12 +100,15 @@ export default function CallManager() {
 
     const handleAccepted = (payload: any) => {
       console.log('[CallFlow] call accepted event received', payload)
+      if (payload?.roomId && call?.roomId && payload.roomId !== call.roomId) return
+      if (payload?.callId && call?.callId && payload.callId !== call.callId) return
+
       dispatch(setCallSession({
         callId: payload?.callId,
         roomId: payload?.roomId,
         token: payload?.token,
       }))
-      dispatch(setCallStatus({ status: 'in_call', callId: payload?.callId }))
+      dispatch(setCallStatus({ status: 'in_call' }))
       clearTimers()
     }
 
@@ -305,7 +275,7 @@ export default function CallManager() {
 
   useEffect(() => {
     if (!call || !currentUserId) return
-    if (!call.roomId || !call.callId || call.status !== 'outgoing') return
+    if (!call.roomId || call.status !== 'outgoing') return
 
     // Guard on room + callee so a later setCallSession() update does not retrigger initiation.
     const callKey = `${call.roomId}:${call.peer.id}`

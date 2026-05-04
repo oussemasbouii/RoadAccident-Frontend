@@ -7,18 +7,7 @@ import { connectSharedSocket } from '@/services/socketClient'
 import { closeThread, focusThread, minimizeThread } from '@/features/chat/slices/chatSlice'
 import { startOutgoingCall } from '@/features/calls/slices/callSlice'
 import ChatWindow from '@/components/ChatWindow'
-
-function decodeJwtSub(token?: string | null): string | null {
-  if (!token) return null
-  const parts = token.split('.')
-  if (parts.length !== 3) return null
-  try {
-    const payload = JSON.parse(atob(parts[1]))
-    return payload?.sub ? String(payload.sub) : null
-  } catch {
-    return null
-  }
-}
+import { decodeJwtSub } from '@/utils/callUtils'
 
 export default function ChatDockManager() {
   const location = useLocation()
@@ -113,7 +102,6 @@ export default function ChatDockManager() {
               }}
               onCall={(type) => {
                 const roomId = crypto.randomUUID()
-                const callId = `call-${Date.now()}-${crypto.randomUUID()}`
                 dispatch(startOutgoingCall({
                   peer: {
                     id: peer.id,
@@ -123,7 +111,6 @@ export default function ChatDockManager() {
                   },
                   callType: type,
                   roomId,
-                  callId,
                 }))
               }}
             />
