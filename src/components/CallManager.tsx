@@ -10,7 +10,7 @@ import {
   setCallStatus,
 } from '@/features/calls/slices/callSlice'
 import CallOverlay from '@/components/CallOverlay'
-import { useLiveKitAudio } from '@/hooks/useLiveKitAudio'
+import { useLiveKitMedia } from '@/hooks/useLiveKitMedia'
 import { useCallRingtone } from '@/hooks/useCallRingtone'
 import type { CallType } from '@/types/call'
 import { decodeJwtSub, hasLiveKitUrl, requestMicrophonePermission } from '@/utils/callUtils'
@@ -35,10 +35,22 @@ export default function CallManager() {
 
   const isInCall = call?.status === 'in_call'
   useCallRingtone(call?.status === 'ringing')
-  const { isConnected, isMuted, toggleMute, remoteAudioPlaying, error } = useLiveKitAudio(
+  const {
+    isConnected,
+    isMuted,
+    isCameraEnabled,
+    toggleMute,
+    toggleCamera,
+    remoteAudioPlaying,
+    remoteVideoPlaying,
+    error,
+    setRemoteVideoElement,
+    setLocalVideoElement,
+  } = useLiveKitMedia(
     call?.roomId,
     call?.token,
-    isInCall
+    isInCall,
+    call?.callType
   )
 
   useEffect(() => {
@@ -76,8 +88,7 @@ export default function CallManager() {
       dispatch(markCallMissed())
       return
     }
-    dispatch(setCallStatus({ status: 'ended' }))
-    cleanupTimeoutRef.current = window.setTimeout(() => dispatch(clearCall()), 800)
+    dispatch(clearCall())
   }
 
   useEffect(() => {
@@ -270,7 +281,7 @@ export default function CallManager() {
     }, (ack: any) => {
       console.log('[CallFlow] request:call:end ack', { ack, callId: call.callId })
     })
-    finalizeCall('ended')
+    dispatch(clearCall())
   }
 
   useEffect(() => {
@@ -368,11 +379,17 @@ export default function CallManager() {
       onAccept={handleAccept}
       onReject={handleReject}
       onEnd={handleEnd}
+      localDisplayName={me?.displayName || me?.officerId || me?.id}
       isMuted={isMuted}
       onToggleMute={toggleMute}
+      onToggleCamera={toggleCamera}
       isConnected={isConnected}
+      isCameraEnabled={isCameraEnabled}
       remoteAudioPlaying={remoteAudioPlaying}
+      remoteVideoPlaying={remoteVideoPlaying}
       connectionError={error}
+      remoteVideoRef={setRemoteVideoElement}
+      localVideoRef={setLocalVideoElement}
     />
   )
 }

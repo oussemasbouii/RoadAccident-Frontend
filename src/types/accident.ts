@@ -442,6 +442,60 @@ export interface EvidenceFile {
   createdAt?: string
 }
 
+export type IncidentDocumentLifecycleStatus = 'uploaded' | 'processing' | 'available' | 'archived' | 'failed'
+
+export type IncidentDocumentTypeCode =
+  | 'PHOTO'
+  | 'PDF'
+  | 'SCANNED_DOCUMENT'
+  | 'VIDEO'
+  | 'SKETCH'
+  | 'REPORT'
+  | 'IDENTITY_DOCUMENT'
+  | 'INSURANCE_DOCUMENT'
+  | 'OTHER'
+
+export interface IncidentDocument {
+  id: string
+  accidentId: string
+  filename: string
+  mimeType: string
+  size: number
+  documentType: IncidentDocumentTypeCode | string
+  description?: string
+  tags: string[]
+  status: IncidentDocumentLifecycleStatus
+  createdAt?: string
+  createdBy?: string
+  updatedAt?: string
+  archivedAt?: string
+  downloadUrl?: string
+  previewUrl?: string
+  extractedText?: string
+  ocrStatus?: 'pending' | 'processing' | 'completed' | 'failed'
+}
+
+export interface IncidentDocumentUploadRequest {
+  filename: string
+  mimeType: string
+  size: number
+  documentType: IncidentDocumentTypeCode | string
+  description?: string
+  tags?: string[]
+}
+
+export interface IncidentDocumentUploadConfirmRequest extends IncidentDocumentUploadRequest {
+  clientId: string
+  key: string
+}
+
+export interface IncidentDocumentUpdateRequest {
+  documentType?: IncidentDocumentTypeCode | string
+  description?: string
+  tags?: string[]
+  status?: IncidentDocumentLifecycleStatus
+}
+
 export interface AccidentReport {
   id?: string
   location: LocationInfo

@@ -30,11 +30,12 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import AccidentLocationMap from '@/components/Common/AccidentLocationMap'
+import IncidentDocumentsPanel from './IncidentDocumentsPanel'
 
 export interface AddIncidentDrawerProps {
   open: boolean
   onClose: () => void
-  onSubmit?: (payload: any) => Promise<void> | void
+  onSubmit?: (payload: any) => Promise<any> | any
   error?: string | null
   mode?: 'create' | 'edit'
   initialData?: any | null
@@ -338,8 +339,11 @@ export default function AddIncidentDrawer({
           attachments: [],
         },
       }
-      await onSubmit?.(payload)
-      onClose()
+      const result = await onSubmit?.(payload)
+      const keepOpen = Boolean(result && typeof result === 'object' && (result as any).keepOpen)
+      if (!keepOpen) {
+        onClose()
+      }
     } finally {
       setSubmitting(false)
     }
@@ -636,6 +640,10 @@ export default function AddIncidentDrawer({
             </Paper>
           </Stack>
         )}
+
+        <Box sx={{ mt: 2.5 }}>
+          <IncidentDocumentsPanel accidentId={String(initialData?.id || '') || null} />
+        </Box>
       </DialogContent>
 
       <Box

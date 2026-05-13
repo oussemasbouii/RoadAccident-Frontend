@@ -351,10 +351,22 @@ export default function IncidentsPage() {
         initialData={editingIncident}
         onSubmit={async (payload) => {
           if (drawerMode === 'edit' && editingIncident?.id) {
-            await dispatch(updateIncident({ id: String(editingIncident.id), payload }) as any).unwrap()
-            return
+            const updated = await dispatch(updateIncident({ id: String(editingIncident.id), payload }) as any).unwrap()
+            const updatedData = updated?.data ?? updated
+            if (updatedData) {
+              setEditingIncident(updatedData)
+            }
+            return updatedData
           }
-          await dispatch(createIncident(payload) as any).unwrap()
+          const created = await dispatch(createIncident(payload) as any).unwrap()
+          const createdData = created?.data ?? created
+          if (createdData?.id) {
+            setEditingIncident(createdData)
+            setDrawerMode('edit')
+            setDrawerOpen(true)
+            return { keepOpen: true, incident: createdData }
+          }
+          return createdData
         }}
       />
 

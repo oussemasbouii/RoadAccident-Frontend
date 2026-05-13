@@ -2,7 +2,10 @@ import axios from 'axios'
 import { 
   AccidentReport, 
   CreateAccidentResponse, 
-  CreateAccidentErrorResponse 
+  CreateAccidentErrorResponse,
+  IncidentDocumentUploadConfirmRequest,
+  IncidentDocumentUploadRequest,
+  IncidentDocumentUpdateRequest,
 } from '@/types/accident'
 import { clearAuthStorage } from '@/utils/authSecurity'
 import { getAccessToken, getDeviceId, getRefreshToken, setAccessToken, setRefreshToken } from '@/utils/tokenStore'
@@ -272,6 +275,28 @@ export const apiService = {
       size: number
     }) => api.post('/attachments/confirm-upload', data),
     getDownload: (id: string) => api.get(`/attachments/${id}`),
+  },
+
+  // Incident documents
+  incidentDocuments: {
+    requestUpload: (accidentId: string, data: IncidentDocumentUploadRequest) =>
+      api.post(`/accidents/${accidentId}/documents/request-upload`, data),
+    confirmUpload: (accidentId: string, data: IncidentDocumentUploadConfirmRequest) =>
+      api.post(`/accidents/${accidentId}/documents/confirm-upload`, data),
+    list: (accidentId: string) => api.get(`/accidents/${accidentId}/documents`),
+    getDownload: (accidentId: string, documentId: string) =>
+      api.get(`/accidents/${accidentId}/documents/${documentId}/download`),
+    update: (accidentId: string, documentId: string, data: IncidentDocumentUpdateRequest) =>
+      api.patch(`/accidents/${accidentId}/documents/${documentId}`, data),
+    archive: (accidentId: string, documentId: string, data?: { reason?: string }) =>
+      api.post(`/accidents/${accidentId}/documents/${documentId}/archive`, data || {}),
+    remove: (accidentId: string, documentId: string, data?: { reason?: string }) =>
+      api.delete(`/accidents/${accidentId}/documents/${documentId}`, { data }),
+    replace: (
+      accidentId: string,
+      documentId: string,
+      data: IncidentDocumentUploadConfirmRequest & { replacedByDocumentId?: string }
+    ) => api.post(`/accidents/${accidentId}/documents/${documentId}/replace`, data),
   },
 }
 
