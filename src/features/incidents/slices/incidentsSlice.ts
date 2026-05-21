@@ -9,6 +9,7 @@ export interface Incident {
   severity: 'critical' | 'high' | 'medium' | 'low'
   status: 'active' | 'responded' | 'resolved'
   time: string
+  timestamp?: string
   vehicles: number
   injuries: number
   description?: string
@@ -61,6 +62,10 @@ function toUiIncident(raw: any): Incident {
     typeof timestamp === 'number'
       ? new Date(timestamp).toLocaleString()
       : (timestamp ? new Date(timestamp).toLocaleString() : 'Just now')
+  const rawTimestamp =
+    typeof timestamp === 'number'
+      ? new Date(timestamp).toISOString()
+      : (timestamp ? new Date(timestamp).toISOString() : undefined)
 
   const hospitalized = Number(raw?.damagesReport?.hospitalizedInjuredCount ?? 0)
   const lightly = Number(raw?.damagesReport?.lightlyInjuredCount ?? 0)
@@ -106,6 +111,7 @@ function toUiIncident(raw: any): Incident {
       ? raw.status
       : 'active') as Incident['status'],
     time: formattedTime,
+    timestamp: rawTimestamp,
     vehicles: Number(raw?.vehicles ?? raw?.vehicleCount ?? raw?.participants?.length ?? 0),
     injuries: Number(raw?.injuries ?? raw?.injuryCount ?? totalInjuries),
     description: raw?.description || raw?.comment || raw?.damagesReport?.damageDescription,

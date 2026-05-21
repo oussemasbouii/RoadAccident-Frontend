@@ -3,6 +3,7 @@ import { Box, Dialog, DialogContent, Divider, List, ListItemButton, ListItemText
 import { useNavigate } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/store/store'
 import { openThread, setActivePeer } from '@/features/chat/slices/chatSlice'
+import { useTranslation } from '@/themeMode'
 
 type CommandItem = {
   id: string
@@ -18,6 +19,7 @@ export default function CommandBar() {
   const user = useAppSelector((state) => state.auth.user)
   const contacts = useAppSelector((state) => state.chat.contacts)
   const contactIds = useAppSelector((state) => state.chat.contactIds)
+  const { t } = useTranslation()
 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -40,56 +42,56 @@ export default function CommandBar() {
     const items: CommandItem[] = [
       {
         id: 'nav-dashboard',
-        label: 'Go to Dashboard',
-        description: 'Overview and live metrics',
+        label: `${t('common.go_to')} ${t('nav.dashboard')}`,
+        description: `${t('dashboard.overview')} · ${t('dashboard.subtitle')}`,
         onSelect: () => navigate('/dashboard'),
         keywords: ['home', 'overview'],
       },
       {
         id: 'nav-incidents',
-        label: 'Go to Incidents',
-        description: 'Live incidents and dispatch',
+        label: `${t('common.go_to')} ${t('nav.accidents')}`,
+        description: t('incidents.subtitle'),
         onSelect: () => navigate('/incidents'),
       },
       {
         id: 'nav-alerts',
-        label: 'Go to Alerts',
-        description: 'Incoming and sent alerts',
+        label: `${t('common.go_to')} ${t('nav.alerts')}`,
+        description: t('alerts.subtitle'),
         onSelect: () => navigate('/alerts'),
       },
       {
         id: 'nav-reports',
-        label: 'Go to Reports',
-        description: 'Filed reports and exports',
+        label: `${t('common.go_to')} ${t('nav.reports')}`,
+        description: t('reports.subtitle'),
         onSelect: () => navigate('/reports'),
       },
       {
         id: 'nav-communications',
-        label: 'Go to Chat',
-        description: 'Open the chat hub',
+        label: `${t('common.go_to')} ${t('nav.communications')}`,
+        description: t('comms.subtitle'),
         onSelect: () => navigate('/communications'),
         keywords: ['messages', 'chat', 'comms'],
       },
       {
         id: 'nav-settings',
-        label: 'Go to Settings',
-        description: 'Profile and preferences',
+        label: `${t('common.go_to')} ${t('common.settings')}`,
+        description: t('settings.subtitle'),
         onSelect: () => navigate('/settings'),
       },
     ]
 
     if (user?.role === 'admin') {
-      items.push(
+          items.push(
         {
           id: 'nav-admin-accounts',
-          label: 'Admin Accounts',
-          description: 'Manage admins and permissions',
+          label: t('nav.user_accounts'),
+          description: t('settings.title'),
           onSelect: () => navigate('/admin/accounts'),
         },
         {
           id: 'nav-officer-tracking',
-          label: 'Officer Tracking',
-          description: 'Live officer locations',
+          label: t('nav.officer_tracking'),
+          description: t('comms.contacts'),
           onSelect: () => navigate('/admin/officer-tracking'),
         }
       )
@@ -103,8 +105,8 @@ export default function CommandBar() {
       const contact = contacts[id]
       return {
         id: `chat-${id}`,
-        label: `Chat: ${contact?.name ?? 'Officer'}`,
-        description: contact?.officerId ? `ID: ${contact.officerId}` : undefined,
+        label: `${t('nav.communications')}: ${contact?.name ?? t('common.people')}`,
+        description: contact?.officerId ? `${t('topbar.id_label')}: ${contact.officerId}` : undefined,
         onSelect: () => {
           dispatch(openThread({ peerId: id }))
           dispatch(setActivePeer({ peerId: id }))
@@ -148,13 +150,13 @@ export default function CommandBar() {
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
           <Typography sx={{ fontWeight: 700 }}>Command Bar</Typography>
           <Typography variant="caption" color="text.secondary">
-            Esc to close
+            {t('common.esc_to_close')}
           </Typography>
         </Stack>
         <TextField
           autoFocus
           fullWidth
-          placeholder="Search pages or people..."
+          placeholder={t('common.search_pages_or_people')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           size="small"
@@ -164,7 +166,7 @@ export default function CommandBar() {
         {filteredNav.length === 0 && filteredContacts.length === 0 ? (
           <Box sx={{ p: 3 }}>
             <Typography variant="body2" color="text.secondary">
-              No results found.
+              {t('common.no_results_found')}
             </Typography>
           </Box>
         ) : (
@@ -173,7 +175,7 @@ export default function CommandBar() {
               <>
                 <Box sx={{ px: 2.5, py: 1 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: 0.4 }}>
-                    Navigation
+                    {t('common.navigation')}
                   </Typography>
                 </Box>
                 {filteredNav.map((item) => (
@@ -201,7 +203,7 @@ export default function CommandBar() {
                 <Divider sx={{ my: 1 }} />
                 <Box sx={{ px: 2.5, py: 1 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: 0.4 }}>
-                    People
+                    {t('common.people')}
                   </Typography>
                 </Box>
                 {filteredContacts.map((item) => (

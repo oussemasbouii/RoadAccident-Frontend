@@ -13,7 +13,7 @@ import {
 } from '@mui/material'
 import { useAppSelector } from '../../../store/store'
 import Card from '../../../components/Common/Card'
-import { useThemeMode } from '../../../themeMode'
+import { useThemeMode, useTranslation } from '../../../themeMode'
 
 export default function SettingsPage() {
   const theme = useTheme()
@@ -21,9 +21,10 @@ export default function SettingsPage() {
   const [emailAlerts, setEmailAlerts] = useState<boolean>(true)
   const [pushAlerts, setPushAlerts] = useState<boolean>(true)
   const { mode, toggleMode } = useThemeMode()
+  const { t } = useTranslation()
 
   const profile = useMemo(() => {
-    const displayName = user?.displayName || user?.officerId || 'Officer'
+    const displayName = user?.displayName || user?.officerId || t('admin_accounts.role_officer')
     const initials =
       (displayName || 'O')
         .split(' ')
@@ -34,19 +35,19 @@ export default function SettingsPage() {
 
     return {
       displayName,
-      role: user?.role || 'officer',
-      officerId: user?.officerId || 'Not available',
-      center: user?.center || 'Not assigned',
-      phoneNumber: user?.phoneNumber || 'Not provided',
+      role: user?.role || t('admin_accounts.role_officer').toLowerCase(),
+      officerId: user?.officerId || t('settings.not_available'),
+      center: user?.center || t('settings.not_assigned'),
+      phoneNumber: user?.phoneNumber || t('settings.not_provided'),
       initials,
     }
-  }, [user])
+  }, [user, t])
 
   return (
     <Stack spacing={3}>
       <Box>
-        <Typography variant="h4" sx={{ fontWeight: 800, mb: .5 }}>Settings</Typography>
-        <Typography color="text.secondary">Manage your profile, preferences, and account security.</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800, mb: .5 }}>{t('settings.title')}</Typography>
+        <Typography color="text.secondary">{t('settings.subtitle')}</Typography>
       </Box>
 
       <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: '1fr 2fr' } }}>
@@ -79,16 +80,16 @@ export default function SettingsPage() {
             </Box>
             <Divider sx={{ my: 3, opacity: 0.6 }} />
             <Stack spacing={2}>
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Officer ID</Typography>
+              <Box sx={{ textAlign: 'start' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.officer_id')}</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{profile.officerId}</Typography>
               </Box>
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Center</Typography>
+              <Box sx={{ textAlign: 'start' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.center')}</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{profile.center}</Typography>
               </Box>
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Contact</Typography>
+              <Box sx={{ textAlign: 'start' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.contact')}</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{profile.phoneNumber}</Typography>
               </Box>
             </Stack>
@@ -98,13 +99,13 @@ export default function SettingsPage() {
         <Box>
           <Stack spacing={3}>
             <Card sx={{ p: 4 }}>
-              <Typography variant="h6" sx={{ mb: 3, fontWeight: 800 }}>Detailed Information</Typography>
+              <Typography variant="h6" sx={{ mb: 3, fontWeight: 800 }}>{t('settings.detailed_information')}</Typography>
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
                 {[
-                  ['Full Name', profile.displayName], 
-                  ['Officer ID', profile.officerId], 
-                  ['Assigned Center', profile.center], 
-                  ['Account Role', profile.role]
+                  [t('settings.full_name'), profile.displayName], 
+                  [t('settings.officer_id'), profile.officerId], 
+                  [t('settings.assigned_center'), profile.center], 
+                  [t('settings.account_role'), profile.role]
                 ].map(([k, v]) => (
                   <Box 
                     key={String(k)} 
@@ -124,20 +125,20 @@ export default function SettingsPage() {
             </Card>
 
             <Card sx={{ p: 4 }}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 800 }}>System Preferences</Typography>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 800 }}>{t('settings.system_preferences')}</Typography>
               <Stack spacing={1}>
                 <FormControlLabel 
                   control={<Switch checked={mode === 'dark'} onChange={toggleMode} color="primary" />} 
-                  label={<Typography sx={{ fontWeight: 600 }}>Enable High-Contrast Dark Mode (OLED)</Typography>} 
+                  label={<Typography sx={{ fontWeight: 600 }}>{t('settings.dark_mode')}</Typography>} 
                 />
                 <Divider sx={{ my: 1, opacity: 0.4 }} />
                 <FormControlLabel 
                   control={<Switch checked={emailAlerts} onChange={(e) => setEmailAlerts(e.target.checked)} color="primary" />} 
-                  label={<Typography sx={{ fontWeight: 600 }}>Critical Email Notifications</Typography>} 
+                  label={<Typography sx={{ fontWeight: 600 }}>{t('settings.email_notifications')}</Typography>} 
                 />
                 <FormControlLabel 
                   control={<Switch checked={pushAlerts} onChange={(e) => setPushAlerts(e.target.checked)} color="primary" />} 
-                  label={<Typography sx={{ fontWeight: 600 }}>Real-time Push Alerts</Typography>} 
+                  label={<Typography sx={{ fontWeight: 600 }}>{t('settings.push_notifications')}</Typography>} 
                 />
               </Stack>
             </Card>

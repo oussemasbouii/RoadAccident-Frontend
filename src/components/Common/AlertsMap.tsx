@@ -3,6 +3,7 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { alpha, Box, Paper, Typography, useTheme } from '@mui/material'
 import { getMapboxToken, getMapboxTokenError } from '@/utils/mapboxToken'
+import { useTranslation } from '@/themeMode'
 
 interface AlertMapItem {
   id: string
@@ -55,6 +56,7 @@ function createAlertMarker(direction: 'received' | 'sent', read: boolean): HTMLD
 
 export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
   const theme = useTheme()
+  const { t } = useTranslation()
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
@@ -90,9 +92,9 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
         zoom: 6,
       })
       mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
-      mapRef.current.on('error', () => setError('Failed to load alerts map'))
+      mapRef.current.on('error', () => setError(t('maps.failed_to_load_alerts_map')))
     } catch {
-      setError('Failed to initialize alerts map. Check VITE_MAPBOX_ACCESS_TOKEN.')
+      setError(t('maps.failed_to_initialize_alerts_map'))
     }
 
     return () => {
@@ -113,11 +115,11 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
     const bounds = new mapboxgl.LngLatBounds()
 
     alertsWithCoords.forEach((alert) => {
-      const title = escapeHtml(alert.title || 'Alert Notification')
+      const title = escapeHtml(alert.title || t('common.loading_text'))
       const comment = escapeHtml(alert.comment || '')
       const time = escapeHtml(alert.time || '')
-      const direction = alert.direction === 'sent' ? 'Sent' : 'Received'
-      const readStatus = alert.read ? 'Read' : 'Unread'
+      const direction = alert.direction === 'sent' ? t('alerts.sent') : t('alerts.received')
+      const readStatus = alert.read ? t('common.yes') : t('common.no')
       const directionChipColor = alert.direction === 'sent' ? '#1d4ed8' : '#b45309'
       const readChipColor = alert.read ? '#15803d' : '#b91c1c'
 
@@ -248,7 +250,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
 
       {!error && alerts.length > 0 && alertsWithCoords.length === 0 && (
         <Paper sx={{ position: 'absolute', left: 12, right: 12, bottom: 12, p: 1, bgcolor: 'warning.main', color: 'warning.contrastText' }}>
-          <Typography variant="caption">No alert coordinates found yet.</Typography>
+          <Typography variant="caption">{t('maps.no_alert_coordinates_found_yet')}</Typography>
         </Paper>
       )}
     </Box>

@@ -13,7 +13,10 @@ import {
   ListItemText,
   Typography,
   Tooltip,
+  useTheme,
 } from '@mui/material'
+import { motion } from 'framer-motion'
+import { spring } from '../../utils/motion'
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded'
 import ReportProblemRoundedIcon from '@mui/icons-material/ReportProblemRounded'
 import NotificationsActiveRoundedIcon from '@mui/icons-material/NotificationsActiveRounded'
@@ -27,6 +30,7 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 import { RootState } from '../../store/store'
 import { logout } from '../../features/auth/slices/authSlice'
 import { clearAuthStorage } from '../../utils/authSecurity'
+import { useThemeMode, useTranslation } from '../../themeMode'
 
 interface SidebarProps {
   collapsed?: boolean
@@ -37,16 +41,21 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const user = useSelector((state: RootState) => state.auth.user)
+  const { t } = useTranslation()
+  const { direction } = useThemeMode()
+  const theme = useTheme()
+  const tooltipPlacement = direction === 'rtl' ? 'left' : 'right'
+  const rowDirection = direction === 'rtl' ? 'row-reverse' : 'row'
 
   const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: <DashboardRoundedIcon /> },
-    { path: '/incidents', label: 'Accidents', icon: <ReportProblemRoundedIcon /> },
-    { path: '/alerts', label: 'Alerts', icon: <NotificationsActiveRoundedIcon /> },
-    { path: '/reports', label: 'Reports', icon: <BarChartRoundedIcon /> },
-    { path: '/communications', label: 'Chat', icon: <ForumRoundedIcon /> },
-    { path: '/admin/accounts', label: 'User Accounts', icon: <AdminPanelSettingsRoundedIcon />, role: 'admin' },
-    { path: '/admin/officer-tracking', label: 'Officer Tracking', icon: <LocationSearchingRoundedIcon />, role: 'admin' },
-    { path: '/settings', label: 'Settings', icon: <SettingsRoundedIcon /> },
+    { path: '/dashboard', label: t('nav.dashboard'), icon: <DashboardRoundedIcon /> },
+    { path: '/incidents', label: t('nav.accidents'), icon: <ReportProblemRoundedIcon /> },
+    { path: '/alerts', label: t('nav.alerts'), icon: <NotificationsActiveRoundedIcon /> },
+    { path: '/reports', label: t('nav.reports'), icon: <BarChartRoundedIcon /> },
+    { path: '/communications', label: t('nav.communications'), icon: <ForumRoundedIcon /> },
+    { path: '/admin/accounts', label: t('nav.user_accounts'), icon: <AdminPanelSettingsRoundedIcon />, role: 'admin' },
+    { path: '/admin/officer-tracking', label: t('nav.officer_tracking'), icon: <LocationSearchingRoundedIcon />, role: 'admin' },
+    { path: '/settings', label: t('nav.settings'), icon: <SettingsRoundedIcon /> },
   ]
 
   const filteredMenuItems = menuItems.filter(item => !item.role || user?.role === item.role)
@@ -114,7 +123,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
             }),
           }}
         >
-          RoadAccident
+          {t('app.name')}
         </Typography>
       </Box>
 
@@ -137,7 +146,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
             }),
           }}
         >
-          Main Menu
+          {t('common.main_menu')}
         </Typography>
 
         <List sx={{ p: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -150,45 +159,70 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                 to={item.path}
                 selected={isItemActive}
                 sx={{
+                  position: 'relative',
+                  flexDirection: rowDirection,
                   borderRadius: 100,
                   py: 1.5,
                   px: collapsed ? 2 : 2.5,
                   justifyContent: collapsed ? 'center' : 'flex-start',
                   minHeight: 56,
-                  transition: (theme) => theme.transitions.create(['padding', 'background-color'], {
+                  overflow: 'hidden',
+                  transition: (theme) => theme.transitions.create(['padding'], {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.standard,
                   }),
+                  // Let framer-motion handle the selection background
                   '&.Mui-selected': {
-                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                    bgcolor: 'transparent',
                     color: 'primary.main',
-                    '&:hover': {
-                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.18),
-                    },
-                    '& .MuiListItemIcon-root': {
-                      color: 'primary.main',
-                      transform: 'scale(1.1)',
-                    },
+                    '&:hover': { bgcolor: 'transparent' },
+                  },
+                  '&:hover': {
+                    bgcolor: (t) => alpha(t.palette.action.active, 0.04),
                   },
                 }}
               >
-                <ListItemIcon sx={{ 
-                  minWidth: collapsed ? 0 : 44, 
+                {/* Animated active indicator pill — slides between items */}
+                {isItemActive && (
+                  <motion.div
+                    layoutId="sidebar-indicator"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: 100,
+                      backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                      zIndex: 0,
+                    }}
+                    transition={spring.snappy}
+                  />
+                )}
+
+                <ListItemIcon sx={{
+                  minWidth: collapsed ? 0 : 44,
                   color: isItemActive ? 'primary.main' : 'text.secondary',
-                  transition: (theme) => theme.transitions.create(['min-width', 'color', 'transform'], {
+                  position: 'relative',
+                  zIndex: 1,
+                  justifyContent: 'center',
+                  transition: (theme) => theme.transitions.create(['min-width', 'color'], {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.standard,
                   }),
-                  justifyContent: 'center'
                 }}>
-                  {item.icon}
+                  <motion.div
+                    animate={{ scale: isItemActive ? 1.1 : 1 }}
+                    transition={spring.snappy}
+                    style={{ display: 'flex' }}
+                  >
+                    {item.icon}
+                  </motion.div>
                 </ListItemIcon>
-                
-                <ListItemText 
-                  primary={item.label} 
-                  primaryTypographyProps={{ 
+
+                <ListItemText
+                  primary={item.label}
+                  sx={{ position: 'relative', zIndex: 1 }}
+                  primaryTypographyProps={{
                     variant: 'body2',
-                    sx: { 
+                    sx: {
                       fontWeight: isItemActive ? 700 : 500,
                       whiteSpace: 'nowrap',
                       opacity: collapsed ? 0 : 1,
@@ -197,14 +231,14 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.standard,
                       }),
-                    } 
-                  }} 
+                    }
+                  }}
                 />
               </ListItemButton>
             )
 
             return collapsed ? (
-              <Tooltip key={item.path} title={item.label} placement="right">
+              <Tooltip key={item.path} title={item.label} placement={tooltipPlacement}>
                 {content}
               </Tooltip>
             ) : content
@@ -222,6 +256,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
             borderRadius: 'var(--radius-m3-xl, 24px)',
             display: 'flex',
             alignItems: 'center',
+            flexDirection: rowDirection,
             gap: collapsed ? 0 : 2,
             transition: (theme) => theme.transitions.create(['padding', 'gap'], {
               easing: theme.transitions.easing.sharp,
@@ -231,7 +266,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
             '&:hover': { bgcolor: (theme) => alpha(theme.palette.action.active, 0.06) }
           }} 
         >
-          <Tooltip title={collapsed ? user?.displayName || 'User' : ''} placement="right">
+          <Tooltip title={collapsed ? user?.displayName || 'User' : ''} placement={tooltipPlacement}>
             <Avatar 
               sx={{ 
                 bgcolor: 'primary.main', 
@@ -244,7 +279,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                 boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
               }}
             >
-              {((user?.displayName?.[0]) || (user?.officerId?.[0]) || 'U').toUpperCase()}
+          {((user?.displayName?.[0]) || (user?.officerId?.[0]) || 'U').toUpperCase()}
             </Avatar>
           </Tooltip>
           
@@ -267,7 +302,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
           </Box>
 
           {!collapsed && (
-            <Tooltip title="Sign Out">
+            <Tooltip title={t('topbar.sign_out')}>
               <IconButton
                 onClick={handleLogout}
                 sx={{
@@ -282,7 +317,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
         </Box>
         
         {collapsed && (
-          <Tooltip title="Sign Out" placement="right">
+          <Tooltip title={t('topbar.sign_out')} placement={tooltipPlacement}>
             <IconButton
               onClick={handleLogout}
               sx={{
@@ -290,6 +325,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                 borderRadius: 3,
                 mt: 1,
                 py: 1.5,
+                flexDirection: rowDirection,
                 color: 'error.main',
                 '&:hover': { bgcolor: (theme) => alpha(theme.palette.error.main, 0.08) }
               }}

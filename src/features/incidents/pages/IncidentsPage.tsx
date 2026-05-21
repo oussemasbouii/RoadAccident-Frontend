@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { 
-  Box, 
-  Stack, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableRow, 
+import {
+  Box,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   Typography,
   alpha,
   useTheme,
@@ -14,8 +14,15 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
 } from '@mui/material'
+import { motion, AnimatePresence } from 'framer-motion'
+import { listParent, listChild, tableParent, tableRow, fadeIn } from '../../../utils/motion'
+import { StatCardSkeleton, TableRowSkeleton } from '../../../components/Common/Skeletons'
+
+const MotionBox = motion(Box)
+const MotionTableBody = motion(TableBody)
+const MotionTableRow = motion(TableRow)
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded'
 import DirectionsCarRoundedIcon from '@mui/icons-material/DirectionsCarRounded'
 import LocalHospitalRoundedIcon from '@mui/icons-material/LocalHospitalRounded'
@@ -32,10 +39,13 @@ import Button from '../../../components/Common/Button'
 import StatCard from '../../../components/Common/StatCard'
 import { ExportButton } from '../../../components/Common'
 import IncidentsMap from '../../../components/Common/IncidentsMap'
+import { useTranslation, useThemeMode } from '../../../themeMode'
 
 export default function IncidentsPage() {
   const dispatch = useAppDispatch()
   const theme = useTheme()
+  const { t } = useTranslation()
+  const { locale } = useThemeMode()
   const { list: incidents, loading, stats, error: incidentsError } = useAppSelector((state) => state.incidents)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create')
@@ -102,10 +112,30 @@ export default function IncidentsPage() {
     low: 'success',
   }
 
+  const severityLabel: Record<string, string> = {
+    critical: t('dashboard.critical'),
+    high: t('dashboard.high'),
+    medium: t('dashboard.medium'),
+    low: t('dashboard.low'),
+  }
+
   const statusColor: Record<'active' | 'responded' | 'resolved', 'danger' | 'warning' | 'success'> = {
     active: 'danger',
     responded: 'warning',
     resolved: 'success',
+  }
+
+  const statusLabel: Record<string, string> = {
+    active: t('reports.active'),
+    responded: t('reports.responded'),
+    resolved: t('reports.resolved'),
+  }
+
+  function formatTime(raw: string | undefined): string {
+    if (!raw) return ''
+    const d = new Date(raw)
+    if (Number.isNaN(d.getTime())) return raw
+    return d.toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })
   }
 
   const activeIncidents = displayedIncidents.filter((i: Incident) => i.status !== 'resolved').length
@@ -116,61 +146,51 @@ export default function IncidentsPage() {
     <Stack spacing={4} sx={{ pb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: -0.5 }}>Road Accidents</Typography>
-          <Typography color="text.secondary">National emergency monitoring and record management</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: -0.5 }}>{t('incidents.title')}</Typography>
+          <Typography color="text.secondary">{t('incidents.subtitle')}</Typography>
         </Box>
         <ExportButton
           data={displayedIncidents || []}
           filename="incidents"
-          label="Export Records"
-          title="Incident Operations"
+          label={t('incidents.export_records')}
+          title={t('incidents.incident_operations')}
           variant="incidents"
         />
       </Box>
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: 'repeat(4, 1fr)' } }}>
-        <StatCard 
-          icon={<WarningRoundedIcon />} 
-          label="Active Incidents" 
-          value={activeIncidents} 
-          trend="neutral" 
-          trendValue="Live updates" 
-          intent="danger"
-        />
-        <StatCard 
-          icon={<DirectionsCarRoundedIcon />} 
-          label="Total Vehicles" 
-          value={totalVehicles} 
-          trend="neutral" 
-          trendValue="Current records" 
-          intent="info"
-        />
-        <StatCard 
-          icon={<LocalHospitalRoundedIcon />} 
-          label="Reported Injuries" 
-          value={totalInjuries} 
-          trend="neutral" 
-          trendValue="Medical response" 
-          intent="warning"
-        />
-        <StatCard 
-          icon={<AccessTimeFilledRoundedIcon />} 
-          label="Avg Response" 
-          value={stats.avgResponseTime > 0 ? `${stats.avgResponseTime} min` : '12 min'} 
-          trend="down" 
-          trendValue="Improved by 4%" 
-          intent="success"
-        />
-      </Box>
+      <AnimatePresence mode="wait">
+        {loading && incidents.length === 0 ? (
+          <MotionBox
+            key="skeleton-stats"
+            variants={listParent}
+            initial="initial"
+            animate="animate"
+            sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: 'repeat(4, 1fr)' } }}
+          >
+            {[0, 1, 2, 3].map((i) => (
+              <motion.div key={i} variants={listChild}><StatCardSkeleton /></motion.div>
+            ))}
+          </MotionBox>
+        ) : (
+          <MotionBox
+            key="live-stats"
+            variants={listParent}
+            initial="initial"
+            animate="animate"
+            sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: 'repeat(4, 1fr)' } }}
+          >
+            <StatCard icon={<WarningRoundedIcon />} label={t('incidents.active_incidents')} value={activeIncidents} trend="neutral" trendValue={t('incidents.live_updates')} intent="danger" />
+            <StatCard icon={<DirectionsCarRoundedIcon />} label={t('incidents.total_vehicles')} value={totalVehicles} trend="neutral" trendValue={t('incidents.current_records')} intent="info" />
+            <StatCard icon={<LocalHospitalRoundedIcon />} label={t('incidents.reported_injuries')} value={totalInjuries} trend="neutral" trendValue={t('incidents.medical_response')} intent="warning" />
+            <StatCard icon={<AccessTimeFilledRoundedIcon />} label={t('incidents.avg_response')} value={stats.avgResponseTime > 0 ? `${stats.avgResponseTime} min` : '12 min'} trend="down" trendValue={t('incidents.improved_by_4_percent')} intent="success" />
+          </MotionBox>
+        )}
+      </AnimatePresence>
 
       <Card sx={{ p: 0, overflow: 'hidden' }}>
         <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}` }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Incident Map
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Live geographic view of reported incidents
-          </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('incidents.map_title')}</Typography>
+          <Typography variant="body2" color="text.secondary">{t('incidents.map_subtitle')}</Typography>
         </Box>
         <Box sx={{ p: 2 }}>
           <IncidentsMap incidents={displayedIncidents} height={420} />
@@ -181,7 +201,7 @@ export default function IncidentsPage() {
       <Card sx={{ p: 2 }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2, alignItems: 'end' }}>
           <TextField
-            label="Search incidents"
+            label={t('incidents.search_incidents')}
             variant="outlined"
             size="small"
             value={filters.search}
@@ -189,7 +209,7 @@ export default function IncidentsPage() {
             sx={{ bgcolor: 'background.paper' }}
           />
           <TextField
-            label="Location"
+            label={t('incidents.location')}
             variant="outlined"
             size="small"
             value={filters.location}
@@ -197,30 +217,30 @@ export default function IncidentsPage() {
             sx={{ bgcolor: 'background.paper' }}
           />
           <FormControl size="small" sx={{ bgcolor: 'background.paper' }}>
-            <InputLabel>Severity</InputLabel>
+            <InputLabel>{t('incidents.severity')}</InputLabel>
             <Select
               value={filters.severity}
-              label="Severity"
+              label={t('incidents.severity')}
               onChange={(e) => setFilters(prev => ({ ...prev, severity: e.target.value }))}
             >
-              <MenuItem value="all">All Severities</MenuItem>
-              <MenuItem value="critical">Critical</MenuItem>
-              <MenuItem value="high">High</MenuItem>
-              <MenuItem value="medium">Medium</MenuItem>
-              <MenuItem value="low">Low</MenuItem>
+              <MenuItem value="all">{t('incidents.all_severities')}</MenuItem>
+              <MenuItem value="critical">{t('dashboard.critical')}</MenuItem>
+              <MenuItem value="high">{t('dashboard.high')}</MenuItem>
+              <MenuItem value="medium">{t('dashboard.medium')}</MenuItem>
+              <MenuItem value="low">{t('dashboard.low')}</MenuItem>
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ bgcolor: 'background.paper' }}>
-            <InputLabel>Status</InputLabel>
+            <InputLabel>{t('incidents.status')}</InputLabel>
             <Select
               value={filters.status}
-              label="Status"
+              label={t('incidents.status')}
               onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
             >
-              <MenuItem value="all">All Status</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="responded">Responded</MenuItem>
-              <MenuItem value="resolved">Resolved</MenuItem>
+              <MenuItem value="all">{t('incidents.all_status')}</MenuItem>
+              <MenuItem value="active">{t('reports.active')}</MenuItem>
+              <MenuItem value="responded">{t('reports.responded')}</MenuItem>
+              <MenuItem value="resolved">{t('reports.resolved')}</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -230,13 +250,13 @@ export default function IncidentsPage() {
       <Card sx={{ p: 0, overflow: 'hidden' }}>
         <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Incident Management Data</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('incidents.title')}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {displayedIncidents.length} report(s) in current view
+                {displayedIncidents.length} {t('incidents.reports_in_view')}
               </Typography>
             </Box>
-            <Button variant="primary" size="sm" onClick={handleOpenCreateDrawer} aria-label="File new incident report">
-              + File New Report
+            <Button variant="primary" size="sm" onClick={handleOpenCreateDrawer} aria-label={t('incidents.file_new_report')}>
+              + {t('incidents.file_new_report')}
             </Button>
         </Box>
         <Box sx={{ overflowX: 'auto' }}>
@@ -244,101 +264,114 @@ export default function IncidentsPage() {
             <TableHead sx={{ bgcolor: alpha(theme.palette.action.active, 0.02) }}>
               <TableRow>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, py: 2 }}>
-                  Incident ID
+                  {t('incidents.incident_id')}
                 </TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Location
+                  {t('incidents.location')}
                 </TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Severity
+                  {t('incidents.severity')}
                 </TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Status
+                  {t('incidents.status')}
                 </TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Reported At
+                  {t('incidents.reported_at')}
                 </TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }} align="right">
-                  Actions
+                  {t('incidents.actions')}
                 </TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }} align="right">
-                  Metric Details
+                  {t('incidents.metric_details')}
                 </TableCell>
               </TableRow>
             </TableHead>
-            <TableBody>
-              {displayedIncidents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 8, color: 'text.secondary' }}>
-                    {loading ? 'Fetching national incident data...' : 'No incident records found in current scope.'}
-                  </TableCell>
-                </TableRow>
-              ) : displayedIncidents.map((incident: Incident) => (
-                <TableRow
-                  key={incident.id}
-                  sx={{
-                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.045) },
-                    transition: 'background-color 0.2s',
-                  }}
+            <AnimatePresence mode="wait">
+              {loading && incidents.length === 0 ? (
+                // Show skeletons while loading initial data
+                <TableBody key="skeleton">
+                  {[0, 1, 2, 3, 4, 5].map((i) => <TableRowSkeleton key={i} index={i} />)}
+                </TableBody>
+              ) : displayedIncidents.length === 0 ? (
+                <TableBody key="empty">
+                  <TableRow>
+                    <TableCell colSpan={7} align="center" sx={{ py: 8, color: 'text.secondary' }}>
+                      {t('incidents.empty')}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              ) : (
+                // Stagger rows on initial data load and filter changes
+                <MotionTableBody
+                  key={`rows-${loading ? 'l' : incidents.length}`}
+                  variants={tableParent}
+                  initial="initial"
+                  animate="animate"
                 >
-                  <TableCell sx={{ fontWeight: 800, color: 'primary.main', py: 2.5 }}>
-                    #{incident.id}
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 600, maxWidth: 260 }}>
-                    <Typography
-                      variant="body2"
+                  {displayedIncidents.map((incident: Incident) => (
+                    <MotionTableRow
+                      key={incident.id}
+                      variants={tableRow}
                       sx={{
-                        fontWeight: 600,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
+                        transition: 'background-color 0.15s ease',
                       }}
-                      title={incident.location}
                     >
-                      {incident.location}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      label={incident.severity.toUpperCase()}
-                      variant={severityColor[incident.severity as 'critical' | 'high' | 'medium' | 'low']}
-                      size="sm"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      label={incident.status.charAt(0).toUpperCase() + incident.status.slice(1)}
-                      variant={statusColor[incident.status as 'active' | 'responded' | 'resolved']}
-                      size="sm"
-                    />
-                  </TableCell>
-                  <TableCell sx={{ color: 'text.secondary', fontWeight: 500 }}>
-                    {incident.time}
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      icon={<EditRoundedIcon sx={{ fontSize: 16 }} />}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        handleOpenEditDrawer(incident.id)
-                      }}
-                      loading={drawerLoading && editingIncidentId === incident.id}
-                      disabled={drawerLoading && editingIncidentId !== incident.id}
-                      aria-label={`Edit incident ${incident.id}`}
-                    >
-                      {drawerLoading && editingIncidentId === incident.id ? 'Opening...' : 'Edit'}
-                    </Button>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
-                      Vehicles {incident.vehicles} <Box component="span" sx={{ mx: 0.5 }}>|</Box> Injuries {incident.injuries}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
+                      <TableCell sx={{ fontWeight: 800, color: 'primary.main', py: 2.5 }}>
+                        #{incident.id}
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, maxWidth: 260 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          title={incident.location}
+                        >
+                          {incident.location}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          label={severityLabel[incident.severity] ?? incident.severity.toUpperCase()}
+                          variant={severityColor[incident.severity as 'critical' | 'high' | 'medium' | 'low']}
+                          size="sm"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          label={statusLabel[incident.status] ?? (incident.status.charAt(0).toUpperCase() + incident.status.slice(1))}
+                          variant={statusColor[incident.status as 'active' | 'responded' | 'resolved']}
+                          size="sm"
+                        />
+                      </TableCell>
+                      <TableCell sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                        {formatTime(incident.time)}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={<EditRoundedIcon sx={{ fontSize: 16 }} />}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleOpenEditDrawer(incident.id)
+                          }}
+                          loading={drawerLoading && editingIncidentId === incident.id}
+                          disabled={drawerLoading && editingIncidentId !== incident.id}
+                          aria-label={`${t('common.edit')} incident ${incident.id}`}
+                        >
+                          {drawerLoading && editingIncidentId === incident.id ? t('incidents.opening') : t('common.edit')}
+                        </Button>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                          {t('incidents.vehicles')} {incident.vehicles} <Box component="span" sx={{ mx: 0.5 }}>|</Box> {t('incidents.injuries')} {incident.injuries}
+                        </Typography>
+                      </TableCell>
+                    </MotionTableRow>
+                  ))}
+                </MotionTableBody>
+              )}
+            </AnimatePresence>
           </Table>
         </Box>
       </Card>
@@ -360,12 +393,6 @@ export default function IncidentsPage() {
           }
           const created = await dispatch(createIncident(payload) as any).unwrap()
           const createdData = created?.data ?? created
-          if (createdData?.id) {
-            setEditingIncident(createdData)
-            setDrawerMode('edit')
-            setDrawerOpen(true)
-            return { keepOpen: true, incident: createdData }
-          }
           return createdData
         }}
       />

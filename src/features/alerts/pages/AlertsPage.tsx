@@ -36,6 +36,7 @@ import StatCard from '../../../components/Common/StatCard'
 import AccidentLocationMap from '../../../components/Common/AccidentLocationMap'
 import AlertsMap from '../../../components/Common/AlertsMap'
 import { ExportButton } from '../../../components/Common'
+import { useTranslation } from '../../../themeMode'
 
 interface RecipientOption {
   id: string
@@ -46,6 +47,8 @@ interface RecipientOption {
 export default function AlertsPage() {
   const dispatch = useAppDispatch()
   const theme = useTheme()
+  const { t } = useTranslation()
+  const rowDirection = theme.direction === 'rtl' ? 'row-reverse' : 'row'
   const { list: alerts, unreadCount, loading, error } = useAppSelector((state) => state.alerts)
 
   const [tab, setTab] = useState<'received' | 'sent'>('received')
@@ -92,14 +95,14 @@ export default function AlertsPage() {
         setRecipientOptions(mapped)
       } catch (err: any) {
         setRecipientOptions([])
-        setRecipientError(err?.response?.data?.message || err?.message || 'Failed to load recipients')
+        setRecipientError(err?.response?.data?.message || err?.message || t('alerts.failed_to_load_recipients'))
       } finally {
         setRecipientLoading(false)
       }
     }
 
     loadRecipients()
-  }, [])
+  }, [t])
 
   const sentAlerts = useMemo(() => alerts.filter((a: any) => a.direction === 'sent'), [alerts])
   const receivedAlerts = useMemo(() => alerts.filter((a: any) => a.direction !== 'sent'), [alerts])
@@ -127,7 +130,7 @@ export default function AlertsPage() {
           const lastName = String(raw?.lastName ?? '').trim()
           const displayName = String(raw?.displayName ?? '').trim()
           const fullName = `${firstName} ${lastName}`.trim() || displayName
-          return { id, fullName: fullName || 'Unknown sender' }
+          return { id, fullName: fullName || t('alerts.unknown_sender') }
         })
       )
 
@@ -148,7 +151,7 @@ export default function AlertsPage() {
     return () => {
       mounted = false
     }
-  }, [receivedAlerts, senderNames])
+  }, [receivedAlerts, senderNames, t])
 
   const mapAlerts = useMemo(
     () =>
@@ -190,7 +193,7 @@ export default function AlertsPage() {
 
   const handleUseCurrentLocation = () => {
     if (!navigator.geolocation) {
-      setSendError('Geolocation is not supported on this device.')
+      setSendError(t('alerts.geolocation_unsupported'))
       return
     }
     navigator.geolocation.getCurrentPosition(
@@ -203,10 +206,10 @@ export default function AlertsPage() {
       },
       (geoError) => {
         if (geoError.code === 1) {
-          setSendError('Location permission denied. Enter coordinates manually.')
+          setSendError(t('alerts.location_permission_denied'))
           return
         }
-        setSendError('Unable to retrieve your location. Enter coordinates manually.')
+        setSendError(t('alerts.location_unavailable'))
       }
     )
   }
@@ -220,15 +223,15 @@ export default function AlertsPage() {
     const comment = form.comment.trim()
 
     if (form.recipientIds.length === 0) {
-      setSendError('Select at least one recipient.')
+      setSendError(t('alerts.select_at_least_one_recipient'))
       return
     }
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      setSendError('Latitude and longitude must be valid numbers.')
+      setSendError(t('alerts.invalid_coordinates'))
       return
     }
     if (!comment) {
-      setSendError('Write a short alert comment before sending.')
+      setSendError(t('alerts.comment_required'))
       return
     }
 
@@ -239,7 +242,7 @@ export default function AlertsPage() {
         longitude,
         comment,
       }) as any).unwrap()
-      setSendMessage('Alert sent successfully.')
+      setSendMessage(t('alerts.alert_sent_success'))
       setForm({
         recipientIds: [],
         latitude: '',
@@ -248,7 +251,7 @@ export default function AlertsPage() {
       })
       dispatch(fetchAlerts({ page: 1, limit: 50 }) as any)
     } catch (err: any) {
-      setSendError(err || 'Failed to send alert')
+      setSendError(err || t('alerts.failed_to_send_alert'))
     }
   }
 
@@ -260,29 +263,29 @@ export default function AlertsPage() {
     <Stack spacing={3}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>Alerts Operations</Typography>
-          <Typography color="text.secondary">Send location alerts, track delivery, and acknowledge received alerts</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>{t('alerts.title')}</Typography>
+          <Typography color="text.secondary">{t('alerts.subtitle')}</Typography>
         </Box>
         <ExportButton
           data={alerts || []}
           filename="alerts-operations"
-          label="Export Alerts"
-          title="Alert Operations"
+          label={t('common.view_all')}
+          title={t('alerts.export_title')}
           variant="alerts"
         />
       </Box>
 
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: 'repeat(4, 1fr)' } }}>
-        <StatCard icon={<NotificationsActiveRoundedIcon />} label="Received Alerts" value={receivedAlerts.length} trend="neutral" trendValue={`${unreadCount} unread`} intent="warning" />
-        <StatCard icon={<SendRoundedIcon />} label="Sent Alerts" value={sentAlerts.length} trend="neutral" trendValue="Delivered to recipients" intent="info" />
-        <StatCard icon={<CheckCircleRoundedIcon />} label="Acknowledged Rate" value={`${sentAcknowledgedRate}%`} trend={sentAcknowledgedRate >= 50 ? 'up' : 'neutral'} trendValue="For sent alerts" intent="success" />
-        <StatCard icon={<PublicRoundedIcon />} label="Unread Received" value={unreadCount} trend={unreadCount > 0 ? 'up' : 'down'} trendValue={unreadCount > 0 ? 'Needs action' : 'All acknowledged'} intent="danger" />
+        <StatCard icon={<NotificationsActiveRoundedIcon />} label={t('alerts.received')} value={receivedAlerts.length} trend="neutral" trendValue={`${unreadCount} ${t('alerts.unread_items')}`} intent="warning" />
+        <StatCard icon={<SendRoundedIcon />} label={t('alerts.sent')} value={sentAlerts.length} trend="neutral" trendValue={t('alerts.delivered_to_recipients')} intent="info" />
+        <StatCard icon={<CheckCircleRoundedIcon />} label={t('alerts.acknowledged_rate')} value={`${sentAcknowledgedRate}%`} trend={sentAcknowledgedRate >= 50 ? 'up' : 'neutral'} trendValue={t('alerts.for_sent_alerts')} intent="success" />
+        <StatCard icon={<PublicRoundedIcon />} label={t('alerts.status_unread')} value={unreadCount} trend={unreadCount > 0 ? 'up' : 'down'} trendValue={unreadCount > 0 ? t('alerts.needs_action') : t('alerts.all_acknowledged')} intent="danger" />
       </Box>
 
       <Card sx={{ p: 3 }}>
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
           <GroupRoundedIcon color="primary" fontSize="small" />
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>Compose Alert</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('alerts.compose_alert')}</Typography>
         </Stack>
 
         <Stack spacing={2}>
@@ -291,23 +294,23 @@ export default function AlertsPage() {
           {recipientError && <MuiAlert severity="warning">{recipientError}</MuiAlert>}
 
           <FormControl fullWidth size="small">
-            <InputLabel id="recipients-label">Recipients</InputLabel>
+            <InputLabel id="recipients-label">{t('alerts.recipients')}</InputLabel>
             <Select
               labelId="recipients-label"
               multiple
               value={form.recipientIds}
-              label="Recipients"
+              label={t('alerts.recipients')}
               onChange={(e) => setForm((prev) => ({ ...prev, recipientIds: e.target.value as string[] }))}
-              renderValue={(selected) => `${selected.length} selected`}
+              renderValue={(selected) => `${selected.length} ${t('common.selected')}`}
             >
               {recipientLoading ? (
-                <MenuItem disabled>Loading recipients...</MenuItem>
+                <MenuItem disabled>{t('common.loading')}</MenuItem>
               ) : recipientOptions.length === 0 ? (
-                <MenuItem disabled>No recipients available</MenuItem>
+                <MenuItem disabled>{t('alerts.no_recipients_available')}</MenuItem>
               ) : (
                 recipientOptions.map((recipient) => (
                   <MenuItem key={recipient.id} value={recipient.id}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%', justifyContent: 'space-between' }}>
+                  <Stack direction={rowDirection} spacing={1} alignItems="center" sx={{ width: '100%', justifyContent: 'space-between' }}>
                       <Typography variant="body2">{recipient.label}</Typography>
                       {recipient.sublabel && <Typography variant="caption" color="text.secondary">{recipient.sublabel}</Typography>}
                     </Stack>
@@ -320,24 +323,24 @@ export default function AlertsPage() {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr auto' }, gap: 2 }}>
             <TextField
               size="small"
-              label="Latitude"
+              label={t('alerts.latitude')}
               value={form.latitude}
               onChange={(e) => setForm((prev) => ({ ...prev, latitude: e.target.value }))}
             />
             <TextField
               size="small"
-              label="Longitude"
+              label={t('alerts.longitude')}
               value={form.longitude}
               onChange={(e) => setForm((prev) => ({ ...prev, longitude: e.target.value }))}
             />
-            <Button variant="secondary" icon={<MyLocationRoundedIcon fontSize="small" />} onClick={handleUseCurrentLocation}>
-              Use My Location
+              <Button variant="secondary" icon={<MyLocationRoundedIcon fontSize="small" />} onClick={handleUseCurrentLocation}>
+              {t('alerts.use_current_location')}
             </Button>
           </Box>
 
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-              Pick Exact Location On Map
+              {t('incidents.map_title')}
             </Typography>
             <AccidentLocationMap
               initialLocation={{
@@ -362,15 +365,15 @@ export default function AlertsPage() {
           <TextField
             multiline
             minRows={3}
-            label="Alert Comment"
+            label={t('alerts.comment')}
             value={form.comment}
             onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
-            placeholder="Write what happened and what officers should do."
+            placeholder={t('alerts.comment_required')}
           />
 
           <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Button variant="primary" icon={<SendRoundedIcon fontSize="small" />} loading={loading} onClick={handleSendAlert}>
-              Send Alert
+              {t('alerts.send')}
             </Button>
           </Box>
         </Stack>
@@ -379,10 +382,10 @@ export default function AlertsPage() {
       <Card sx={{ p: 3 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
           <PlaceRoundedIcon color="primary" fontSize="small" />
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>Alerts Location Map</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('alerts.title')} {t('incidents.map_title')}</Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Live map of sent and received alerts with saved coordinates.
+          {t('alerts.subtitle')}
         </Typography>
         <AlertsMap alerts={mapAlerts} height={360} />
       </Card>
@@ -390,8 +393,8 @@ export default function AlertsPage() {
       <Card sx={{ p: 0, overflow: 'hidden' }}>
         <Box sx={{ px: 2, pt: 2 }}>
           <Tabs value={tab} onChange={(_, next) => setTab(next)} sx={{ mb: 1 }}>
-            <Tab label={`Received (${receivedAlerts.length})`} value="received" />
-            <Tab label={`Sent (${sentAlerts.length})`} value="sent" />
+            <Tab label={`${t('alerts.received')} (${receivedAlerts.length})`} value="received" />
+            <Tab label={`${t('alerts.sent')} (${sentAlerts.length})`} value="sent" />
           </Tabs>
         </Box>
 
@@ -399,21 +402,21 @@ export default function AlertsPage() {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: tab === 'received' ? '2fr 1fr' : '1fr' }, gap: 2 }}>
             <TextField
               size="small"
-              label="Search alerts"
+              label={t('common.search')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             {tab === 'received' && (
               <FormControl size="small">
-                <InputLabel>Status</InputLabel>
+                <InputLabel>{t('alerts.status_all')}</InputLabel>
                 <Select
                   value={statusFilter}
-                  label="Status"
+                  label={t('alerts.status_all')}
                   onChange={(e) => setStatusFilter(e.target.value as 'all' | 'unread' | 'read')}
                 >
-                  <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="unread">Unread</MenuItem>
-                  <MenuItem value="read">Read</MenuItem>
+                  <MenuItem value="all">{t('common.all')}</MenuItem>
+                  <MenuItem value="unread">{t('alerts.status_unread')}</MenuItem>
+                  <MenuItem value="read">{t('alerts.status_read')}</MenuItem>
                 </Select>
               </FormControl>
             )}
@@ -432,7 +435,7 @@ export default function AlertsPage() {
           </Box>
         ) : displayedAlerts.length === 0 ? (
           <Box sx={{ py: 8, textAlign: 'center' }}>
-            <Typography color="text.secondary">No alerts found for current filters.</Typography>
+            <Typography color="text.secondary">{t('alerts.no_alerts')}</Typography>
           </Box>
         ) : (
           <List disablePadding>
@@ -443,7 +446,7 @@ export default function AlertsPage() {
               const pendingCount = Math.max(0, recipientCount - ackCount)
               const senderName =
                 alert.direction === 'received'
-                  ? (alert.senderId && senderNames[alert.senderId] ? senderNames[alert.senderId] : 'Unknown sender')
+                  ? (alert.senderId && senderNames[alert.senderId] ? senderNames[alert.senderId] : t('alerts.unknown_sender'))
                   : ''
               return (
                 <ListItem
@@ -474,17 +477,17 @@ export default function AlertsPage() {
                     primary={
                       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                          {alert.direction === 'received' ? `Alert from ${senderName}` : 'Sent alert'}
+                          {alert.direction === 'received' ? `${t('alerts.alert_from')} ${senderName}` : t('alerts.sent_alert')}
                         </Typography>
-                        <Chip size="small" label={alert.direction.toUpperCase()} color={alert.direction === 'sent' ? 'info' : 'warning'} variant="outlined" />
+                        <Chip size="small" label={alert.direction === 'sent' ? t('alerts.sent') : t('alerts.received')} color={alert.direction === 'sent' ? 'info' : 'warning'} variant="outlined" />
                         {alert.direction === 'received' && (
-                          <Chip size="small" label={alert.read ? 'READ' : 'UNREAD'} color={alert.read ? 'success' : 'warning'} />
+                          <Chip size="small" label={alert.read ? t('alerts.read') : t('alerts.unread')} color={alert.read ? 'success' : 'warning'} />
                         )}
                         {alert.direction === 'sent' && (
                           <Chip
                             size="small"
                             color={pendingCount === 0 ? 'success' : 'warning'}
-                            label={pendingCount === 0 ? 'Fully acknowledged' : `${pendingCount} pending`}
+                            label={pendingCount === 0 ? t('alerts.fully_acknowledged') : t('alerts.pending_count', { n: pendingCount })}
                           />
                         )}
                       </Stack>
@@ -506,7 +509,7 @@ export default function AlertsPage() {
                           </Typography>
                           {alert.direction === 'sent' && (
                             <Typography variant="caption" color="text.secondary">
-                              Delivery: {ackCount}/{recipientCount} acknowledged
+                              {t('alerts.delivery_acknowledged', { ack: ackCount, total: recipientCount })}
                             </Typography>
                           )}
                         </Stack>

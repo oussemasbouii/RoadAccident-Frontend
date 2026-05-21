@@ -6,10 +6,13 @@ import CallMadeRoundedIcon from '@mui/icons-material/CallMadeRounded'
 import CallEndRoundedIcon from '@mui/icons-material/CallEndRounded'
 import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded'
 import { Card } from '@/components/Common'
+import { useTranslation } from '@/themeMode'
 
 export default function CallHistory() {
   const theme = useTheme()
   const callHistory = useAppSelector((state) => state.call.callHistory)
+  const { t, locale } = useTranslation()
+  const rowDirection = theme.direction === 'rtl' ? 'row-reverse' : 'row'
 
   const formatDuration = (startedAt?: number, endedAt?: number) => {
     if (!startedAt || !endedAt) return ''
@@ -21,7 +24,7 @@ export default function CallHistory() {
 
   const formatTime = (timestamp?: number) => {
     if (!timestamp) return ''
-    return new Date(timestamp).toLocaleString()
+    return new Date(timestamp).toLocaleString(locale)
   }
 
   const getStatusIcon = (status: string) => {
@@ -54,7 +57,7 @@ export default function CallHistory() {
         boxShadow: '0 18px 50px rgba(0,0,0,0.06)',
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexDirection: rowDirection }}>
         <Box
           sx={{
             width: 36,
@@ -70,10 +73,10 @@ export default function CallHistory() {
         </Box>
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Call History
+            {t('comms.call_history')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {callHistory.length} calls
+            {callHistory.length} {t('comms.completed_calls')}
           </Typography>
         </Box>
       </Box>
@@ -81,10 +84,10 @@ export default function CallHistory() {
       {callHistory.length === 0 ? (
         <Box sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            No call history yet
+            {t('comms.no_call_history')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Your completed calls will appear here
+            {t('comms.your_completed_calls_will_appear_here')}
           </Typography>
         </Box>
       ) : (
@@ -100,7 +103,7 @@ export default function CallHistory() {
                   </ListItemAvatar>
                   <ListItemText
                     primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: rowDirection }}>
                         <Typography variant="subtitle2">
                           {call.peer.name}
                         </Typography>
@@ -113,7 +116,7 @@ export default function CallHistory() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                         {getDirectionIcon(call.direction === 'incoming')}
                         <Typography variant="caption" color="text.secondary">
-                          {formatTime(call.endedAt)}
+                          {formatTime(call.endedAt) || t('comms.unknown_time')}
                         </Typography>
                         {call.startedAt && call.endedAt && (
                           <>
@@ -126,11 +129,11 @@ export default function CallHistory() {
                       </Box>
                     }
                   />
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: rowDirection }}>
                     {getStatusIcon(call.status)}
                     <Chip
                       size="small"
-                      label={call.status === 'missed' ? 'Missed' : call.direction === 'incoming' ? 'Incoming' : 'Outgoing'}
+                      label={call.status === 'missed' ? t('comms.missed') : call.direction === 'incoming' ? t('comms.incoming') : t('comms.outgoing')}
                       color={call.status === 'missed' ? 'warning' : call.status === 'ended' ? 'success' : 'default'}
                       variant="outlined"
                     />

@@ -3,6 +3,7 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { alpha, Box, CircularProgress, Paper, Typography } from '@mui/material'
 import { getMapboxToken, getMapboxTokenError } from '@/utils/mapboxToken'
+import { useTranslation } from '@/themeMode'
 
 interface IncidentMapItem {
   id: string
@@ -66,6 +67,7 @@ const createIncidentMarkerElement = (severity: IncidentMapItem['severity']): HTM
 }
 
 export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapProps) {
+  const { t } = useTranslation()
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
@@ -91,12 +93,12 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
         zoom: 6,
       })
     } catch (err) {
-      setError('Failed to initialize map. Check VITE_MAPBOX_ACCESS_TOKEN (must be pk.*).')
+      setError(t('maps.failed_to_initialize_map'))
       return
     }
 
     mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
-    mapRef.current.on('error', () => setError('Failed to load map'))
+    mapRef.current.on('error', () => setError(t('maps.failed_to_load_map')))
 
     return () => {
       markersRef.current.forEach((marker) => marker.remove())
@@ -209,15 +211,15 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
     incidentsWithCoordinates.forEach(({ incident, coords }) => {
       if (!coords) return
 
-      const safeLocation = String(incident.location || 'Unknown location').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const safeLocation = String(incident.location || t('reports.no_location_data')).replace(/</g, '&lt;').replace(/>/g, '&gt;')
       const safeSeverity = String(incident.severity || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       const safeStatus = String(incident.status || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       const safeTime = String(incident.time || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       const popup = new mapboxgl.Popup({ offset: 20 }).setHTML(
         `<div style="padding:8px 10px; color:#0f172a; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height:1.35;">
           <div style="font-weight:700; margin-bottom:4px;">${safeLocation}</div>
-          <div style="font-size:12px; color:#334155; margin-bottom:4px;">Severity: ${safeSeverity.toUpperCase()} | Status: ${safeStatus}</div>
-          <div style="font-size:11px; color:#475569; margin-bottom:3px;">Vehicles: ${incident.vehicles} | Injuries: ${incident.injuries}</div>
+          <div style="font-size:12px; color:#334155; margin-bottom:4px;">${t('incidents.severity')}: ${safeSeverity.toUpperCase()} | ${t('incidents.status')}: ${safeStatus}</div>
+          <div style="font-size:11px; color:#475569; margin-bottom:3px;">${t('incidents.vehicles')}: ${incident.vehicles} | ${t('incidents.injuries')}: ${incident.injuries}</div>
           <div style="font-size:11px; color:#475569;">${safeTime}</div>
         </div>`
       )
@@ -277,7 +279,7 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
           }}
         >
           <CircularProgress size={16} />
-          <Typography variant="caption">Resolving locations...</Typography>
+          <Typography variant="caption">{t('maps.resolving_locations')}</Typography>
         </Box>
       )}
 

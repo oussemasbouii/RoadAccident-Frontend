@@ -3,9 +3,12 @@ import { useEffect, useState } from 'react'
 import { Box, useMediaQuery, useTheme, Drawer, Alert, Collapse, IconButton, alpha, Typography, Stack } from '@mui/material'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useAppSelector } from '../../store/store'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import { useThemeMode, useTranslation } from '../../themeMode'
+import { pageVariants } from '../../utils/motion'
 
 const SIDEBAR_WIDTH = 280
 const COLLAPSED_SIDEBAR_WIDTH = 88
@@ -13,6 +16,8 @@ const COLLAPSED_SIDEBAR_WIDTH = 88
 export default function DashboardLayout() {
   const location = useLocation()
   const theme = useTheme()
+  const { t } = useTranslation()
+  const { direction } = useThemeMode()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile)
   const [showWarning, setShowWarning] = useState(true)
@@ -48,8 +53,16 @@ export default function DashboardLayout() {
   })
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        overflowX: 'hidden',
+      }}
+    >
       <Drawer
+        anchor={direction === 'rtl' ? 'right' : 'left'}
         variant={isMobile ? 'temporary' : 'permanent'}
         open={sidebarOpen}
         onClose={toggleSidebar}
@@ -63,7 +76,7 @@ export default function DashboardLayout() {
             width: sidebarOpen ? SIDEBAR_WIDTH : COLLAPSED_SIDEBAR_WIDTH,
             transition: drawerTransition,
             overflowX: 'hidden',
-            borderRight: '1px solid',
+            borderInlineEnd: '1px solid',
             borderColor: 'divider',
             bgcolor: 'background.default',
           },
@@ -93,7 +106,7 @@ export default function DashboardLayout() {
               py: 1.5,
               px: 2,
               bgcolor: alpha(theme.palette.warning.main, 0.1),
-              borderLeft: `4px solid ${theme.palette.warning.main}`,
+              borderInlineStart: `4px solid ${theme.palette.warning.main}`,
               '& .MuiAlert-icon': { 
                 color: theme.palette.warning.main,
                 fontSize: 24,
@@ -115,19 +128,35 @@ export default function DashboardLayout() {
           >
             <Stack spacing={0.5}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: theme.palette.warning.dark }}>
-                Your Account is Temporarily Restricted
+                {t('auth.restricted')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Your account has been restricted. You can still view data but some actions may be limited. 
-                Please contact an administrator for assistance.
+                {t('auth.blocked')}
               </Typography>
             </Stack>
           </Alert>
         </Collapse>
         
         <Box component="main" sx={{ flex: 1, overflow: 'auto' }}>
-          <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1440, mx: 'auto', width: '100%' }}>
-            <Outlet />
+          <Box
+            sx={{
+              p: { xs: 2, md: 3 },
+              maxWidth: 1440,
+              width: '100%',
+              marginInlineEnd: 'auto',
+            }}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={location.pathname}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
           </Box>
         </Box>
       </Box>

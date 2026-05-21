@@ -76,12 +76,13 @@ export const mobileTokens = {
   },
 }
 
-export function createAppTheme(mode: PaletteMode) {
+export function createAppTheme(mode: PaletteMode, direction: 'ltr' | 'rtl' = 'ltr') {
   const t = mode === 'dark' ? mobileTokens.dark : mobileTokens.light
 
   return createTheme({
     // Enable CSS variables for Tailwind v4 integration
     cssVariables: true,
+    direction,
     palette: {
       mode,
       primary: {
@@ -117,7 +118,10 @@ export function createAppTheme(mode: PaletteMode) {
       borderRadius: 16, // More rounded Material 3 style
     },
     typography: {
-      fontFamily: ['"Public Sans"', 'Roboto', 'Inter', 'sans-serif'].join(','),
+      fontFamily:
+        direction === 'rtl'
+          ? ['"Noto Naskh Arabic"', '"Segoe UI"', 'Tahoma', 'Arial', 'sans-serif'].join(',')
+          : ['"Public Sans"', 'Roboto', 'Inter', 'sans-serif'].join(','),
       // Display
       h1: { fontSize: '3.5625rem', lineHeight: '4rem', fontWeight: 400, letterSpacing: '-0.25px' },
       h2: { fontSize: '2.8125rem', lineHeight: '3.25rem', fontWeight: 400, letterSpacing: 0 },

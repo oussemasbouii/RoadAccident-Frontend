@@ -46,29 +46,30 @@ import type { CallSession } from '@/types/call'
 import AttachmentLightbox from '@/components/AttachmentLightbox'
 import { useChatComposer } from '@/features/communications/hooks/useChatComposer'
 import { decodeJwtSub } from '@/utils/callUtils'
+import { useTranslation } from '@/themeMode'
 
-const QUICK_REPLIES = ['On my way', 'Need backup', 'ETA 5 min', 'Scene secured', 'Call me']
 const REACTION_OPTIONS = ['✅', '⚠️', '👀', '👍', '❗', '❓', '🙏']
 
-function formatRelativeTime(value?: string) {
-  if (!value) return 'Unknown'
+function formatRelativeTime(value?: string, locale = 'en', unknownLabel = 'Unknown') {
+  if (!value) return unknownLabel
   const parsed = Date.parse(value)
   if (Number.isNaN(parsed)) return value
   const diffMs = Date.now() - parsed
-  if (diffMs < 60_000) return 'just now'
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+  if (diffMs < 60_000) return formatter.format(-Math.max(1, Math.round(diffMs / 1000)), 'second')
   const minutes = Math.floor(diffMs / 60_000)
-  if (minutes < 60) return `${minutes} min ago`
+  if (minutes < 60) return formatter.format(-minutes, 'minute')
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
+  if (hours < 24) return formatter.format(-hours, 'hour')
   const days = Math.floor(hours / 24)
-  return `${days}d ago`
+  return formatter.format(-days, 'day')
 }
 
-function formatMessageTime(value?: string) {
+function formatMessageTime(value?: string, locale = 'en') {
   if (!value) return ''
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return parsed.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
 }
 
 function getDateKey(timestamp: number) {
@@ -76,7 +77,7 @@ function getDateKey(timestamp: number) {
   return date.toDateString()
 }
 
-function formatDateHeader(timestamp: number) {
+function formatDateHeader(timestamp: number, locale = 'en', todayLabel = 'Today', yesterdayLabel = 'Yesterday') {
   const date = new Date(timestamp)
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -84,11 +85,11 @@ function formatDateHeader(timestamp: number) {
   const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
 
   if (messageDate.getTime() === today.getTime()) {
-    return 'Today'
+    return todayLabel
   } else if (messageDate.getTime() === yesterday.getTime()) {
-    return 'Yesterday'
+    return yesterdayLabel
   } else {
-    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+    return date.toLocaleDateString(locale, { weekday: 'long', month: 'short', day: 'numeric' })
   }
 }
 
@@ -119,6 +120,8 @@ export default function CommsHubPage() {
   const theme = useTheme()
   const location = useLocation()
   const dispatch = useAppDispatch()
+  const { t, locale } = useTranslation()
+  const rowDirection = theme.direction === 'rtl' ? 'row-reverse' : 'row'
   const me = useAppSelector((state) => state.auth.user)
   const chatState = useAppSelector((state) => state.chat)
   const activePeerId = useAppSelector((state) => state.chat.activePeerId)
@@ -137,6 +140,16 @@ export default function CommsHubPage() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [showNewPill, setShowNewPill] = useState(false)
   const [newCount, setNewCount] = useState(0)
+  const quickReplies = useMemo(
+    () => [
+      t('comms.reply_on_my_way'),
+      t('comms.reply_need_backup'),
+      t('comms.reply_eta_5_min'),
+      t('comms.reply_scene_secured'),
+      t('comms.reply_call_me'),
+    ],
+    [t],
+  )
 
   const currentUserId = useMemo(() => {
     return (
@@ -353,10 +366,10 @@ export default function CommsHubPage() {
               </Box>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Officer Directory
+                  {t('comms.contacts')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {contacts.length} contacts
+                {contacts.length} contacts
                 </Typography>
               </Box>
             </Stack>
@@ -382,7 +395,7 @@ export default function CommsHubPage() {
           <Stack spacing={1} sx={{ overflowY: 'auto' }}>
             {contacts.length === 0 && (
               <Typography variant="body2" color="text.secondary">
-                No users found.
+                {t('comms.no_contacts')}
               </Typography>
             )}
             {contacts.map((contact: ChatContact) => {
@@ -422,9 +435,11 @@ export default function CommsHubPage() {
                         {contact.officerId} · {contact.role}
                       </Typography>
                     </Box>
-                    <Box sx={{ textAlign: 'right' }}>
+                    <Box sx={{ textAlign: 'end' }}>
                       <Typography variant="caption" color="text.secondary">
-                        {contact.status === 'online' ? 'Online' : contact.lastSeen}
+                        {contact.status === 'online'
+                          ? t('comms.online')
+                          : formatRelativeTime(contact.lastSeen, locale, t('comms.unknown_time'))}
                       </Typography>
                       {chatState.unreadByPeer[contact.id] ? (
                         <Chip size="small" label={chatState.unreadByPeer[contact.id]} color="primary" sx={{ mt: 0.5 }} />
@@ -469,7 +484,7 @@ export default function CommsHubPage() {
                 </Badge>
                 <Box sx={{ flex: 1 }}>
                   <Typography sx={{ fontWeight: 700 }}>{selectedContact.name}</Typography>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', mt: 0.2 }}>
+                <Stack direction={rowDirection} spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', mt: 0.2 }}>
                     <Typography variant="caption" color="text.secondary">
                       {selectedContact.officerId}
                     </Typography>
@@ -480,14 +495,14 @@ export default function CommsHubPage() {
                     <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: theme.palette.divider }} />
                     <Typography variant="caption" color="text.secondary">
                       {selectedContact.status === 'online'
-                        ? 'Online'
-                        : `Last seen ${formatRelativeTime(selectedContact.lastSeen)}`}
+                        ? t('common.all')
+                        : t('comms.last_seen', { time: formatRelativeTime(selectedContact.lastSeen, locale, t('comms.unknown_time')) })}
                     </Typography>
                   </Stack>
                 </Box>
-                <Stack direction="row" spacing={0.75} alignItems="center">
+                <Stack direction={rowDirection} spacing={0.75} alignItems="center">
                   {/* Organized call controls */}
-                  <Tooltip title="Audio call">
+                  <Tooltip title={t('comms.audio_call')}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -528,7 +543,7 @@ export default function CommsHubPage() {
                       <CallRoundedIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Video call">
+                  <Tooltip title={t('comms.video_call')}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -571,7 +586,7 @@ export default function CommsHubPage() {
                   </Tooltip>
                   
                   {/* Mute control */}
-                  <Tooltip title={isMuted ? `Muted (${muteTimeRemaining} remaining)` : 'Mute notifications'}>
+                  <Tooltip title={isMuted ? `${t('comms.muted')} (${muteTimeRemaining} ${t('comms.remaining')})` : t('comms.mute_notifications')}>
                     <IconButton
                       size="small"
                       onClick={(event) => setMuteAnchorEl(event.currentTarget)}
@@ -596,7 +611,7 @@ export default function CommsHubPage() {
                   </Tooltip>
                   
                   {/* History */}
-                  <Tooltip title="Call History">
+                  <Tooltip title={t('comms.call_history')}>
                     <IconButton
                       size="small"
                       onClick={() => setShowCallHistory(true)}
@@ -623,10 +638,10 @@ export default function CommsHubPage() {
                   
                   {/* Compact Mute Chip */}
                   {isMuted && (
-                    <Tooltip title={`Muted until ${new Date(mutedUntil).toLocaleTimeString()}`}>
+                    <Tooltip title={`${t('comms.muted_until')} ${new Date(mutedUntil).toLocaleTimeString()}`}>
                       <Chip 
                         size="small" 
-                        label={muteTimeRemaining || "Muted"} 
+                        label={muteTimeRemaining || t('comms.muted')} 
                         color="warning" 
                         variant="outlined"
                         sx={{ 
@@ -644,9 +659,9 @@ export default function CommsHubPage() {
               </>
             ) : (
               <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontWeight: 700 }}>Select a conversation</Typography>
+                <Typography sx={{ fontWeight: 700 }}>{t('comms.contacts')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Choose an officer to start chatting.
+                  {t('comms.subtitle')}
                 </Typography>
               </Box>
             )}
@@ -654,7 +669,7 @@ export default function CommsHubPage() {
 
           <Divider />
 
-          <Stack ref={scrollRef} onScroll={handleScroll} spacing={2} sx={{ flex: 1, overflowY: 'auto', pr: 0.5, maxHeight: 400 }}>
+          <Stack ref={scrollRef} onScroll={handleScroll} spacing={2} sx={{ flex: 1, overflowY: 'auto', paddingInlineEnd: 4, maxHeight: 400 }}>
             {!selectedContact && (
               <Box
                 sx={{
@@ -668,16 +683,16 @@ export default function CommsHubPage() {
                 }}
               >
                 <Box>
-                  <Typography sx={{ fontWeight: 700, mb: 0.5 }}>No conversation selected</Typography>
+                  <Typography sx={{ fontWeight: 700, mb: 0.5 }}>{t('comms.contacts')}</Typography>
                   <Typography variant="body2">
-                    Pick an officer from the list to view messages.
+                    {t('comms.start_conversation')}
                   </Typography>
                 </Box>
               </Box>
             )}
             {selectedContact && combinedItems.length === 0 && (
               <Typography variant="body2" color="text.secondary">
-                No messages or calls yet. Start the conversation.
+                {t('comms.start_conversation')}
               </Typography>
             )}
             {selectedContact && combinedItems.reduce((acc: React.ReactElement[], item, index) => {
@@ -688,7 +703,7 @@ export default function CommsHubPage() {
                 acc.push(
                   <Box key={`date-${currentDateKey}`} sx={{ textAlign: 'center', my: 1 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      {formatDateHeader(item.timestamp)}
+                      {formatDateHeader(item.timestamp, locale, t('comms.today'), t('comms.yesterday'))}
                     </Typography>
                   </Box>
                 )
@@ -842,7 +857,7 @@ export default function CommsHubPage() {
                     </Box>
                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
                       <Typography variant="caption" color="text.secondary">
-                        {formatMessageTime(message.timestamp)}
+                        {formatMessageTime(message.timestamp, locale)}
                       </Typography>
                       {isMe && statusIcon}
                     </Stack>
@@ -880,10 +895,10 @@ export default function CommsHubPage() {
                         </Box>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                            {call.callType === 'video' ? 'Video call' : 'Audio call'} {call.direction === 'incoming' ? 'from' : 'to'} {selectedContact?.name}
+                            {call.callType === 'video' ? t('comms.video_call') : t('comms.audio_call')} {call.direction === 'incoming' ? t('comms.from') : t('comms.to')} {selectedContact?.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {call.startedAt ? new Date(call.startedAt).toLocaleString() : 'Unknown time'}
+                            {call.startedAt ? new Date(call.startedAt).toLocaleString(locale) : t('comms.unknown_time')}
                             {call.endedAt ? ` · ${formatDuration(call.startedAt, call.endedAt)}` : ''}
                           </Typography>
                         </Box>
@@ -921,7 +936,7 @@ export default function CommsHubPage() {
                   bgcolor: theme.palette.primary.main,
                 }}
               />
-              Typing…
+              {t('comms.typing')}
             </Box>
           )}
 
@@ -947,19 +962,19 @@ export default function CommsHubPage() {
                 },
               }}
             >
-              {newCount > 1 ? `${newCount} new messages` : 'New message'}
+              {newCount > 1 ? `${newCount} ${t('comms.new_messages')}` : t('comms.new_message')}
             </Box>
           )}
 
           {selectedContact && (
             <>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                {QUICK_REPLIES.map((reply) => (
+              <Stack direction={rowDirection} spacing={1} sx={{ flexWrap: 'wrap' }}>
+                {quickReplies.map((reply) => (
                   <Chip key={reply} label={reply} onClick={() => setDraft(reply)} />
                 ))}
               </Stack>
 
-              <Stack direction="row" spacing={1} alignItems="flex-end">
+              <Stack direction={rowDirection} spacing={1} alignItems="flex-end">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -972,11 +987,11 @@ export default function CommsHubPage() {
                   icon={<AttachFileRoundedIcon fontSize="small" />}
                   onClick={handleFilePick}
                 >
-                  Attach
+                  {t('comms.attach')}
                 </Button>
                 <TextField
                   size="small"
-                  placeholder="Type a message..."
+                  placeholder={t('comms.new_message')}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   fullWidth
@@ -997,12 +1012,12 @@ export default function CommsHubPage() {
                     },
                   }}
                 />
-                <Button icon={<SendRoundedIcon fontSize="small" />} onClick={handleSend}>Send</Button>
+                <Button icon={<SendRoundedIcon fontSize="small" />} onClick={handleSend}>{t('comms.send')}</Button>
               </Stack>
               {pendingAttachment && (
                 <Chip
                   size="small"
-                  label={`Ready to send: ${pendingAttachment.filename}`}
+                  label={`${t('comms.ready_to_send')}: ${pendingAttachment.filename}`}
                   onDelete={() => setPendingAttachment(null)}
                   sx={{ alignSelf: 'flex-start' }}
                 />
@@ -1030,7 +1045,7 @@ export default function CommsHubPage() {
             setMuteAnchorEl(null)
           }}
         >
-          Mute 15 min
+          {t('comms.mute_15_min')}
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -1040,7 +1055,7 @@ export default function CommsHubPage() {
             setMuteAnchorEl(null)
           }}
         >
-          Mute 1 hour
+          {t('comms.mute_1_hour')}
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -1050,7 +1065,7 @@ export default function CommsHubPage() {
             setMuteAnchorEl(null)
           }}
         >
-          Mute 8 hours
+          {t('comms.mute_8_hours')}
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -1060,7 +1075,7 @@ export default function CommsHubPage() {
             setMuteAnchorEl(null)
           }}
         >
-          Unmute
+          {t('comms.unmute')}
         </MenuItem>
       </Menu>
       <AttachmentLightbox lightbox={lightbox} onClose={() => setLightbox(null)} onDownload={handleDownloadImage} />
@@ -1123,12 +1138,12 @@ export default function CommsHubPage() {
 
       <Dialog open={showCallHistory} onClose={() => setShowCallHistory(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Stack direction={rowDirection} justifyContent="space-between" alignItems="center">
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Call History
+              {t('comms.call_history')}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {selectedCallHistory.length} {selectedCallHistory.length === 1 ? 'call' : 'calls'}
+              {selectedCallHistory.length} {t('comms.completed_calls')}
             </Typography>
           </Stack>
         </DialogTitle>
@@ -1136,7 +1151,7 @@ export default function CommsHubPage() {
           <Stack spacing={1}>
             {selectedCallHistory.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-                No call history for this officer yet.
+                {t('comms.no_call_history')}
               </Typography>
             ) : (
               <Stack spacing={1}>
@@ -1150,8 +1165,8 @@ export default function CommsHubPage() {
                       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
                     }}
                   >
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-                      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+                    <Stack direction={rowDirection} alignItems="center" justifyContent="space-between" spacing={1}>
+                      <Stack direction={rowDirection} spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
                         <Box
                           sx={{
                             width: 34,
@@ -1167,14 +1182,14 @@ export default function CommsHubPage() {
                         </Box>
                         <Box sx={{ minWidth: 0 }}>
                           <Typography variant="body2" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {call.callType === 'video' ? 'Video call' : 'Audio call'}
+                            {call.callType === 'video' ? t('comms.video_call') : t('comms.audio_call')}
                           </Typography>
                           <Typography variant="caption" color="text.secondary" noWrap>
-                            {call.startedAt ? new Date(call.startedAt).toLocaleString() : 'Unknown time'}
+                            {call.startedAt ? new Date(call.startedAt).toLocaleString() : t('comms.unknown_time')}
                           </Typography>
                         </Box>
                       </Stack>
-                      <Stack direction="row" spacing={1} alignItems="center">
+                      <Stack direction={rowDirection} spacing={1} alignItems="center">
                         {call.endedAt ? (
                           <Typography variant="caption" color="text.secondary">
                             {formatDuration(call.startedAt, call.endedAt)}
@@ -1182,7 +1197,7 @@ export default function CommsHubPage() {
                         ) : null}
                         <Chip
                           size="small"
-                          label={call.direction === 'incoming' ? 'Incoming' : 'Outgoing'}
+                          label={call.direction === 'incoming' ? t('comms.incoming') : t('comms.outgoing')}
                           color={call.status === 'ended' ? 'success' : 'warning'}
                           variant="outlined"
                         />

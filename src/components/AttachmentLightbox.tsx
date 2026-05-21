@@ -2,6 +2,7 @@ import { Box, Dialog, DialogActions, DialogContent, IconButton, Stack, Typograph
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
 import { Button } from '@/components/Common'
+import { useTranslation } from '@/themeMode'
 
 type LightboxState = {
   url: string
@@ -16,6 +17,7 @@ type AttachmentLightboxProps = {
 
 export default function AttachmentLightbox({ lightbox, onClose, onDownload }: AttachmentLightboxProps) {
   const theme = useTheme()
+  const { t } = useTranslation()
   return (
     <Dialog
       open={Boolean(lightbox)}
@@ -88,10 +90,10 @@ export default function AttachmentLightbox({ lightbox, onClose, onDownload }: At
       </DialogContent>
       <DialogActions sx={{ px: 2.5, pb: 2.2, pt: 0.5 }}>
         <Button icon={<DownloadRoundedIcon fontSize="small" />} onClick={onDownload}>
-          Download
+          {t('common.download')}
         </Button>
         <Button variant="secondary" onClick={onClose}>
-          Close
+          {t('common.close')}
         </Button>
       </DialogActions>
     </Dialog>

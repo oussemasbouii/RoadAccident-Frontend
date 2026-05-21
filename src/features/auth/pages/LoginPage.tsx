@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
-import { 
+import {
   Alert, 
   Box, 
   IconButton, 
@@ -30,12 +30,13 @@ import HourglassEmptyRoundedIcon from '@mui/icons-material/HourglassEmptyRounded
 import { apiService } from '@/services/api'
 import { AuthUser } from '../slices/authSlice'
 import { setUser, setToken } from '../slices/authSlice'
-import { useThemeMode } from '../../../themeMode'
+import { useThemeMode, useTranslation } from '../../../themeMode'
+import { localeLabels, type LocaleCode, translate } from '../../../i18n'
 import { clearAuthStorage } from '@/utils/authSecurity'
 import { getDeviceId, setAccessToken, setDeviceId, setRefreshToken } from '@/utils/tokenStore'
 import { Button, Card } from '@/components/Common'
 
-function mapLoginError(err: any): { message: string; isBlocked?: boolean; isRestricted?: boolean } {
+function mapLoginError(err: any, locale: LocaleCode): { message: string; isBlocked?: boolean; isRestricted?: boolean } {
   const status = err?.response?.status
   const payload = err?.response?.data || {}
   const errorType = String(payload?.type || '').toUpperCase()
@@ -77,7 +78,7 @@ function mapLoginError(err: any): { message: string; isBlocked?: boolean; isRest
     errorType === 'BLOCKED'
   ) {
     return { 
-      message: 'Your account has been blocked. You cannot sign in at this time. Please contact an administrator for assistance.',
+      message: translate(locale, 'auth.blocked'),
       isBlocked: true
     }
   }
@@ -101,7 +102,7 @@ function mapLoginError(err: any): { message: string; isBlocked?: boolean; isRest
     errorType === 'FROZEN'
   ) {
     return { 
-      message: 'Your account is temporarily restricted. Some features may be limited. Please contact an administrator for assistance.',
+      message: translate(locale, 'auth.restricted'),
       isRestricted: true
     }
   }
@@ -110,13 +111,13 @@ function mapLoginError(err: any): { message: string; isBlocked?: boolean; isRest
   // Note: Backend returns same message for both blocked and restricted accounts
   if (errorType === 'INVALID_CREDENTIALS' && msg.includes('user not valid')) {
     return { 
-      message: 'Your account has been blocked, restricted, or is not yet validated. Please contact an administrator for assistance.',
+      message: translate(locale, 'auth.not_validated'),
       isBlocked: true
     }
   }
 
   if (errorType === 'INVALID_CREDENTIALS') {
-    return { message: 'Invalid credentials. Please verify your Officer ID and password.' }
+    return { message: translate(locale, 'auth.invalid_credentials') }
   }
 
   if (errorType === 'UNKNOWN_ERROR' && msg.includes('verifying user password')) {
@@ -133,18 +134,18 @@ function mapLoginError(err: any): { message: string; isBlocked?: boolean; isRest
     msg.includes('suspended') ||
     msg.includes('restricted')
   ) {
-    return { message: 'Your account is restricted. Please contact an administrator.' }
+    return { message: translate(locale, 'auth.restricted') }
   }
 
   if (status === 401 || status === 403 || msg.includes('invalid') || msg.includes('unauthorized')) {
-    return { message: 'Invalid credentials. Please check your officer ID and password.' }
+    return { message: translate(locale, 'auth.invalid_credentials') }
   }
 
   if (!status && (msg.includes('network') || msg.includes('failed to fetch'))) {
     return { message: 'Network error. Check your connection and try again.' }
   }
 
-  return { message: payload?.message || err?.message || 'Login failed' }
+  return { message: payload?.message || err?.message || translate(locale, 'auth.invalid_credentials') }
 }
 
 function getDeviceInfo() {
@@ -169,7 +170,6 @@ export default function LoginPage() {
   const [officerId, setOfficerId] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [language, setLanguage] = useState<'EN' | 'FR'>('EN')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusWarning, setStatusWarning] = useState<{ type: 'blocked' | 'restricted' | 'notValidated' | null; message: string }>({ type: null, message: '' })
@@ -177,7 +177,8 @@ export default function LoginPage() {
   const theme = useTheme()
   const navigate = useNavigate()
   const dispatch = useDispatch()
-  const { mode, toggleMode } = useThemeMode()
+  const { mode, toggleMode, locale, setLocale } = useThemeMode()
+  const { t } = useTranslation()
   
   const canUseDevBypass = import.meta.env.DEV && import.meta.env.VITE_DEV_BYPASS_LOGIN === 'true'
 
@@ -305,7 +306,7 @@ export default function LoginPage() {
       dispatch(setUser(user))
       navigate('/')
     } catch (err: any) {
-      const loginError = mapLoginError(err)
+      const loginError = mapLoginError(err, locale)
       
       // If "user not valid" error, show a user-friendly message
       if (loginError.isBlocked && err?.response?.data?.message?.includes('user not valid')) {
@@ -398,10 +399,14 @@ export default function LoginPage() {
         <Button 
           variant="secondary" 
           size="sm"
-          onClick={() => setLanguage((v) => (v === 'EN' ? 'FR' : 'EN'))}
+          onClick={() => {
+            const order: LocaleCode[] = ['en', 'fr', 'ar']
+            const next = order[(order.indexOf(locale) + 1) % order.length]
+            setLocale(next)
+          }}
           icon={<TranslateRoundedIcon fontSize="inherit" />}
         >
-          {language}
+          {localeLabels[locale]}
         </Button>
       </Box>
 
@@ -451,25 +456,25 @@ export default function LoginPage() {
                   
                   <Box>
                     <Typography variant="h3" sx={{ fontWeight: 800, mb: 1.5, lineHeight: 1.1 }}>
-                      Road Accident System
+                      {t('app.name')}
                     </Typography>
                     <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 400, color: 'inherit' }}>
-                      Emergency Response & Monitoring Interface
+                      {t('auth.welcome_subtitle')}
                     </Typography>
                   </Box>
 
                   <Stack spacing={2} sx={{ mt: 4 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <EmergencyRoundedIcon sx={{ opacity: 0.7 }} />
-                      <Typography variant="body1">Real-time Incident Tracking</Typography>
+                      <Typography variant="body1">{t('dashboard.subtitle')}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <EmergencyRoundedIcon sx={{ opacity: 0.7 }} />
-                      <Typography variant="body1">Officer Deployment Management</Typography>
+                      <Typography variant="body1">{t('nav.officer_tracking')}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <EmergencyRoundedIcon sx={{ opacity: 0.7 }} />
-                      <Typography variant="body1">Analytics & Reporting Dashboard</Typography>
+                      <Typography variant="body1">{t('nav.reports')}</Typography>
                     </Box>
                   </Stack>
                 </Stack>
@@ -493,16 +498,16 @@ export default function LoginPage() {
                 <Stack spacing={4} component="form" onSubmit={handleSubmit}>
                   <Box>
                     <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
-                      Sign In
+                      {t('auth.sign_in')}
                     </Typography>
                     <Typography color="text.secondary">
-                      Access your portal using your credentials
+                      {t('auth.welcome_title')}
                     </Typography>
                   </Box>
 
                   <Stack spacing={2.5}>
                     <TextField
-                      label="Officer ID"
+                      label={t('auth.officer_id')}
                       value={officerId}
                       onChange={(e) => setOfficerId(e.target.value)}
                       required
@@ -524,7 +529,7 @@ export default function LoginPage() {
                     <Box>
                       <TextField
                         type={showPassword ? 'text' : 'password'}
-                        label="Password"
+                        label={t('auth.password')}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
@@ -538,7 +543,7 @@ export default function LoginPage() {
                           endAdornment: (
                             <InputAdornment position="end">
                               <IconButton onClick={() => setShowPassword((v) => !v)} edge="end" size="small">
-                                {showPassword ? <VisibilityOffRoundedIcon fontSize="small" /> : <VisibilityRoundedIcon fontSize="small" />}
+                          {showPassword ? <VisibilityOffRoundedIcon fontSize="small" /> : <VisibilityRoundedIcon fontSize="small" />}
                               </IconButton>
                             </InputAdornment>
                           ),
@@ -556,7 +561,7 @@ export default function LoginPage() {
                           underline="hover" 
                           sx={{ fontSize: 13, fontWeight: 600 }}
                         >
-                          Forgot password?
+                          {t('auth.forgot_password')}
                         </Link>
                       </Box>
                     </Box>
@@ -580,7 +585,7 @@ export default function LoginPage() {
                       }}
                     >
                       <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-                        Account Blocked
+                        {t('auth.blocked')}
                       </Typography>
                       {statusWarning.message}
                     </Alert>
@@ -600,7 +605,7 @@ export default function LoginPage() {
                       }}
                     >
                       <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, color: theme.palette.warning.dark }}>
-                        Account Temporarily Restricted
+                        {t('auth.restricted')}
                       </Typography>
                       <Typography variant="body2" sx={{ color: theme.palette.warning.dark }}>
                         {statusWarning.message}
@@ -622,7 +627,7 @@ export default function LoginPage() {
                       }}
                     >
                       <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, color: theme.palette.info.dark }}>
-                        Account Pending Approval
+                        {t('auth.not_validated')}
                       </Typography>
                       <Typography variant="body2" sx={{ color: theme.palette.info.dark }}>
                         {statusWarning.message}
@@ -642,24 +647,24 @@ export default function LoginPage() {
                       loading={loading} 
                       size="lg"
                     >
-                      Sign In to Portal
+                      {t('auth.sign_in_button')}
                     </Button>
                     
                     {canUseDevBypass && (
                       <Button type="button" variant="secondary" onClick={handleDevBypassLogin}>
-                        Continue in DEV mode
+                        {t('auth.dev_mode')}
                       </Button>
                     )}
 
                     <Box sx={{ textAlign: 'center', pt: 2 }}>
                       <Typography variant="body2" color="text.secondary">
-                        Don't have an account?{' '}
+                        {t('auth.no_account')}{' '}
                         <Link 
                           component={RouterLink} 
                           to="/auth/admin-signup" 
                           sx={{ fontWeight: 700, textDecoration: 'none' }}
                         >
-                          Create Admin Account
+                          {t('auth.create_admin_account')}
                         </Link>
                       </Typography>
                     </Box>

@@ -4,11 +4,18 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { alpha, Box, TextField, Typography, Paper, IconButton, CircularProgress, useTheme } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import { getMapboxToken, getMapboxTokenError } from '@/utils/mapboxToken'
+import { useTranslation } from '@/themeMode'
 
 interface Location {
   latitude: number
   longitude: number
   description?: string
+  adminContext?: {
+    governorate?: string
+    delegation?: string
+    municipality?: string
+    sector?: string
+  }
 }
 
 interface AccidentLocationMapProps {
@@ -31,6 +38,7 @@ export default function AccidentLocationMap({
   markerVariant = 'accident',
 }: AccidentLocationMapProps) {
   const theme = useTheme()
+  const { t } = useTranslation()
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const marker = useRef<mapboxgl.Marker | null>(null)
@@ -219,14 +227,26 @@ export default function AccidentLocationMap({
   const getAddress = async (lat: number, lng: number) => {
     try {
       const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&language=en`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&language=en`
       )
       const data = await response.json()
-      
+
       if (data.features && data.features.length > 0) {
-        const placeName = data.features[0].place_name
+        const feature = data.features[0]
+        const placeName: string = feature.place_name
         setAddress(placeName)
-        onLocationChange?.({ latitude: lat, longitude: lng, description: placeName })
+
+        // Extract admin hierarchy from context array
+        const adminContext: Location['adminContext'] = {}
+        const context: Array<{ id: string; text: string }> = feature.context || []
+        for (const item of context) {
+          if (item.id?.startsWith('region.')) adminContext.governorate = item.text
+          else if (item.id?.startsWith('district.')) adminContext.delegation = item.text
+          else if (item.id?.startsWith('place.') || item.id?.startsWith('locality.')) adminContext.municipality = item.text
+          else if (item.id?.startsWith('neighborhood.')) adminContext.sector = item.text
+        }
+
+        onLocationChange?.({ latitude: lat, longitude: lng, description: placeName, adminContext })
       }
     } catch (err) {
       console.error('Reverse geocoding error:', err)
@@ -440,9 +460,9 @@ export default function AccidentLocationMap({
           sx={{
             position: 'absolute',
             bottom: 16,
-            left: 16,
+            insetInlineStart: 16,
             p: 1.1,
-            pr: 1.3,
+            paddingInlineEnd: 10,
             borderRadius: 2,
             color: theme.palette.text.primary,
             border: `1px solid ${alpha(theme.palette.divider, 0.82)}`,
@@ -455,7 +475,7 @@ export default function AccidentLocationMap({
           }}
         >
           <Typography variant="caption">
-            Click on the map to select accident location
+            {t('maps.select_location')}
           </Typography>
         </Paper>
       )}

@@ -1,8 +1,8 @@
 import React from 'react'
 import { Button as MuiButton, CircularProgress } from '@mui/material'
+import { motion } from 'framer-motion'
 
-interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'success'
   size?: 'sm' | 'md' | 'lg'
   children: React.ReactNode
@@ -32,27 +32,35 @@ export default function Button({
     lg: 'large' as const,
   }
 
+  // Wrap in motion.span to get tactile press feedback without MUI type conflicts
   return (
-    <MuiButton
-      disabled={disabled || loading}
-      variant={variantMap[variant].variant}
-      color={variantMap[variant].color as any}
-      size={sizeMap[size]}
-      startIcon={loading ? <CircularProgress size={16} color="inherit" /> : icon}
-      sx={{ 
-        borderRadius: 100, // Fully rounded buttons for Material 3
-        fontWeight: 700, 
-        textTransform: 'none',
-        px: size === 'sm' ? 2 : 3,
-        py: size === 'sm' ? 0.75 : 1.25,
-        boxShadow: variant === 'primary' ? '0 4px 12px rgba(103,80,164,0.15)' : 'none',
-        '&:hover': {
-          boxShadow: variant === 'primary' ? '0 6px 16px rgba(103,80,164,0.25)' : 'none',
-        }
-      }}
-      {...props}
+    <motion.span
+      whileTap={disabled || loading ? undefined : { scale: 0.96 }}
+      transition={{ type: 'spring', stiffness: 600, damping: 40 }}
+      style={{ display: 'inline-flex' }}
     >
-      {children}
-    </MuiButton>
+      <MuiButton
+        disabled={disabled || loading}
+        variant={variantMap[variant].variant}
+        color={variantMap[variant].color as any}
+        size={sizeMap[size]}
+        startIcon={loading ? <CircularProgress size={16} color="inherit" /> : icon}
+        sx={{
+          borderRadius: 100,
+          fontWeight: 700,
+          textTransform: 'none',
+          px: size === 'sm' ? 2 : 3,
+          py: size === 'sm' ? 0.75 : 1.25,
+          boxShadow: variant === 'primary' ? '0 4px 12px rgba(103,80,164,0.15)' : 'none',
+          transition: 'box-shadow 0.18s ease, background-color 0.18s ease, opacity 0.18s ease',
+          '&:hover': {
+            boxShadow: variant === 'primary' ? '0 6px 18px rgba(103,80,164,0.28)' : 'none',
+          },
+        }}
+        {...props}
+      >
+        {children}
+      </MuiButton>
+    </motion.span>
   )
 }

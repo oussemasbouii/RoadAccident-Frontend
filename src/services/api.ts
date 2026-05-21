@@ -3,6 +3,7 @@ import {
   AccidentReport, 
   CreateAccidentResponse, 
   CreateAccidentErrorResponse,
+  AttachmentFileTypeCode,
   IncidentDocumentUploadConfirmRequest,
   IncidentDocumentUploadRequest,
   IncidentDocumentUpdateRequest,
@@ -264,14 +265,14 @@ export const apiService = {
 
   // Attachments
   attachments: {
-    requestUpload: (data: { filename: string; mimeType: string; fileType: 'IMAGE'; size: number }) =>
+    requestUpload: (data: { filename: string; mimeType: string; fileType: AttachmentFileTypeCode; size: number }) =>
       api.post('/attachments/request-upload', data),
     confirmUpload: (data: {
       clientId: string
       key: string
       filename: string
       mimeType: string
-      fileType: 'IMAGE'
+      fileType: AttachmentFileTypeCode
       size: number
     }) => api.post('/attachments/confirm-upload', data),
     getDownload: (id: string) => api.get(`/attachments/${id}`),

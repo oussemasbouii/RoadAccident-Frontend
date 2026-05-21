@@ -27,6 +27,7 @@ import { Card, Button } from '@/components/Common'
 import { getRefreshToken } from '@/utils/tokenStore'
 import { connectSharedSocket } from '@/services/socketClient'
 import { applyLocationUpdate, buildStateFromSnapshot } from './officerTracking.utils'
+import { useTranslation, useThemeMode } from '@/themeMode'
 
 const TRACKING_EVENTS = {
   subscribe: 'request:admin:tracking:subscribe',
@@ -38,20 +39,30 @@ const TRACKING_EVENTS = {
 const STALE_THRESHOLD_MS = 1000 * 60 * 5
 const SUBSCRIBE_ACK_TIMEOUT_MS = 5000
 
-function formatRelativeTime(lastSeen?: number) {
-  if (!lastSeen) return 'Unknown'
+function formatRelativeTime(lastSeen?: number, labels = { unknown: 'Unknown', secondsAgo: (n: number) => `${n}s ago`, minutesAgo: (n: number) => `${n}m ago`, hoursAgo: (n: number) => `${n}h ago` }) {
+  if (!lastSeen) return labels.unknown
   const diff = Date.now() - lastSeen
   const seconds = Math.max(1, Math.floor(diff / 1000))
-  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 60) return labels.secondsAgo(seconds)
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 60) return labels.minutesAgo(minutes)
   const hours = Math.floor(minutes / 60)
-  return `${hours}h ago`
+  return labels.hoursAgo(hours)
 }
 
 export default function OfficerTrackingPage() {
   const theme = useTheme()
+  const rowDirection = theme.direction === 'rtl' ? 'row-reverse' : 'row'
+  const { t } = useTranslation()
+  const { locale } = useThemeMode()
   const token = useAppSelector((state) => state.auth.token)
+
+  const relativeTimeLabels = {
+    unknown: t('dashboard.time_unknown'),
+    secondsAgo: (n: number) => t('dashboard.seconds_ago', { n }),
+    minutesAgo: (n: number) => t('dashboard.minutes_short', { n }),
+    hoursAgo: (n: number) => t('dashboard.hours_short', { n }),
+  }
   const [officerMap, setOfficerMap] = useState<Record<string, OfficerLocation>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [socketStatus, setSocketStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected')
@@ -110,13 +121,13 @@ export default function OfficerTrackingPage() {
   const searchOptions = useMemo(() => {
     return officers
       .map((officer) => {
-        const label = officer.name || 'Unknown'
+        const label = officer.name || t('dashboard.time_unknown')
         const idLabel = officer.officerId || officer.userId || officer.id
         return idLabel ? `${label} · ${idLabel}` : label
       })
       .filter(Boolean)
       .sort((a, b) => a.localeCompare(b))
-  }, [officers])
+  }, [officers, t])
 
   useEffect(() => {
     if (!token) return
@@ -238,17 +249,17 @@ export default function OfficerTrackingPage() {
   }, [])
 
   const statusChip = socketStatus === 'connected'
-    ? { label: 'Live', color: 'success', icon: <WifiTetheringRoundedIcon fontSize="small" /> }
+    ? { label: t('dashboard.live'), color: 'success', icon: <WifiTetheringRoundedIcon fontSize="small" /> }
     : socketStatus === 'error'
-      ? { label: 'Error', color: 'error', icon: <SignalWifiOffRoundedIcon fontSize="small" /> }
-      : { label: 'Offline', color: 'warning', icon: <SignalWifiOffRoundedIcon fontSize="small" /> }
+      ? { label: t('common.error'), color: 'error', icon: <SignalWifiOffRoundedIcon fontSize="small" /> }
+      : { label: t('comms.offline'), color: 'warning', icon: <SignalWifiOffRoundedIcon fontSize="small" /> }
   const subscribeChip = subscriptionStatus === 'subscribed'
-    ? { label: 'Subscribed', color: 'success' as const }
+    ? { label: t('dashboard.subscribed'), color: 'success' as const }
     : subscriptionStatus === 'pending'
-      ? { label: 'Subscribing', color: 'warning' as const }
+      ? { label: t('dashboard.subscribing'), color: 'warning' as const }
       : subscriptionStatus === 'warning'
-        ? { label: 'Subscribe Warning', color: 'warning' as const }
-        : { label: 'Not Subscribed', color: 'default' as const }
+        ? { label: t('dashboard.subscribe_warning'), color: 'warning' as const }
+        : { label: t('dashboard.not_subscribed'), color: 'default' as const }
 
   return (
     <Stack spacing={3}>
@@ -263,23 +274,23 @@ export default function OfficerTrackingPage() {
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>
-              Officer Location Tracking
+              {t('nav.officer_tracking')}
             </Typography>
             <Typography color="text.secondary">
-              Live overview of officer locations, activity status, and last known updates.
+              {t('dashboard.officer_tracking_subtitle')}
             </Typography>
             {(socketStatus !== 'connected' || subscriptionStatus === 'warning') && (
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+              <Stack direction={rowDirection} spacing={1} alignItems="center" sx={{ mt: 1 }}>
                 <InfoRoundedIcon fontSize="small" color="warning" />
                 <Typography variant="caption" color="text.secondary">
                   {socketStatus !== 'connected'
-                    ? `Realtime stream is ${socketStatus}. The list will update once the socket reconnects.`
-                    : 'Subscribe acknowledgement is delayed or failed. Updates are still being processed.'}
+                    ? t('dashboard.stream_disconnected', { status: t(socketStatus === 'error' ? 'common.error' : 'comms.offline') })
+                    : t('dashboard.subscribe_delayed')}
                 </Typography>
               </Stack>
             )}
           </Box>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction={rowDirection} spacing={1} alignItems="center">
             <Chip
               icon={statusChip.icon}
               label={statusChip.label}
@@ -292,7 +303,7 @@ export default function OfficerTrackingPage() {
               variant="outlined"
             />
             <Button variant="secondary" size="sm" onClick={handleFitBounds} icon={<MyLocationRoundedIcon />}>
-              Fit to officers
+              {t('dashboard.fit_to_officers')}
             </Button>
           </Stack>
         </Stack>
@@ -308,13 +319,13 @@ export default function OfficerTrackingPage() {
           }}
         >
           {[
-            { label: 'Total officers', value: officers.length, icon: <RadarRoundedIcon fontSize="small" /> },
-            { label: 'Live', value: liveCount, icon: <WifiTetheringRoundedIcon fontSize="small" /> },
-            { label: 'Stale', value: staleCount, icon: <SignalWifiOffRoundedIcon fontSize="small" /> },
-            { label: 'Selected', value: selectedOfficer ? 1 : 0, icon: <PersonPinCircleRoundedIcon fontSize="small" /> },
+            { label: t('dashboard.total_officers'), value: officers.length, icon: <RadarRoundedIcon fontSize="small" /> },
+            { label: t('dashboard.live'), value: liveCount, icon: <WifiTetheringRoundedIcon fontSize="small" /> },
+            { label: t('dashboard.stale'), value: staleCount, icon: <SignalWifiOffRoundedIcon fontSize="small" /> },
+            { label: t('dashboard.selected'), value: selectedOfficer ? 1 : 0, icon: <PersonPinCircleRoundedIcon fontSize="small" /> },
           ].map((item) => (
             <Card key={item.label} sx={{ p: 1.5 }}>
-              <Stack direction="row" spacing={1.5} alignItems="center">
+              <Stack direction={rowDirection} spacing={1.5} alignItems="center">
                 <Box
                   sx={{
                     width: 36,
@@ -324,6 +335,7 @@ export default function OfficerTrackingPage() {
                     color: 'primary.main',
                     display: 'grid',
                     placeItems: 'center',
+                    flexShrink: 0,
                   }}
                 >
                   {item.icon}
@@ -346,7 +358,7 @@ export default function OfficerTrackingPage() {
             sx={{
               position: 'absolute',
               top: 28,
-              left: 28,
+              insetInlineStart: 28,
               zIndex: 2,
               bgcolor: alpha(theme.palette.background.paper, 0.92),
               borderRadius: 999,
@@ -361,9 +373,9 @@ export default function OfficerTrackingPage() {
           >
             <LocationSearchingRoundedIcon fontSize="small" color="primary" />
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
-              Live map feed
+              {t('dashboard.live_map_feed')}
             </Typography>
-            <Chip size="small" label={`${officers.length} tracking`} />
+            <Chip size="small" label={`${officers.length} ${t('dashboard.tracking')}`} />
           </Box>
           <Box sx={{ height: { xs: 420, lg: 520 } }}>
             <OfficerTrackingMap
@@ -377,12 +389,12 @@ export default function OfficerTrackingPage() {
 
         <Stack spacing={2.5}>
           <Card sx={{ p: 2.5 }}>
-            <Stack direction="row" spacing={1} alignItems="center">
+            <Stack direction={rowDirection} spacing={1} alignItems="center">
               <LocationSearchingRoundedIcon color="primary" />
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Active Officers
+                {t('dashboard.active_officers')}
               </Typography>
-              <Chip label={officers.length} size="small" sx={{ ml: 'auto' }} />
+              <Chip label={officers.length} size="small" sx={{ marginInlineStart: 'auto' }} />
             </Stack>
 
             <Stack spacing={1.5} sx={{ mt: 2 }}>
@@ -395,18 +407,22 @@ export default function OfficerTrackingPage() {
                   <TextField
                     {...params}
                     size="small"
-                    placeholder="Search by name, officer ID, or role..."
+                    placeholder={t('dashboard.search_by_name_officer_id_or_role')}
                   />
                 )}
               />
 
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction={rowDirection} spacing={1} alignItems="center">
                 <FilterAltRoundedIcon fontSize="small" color="action" />
-                {(['all', 'live', 'stale'] as const).map((value) => (
+                {([
+                  { value: 'all', label: t('common.all') },
+                  { value: 'live', label: t('dashboard.live') },
+                  { value: 'stale', label: t('dashboard.stale') },
+                ] as const).map(({ value, label }) => (
                   <Chip
                     key={value}
                     size="small"
-                    label={value.toUpperCase()}
+                    label={label.toUpperCase()}
                     color={statusFilter === value ? 'primary' : 'default'}
                     onClick={() => setStatusFilter(value)}
                     variant={statusFilter === value ? 'filled' : 'outlined'}
@@ -414,13 +430,16 @@ export default function OfficerTrackingPage() {
                 ))}
               </Stack>
 
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction={rowDirection} spacing={1} alignItems="center">
                 <SortRoundedIcon fontSize="small" color="action" />
-                {(['recent', 'name'] as const).map((value) => (
+                {([
+                  { value: 'recent', label: t('dashboard.most_recent') },
+                  { value: 'name', label: t('dashboard.az') },
+                ] as const).map(({ value, label }) => (
                   <Chip
                     key={value}
                     size="small"
-                    label={value === 'recent' ? 'MOST RECENT' : 'A–Z'}
+                    label={label}
                     color={sortMode === value ? 'primary' : 'default'}
                     onClick={() => setSortMode(value)}
                     variant={sortMode === value ? 'filled' : 'outlined'}
@@ -428,21 +447,21 @@ export default function OfficerTrackingPage() {
                 ))}
               </Stack>
 
-              <Stack direction="row" spacing={1}>
-                <Chip size="small" label={`${staleCount} stale`} color={staleCount ? 'warning' : 'default'} />
-                <Chip size="small" label={`${liveCount} live`} color="success" />
+              <Stack direction={rowDirection} spacing={1}>
+                <Chip size="small" label={`${staleCount} ${t('dashboard.stale')}`} color={staleCount ? 'warning' : 'default'} />
+                <Chip size="small" label={`${liveCount} ${t('dashboard.live')}`} color="success" />
               </Stack>
             </Stack>
           </Card>
 
           <Card sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              Officer List
+              {t('dashboard.active_officers')}
             </Typography>
 
             <Divider />
 
-            <Stack spacing={1} sx={{ maxHeight: 420, overflowY: 'auto', pr: 0.5 }}>
+            <Stack spacing={1} sx={{ maxHeight: 420, overflowY: 'auto', paddingInlineEnd: 4 }}>
               {orderedOfficers.length === 0 && (
                 <Box
                   sx={{
@@ -454,15 +473,15 @@ export default function OfficerTrackingPage() {
                   }}
                 >
                   {officers.length === 0
-                    ? 'No active tracked officers.'
-                    : 'No officers match your current filters.'}
+                    ? t('dashboard.no_active_tracked_officers')
+                    : t('dashboard.no_officers_match_your_current_filters')}
                 </Box>
               )}
 
               {orderedOfficers.map((officer) => {
                 const isSelected = officer.id === selectedId
                 const isStale = officer.lastSeen ? Date.now() - officer.lastSeen > STALE_THRESHOLD_MS : true
-                const statusLabel = officer.status || (isStale ? 'stale' : 'active')
+                const statusLabel = officer.status || (isStale ? t('dashboard.stale') : t('reports.active'))
                 const accent = isStale ? theme.palette.warning.main : theme.palette.success.main
 
               return (
@@ -484,7 +503,7 @@ export default function OfficerTrackingPage() {
                   <Box
                     sx={{
                       position: 'absolute',
-                      left: 0,
+                      insetInlineStart: 0,
                       top: 0,
                       bottom: 0,
                       width: 4,
@@ -493,12 +512,12 @@ export default function OfficerTrackingPage() {
                   />
                   <Stack spacing={0.5}>
                     <Typography sx={{ fontWeight: 700 }}>
-                      {officer.name || 'Unknown officer'}
+                      {officer.name || t('admin_accounts.unknown_officer')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {officer.officerId || officer.userId || officer.role || 'Officer'}
+                      {officer.officerId || officer.userId || officer.role || t('admin_accounts.role_officer')}
                     </Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction={rowDirection} spacing={1} alignItems="center">
                       <Chip
                         size="small"
                         label={statusLabel}
@@ -506,14 +525,14 @@ export default function OfficerTrackingPage() {
                         variant="outlined"
                       />
                       <Typography variant="caption" color="text.secondary">
-                        Updated {formatRelativeTime(officer.lastSeen)}
+                        {t('dashboard.updated_time', { time: formatRelativeTime(officer.lastSeen, relativeTimeLabels) })}
                       </Typography>
                       {Number.isFinite(officer.accuracy) && (
                         <Chip size="small" label={`+/-${Math.round(officer.accuracy!)}m`} variant="outlined" />
                       )}
                     </Stack>
                     <Typography variant="caption" color="text.secondary">
-                      Last seen: {officer.lastSeen ? new Date(officer.lastSeen).toLocaleString() : 'Unknown'}
+                      {t('dashboard.last_seen_time', { time: officer.lastSeen ? new Date(officer.lastSeen).toLocaleString(locale) : t('dashboard.time_unknown') })}
                     </Typography>
                   </Stack>
                 </Box>
@@ -524,25 +543,25 @@ export default function OfficerTrackingPage() {
 
           <Card sx={{ p: 2.5 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              Selected Officer
+              {t('dashboard.selected_officer')}
             </Typography>
             <Divider sx={{ my: 1.5 }} />
             {selectedOfficer ? (
               <Stack spacing={0.5}>
                 <Typography sx={{ fontWeight: 700 }}>
-                  {selectedOfficer.name || 'Unknown officer'}
+                  {selectedOfficer.name || t('admin_accounts.unknown_officer')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {selectedOfficer.role || 'Officer'}
+                  {selectedOfficer.role || t('admin_accounts.role_officer')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Contact: {selectedOfficer.phoneNumber || selectedOfficer.officerId || 'Not available'}
+                  {t('dashboard.contact_label')}: {selectedOfficer.phoneNumber || selectedOfficer.officerId || t('dashboard.not_available')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Last known: {selectedOfficer.latitude.toFixed(5)}, {selectedOfficer.longitude.toFixed(5)}
+                  {t('dashboard.last_known')}: {selectedOfficer.latitude.toFixed(5)}, {selectedOfficer.longitude.toFixed(5)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Updated {formatRelativeTime(selectedOfficer.lastSeen)}
+                  {t('dashboard.updated_time', { time: formatRelativeTime(selectedOfficer.lastSeen, relativeTimeLabels) })}
                 </Typography>
                 <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                   <Button
@@ -551,13 +570,13 @@ export default function OfficerTrackingPage() {
                     onClick={handleFocusSelected}
                     icon={<PersonPinCircleRoundedIcon fontSize="small" />}
                   >
-                    Center on map
+                    {t('dashboard.center_on_map')}
                   </Button>
                 </Stack>
               </Stack>
             ) : (
               <Typography variant="body2" color="text.secondary">
-                Select an officer to see details and map actions.
+                {t('dashboard.select_officer_hint')}
               </Typography>
             )}
           </Card>

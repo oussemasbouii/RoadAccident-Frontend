@@ -32,6 +32,7 @@ import { fetchAlerts } from '../../alerts/slices/alertsSlice'
 import Card from '../../../components/Common/Card'
 import StatCard from '../../../components/Common/StatCard'
 import { ExportButton } from '../../../components/Common'
+import { useTranslation, useThemeMode } from '../../../themeMode'
 
 const severityRank: Record<string, number> = {
   critical: 4,
@@ -72,6 +73,22 @@ function parseDate(input: string | undefined): Date | null {
 export default function ReportsPage() {
   const dispatch = useAppDispatch()
   const theme = useTheme()
+  const { t } = useTranslation()
+  const { locale } = useThemeMode()
+  const rowDirection = theme.direction === 'rtl' ? 'row-reverse' : 'row'
+
+  const severityLabel: Record<string, string> = {
+    critical: t('dashboard.critical'),
+    high: t('dashboard.high'),
+    medium: t('dashboard.medium'),
+    low: t('dashboard.low'),
+  }
+
+  const statusLabel: Record<string, string> = {
+    active: t('reports.active'),
+    responded: t('reports.responded'),
+    resolved: t('reports.resolved'),
+  }
   const [timeRange, setTimeRange] = useState('month')
   const { list: incidents, loading: incidentsLoading, error: incidentsError } = useAppSelector((state) => state.incidents)
   const { list: alerts, unreadCount, loading: alertsLoading, error: alertsError } = useAppSelector((state) => state.alerts)
@@ -131,7 +148,7 @@ export default function ReportsPage() {
   }, {})
 
   const hotspotMap = filteredIncidents.reduce((acc: Record<string, Hotspot>, incident: any) => {
-      const location = String(incident.location || 'Unknown location').trim()
+      const location = String(incident.location || t('reports.no_location_data')).trim()
       const normalized = location.toLowerCase()
       if (!acc[normalized]) {
         acc[normalized] = { location, count: 0 }
@@ -158,10 +175,10 @@ export default function ReportsPage() {
     .slice(0, 8)
 
   const shiftBreakdown = [
-    { label: 'Night (00:00-05:59)', start: 0, end: 5, count: 0 },
-    { label: 'Morning (06:00-11:59)', start: 6, end: 11, count: 0 },
-    { label: 'Afternoon (12:00-17:59)', start: 12, end: 17, count: 0 },
-    { label: 'Evening (18:00-23:59)', start: 18, end: 23, count: 0 },
+    { label: t('reports.night_shift'), start: 0, end: 5, count: 0 },
+    { label: t('reports.morning_shift'), start: 6, end: 11, count: 0 },
+    { label: t('reports.afternoon_shift'), start: 12, end: 17, count: 0 },
+    { label: t('reports.evening_shift'), start: 18, end: 23, count: 0 },
   ]
 
   filteredIncidents.forEach((incident: any) => {
@@ -185,17 +202,17 @@ export default function ReportsPage() {
   })
 
   const incidentSeverityRows: SeverityRow[] = [
-    { label: 'Critical', count: severityCounts.critical || 0, color: theme.palette.error.main },
-    { label: 'High', count: severityCounts.high || 0, color: theme.palette.warning.main },
-    { label: 'Medium', count: severityCounts.medium || 0, color: theme.palette.info.main },
-    { label: 'Low', count: severityCounts.low || 0, color: theme.palette.success.main },
+    { label: t('dashboard.critical'), count: severityCounts.critical || 0, color: theme.palette.error.main },
+    { label: t('dashboard.high'), count: severityCounts.high || 0, color: theme.palette.warning.main },
+    { label: t('dashboard.medium'), count: severityCounts.medium || 0, color: theme.palette.info.main },
+    { label: t('dashboard.low'), count: severityCounts.low || 0, color: theme.palette.success.main },
   ]
 
   const alertSeverityRows: SeverityRow[] = [
-    { label: 'Critical', count: alertSeverityCounts.critical || 0, color: theme.palette.error.main },
-    { label: 'High', count: alertSeverityCounts.high || 0, color: theme.palette.warning.main },
-    { label: 'Medium', count: alertSeverityCounts.medium || 0, color: theme.palette.info.main },
-    { label: 'Low', count: alertSeverityCounts.low || 0, color: theme.palette.success.main },
+    { label: t('dashboard.critical'), count: alertSeverityCounts.critical || 0, color: theme.palette.error.main },
+    { label: t('dashboard.high'), count: alertSeverityCounts.high || 0, color: theme.palette.warning.main },
+    { label: t('dashboard.medium'), count: alertSeverityCounts.medium || 0, color: theme.palette.info.main },
+    { label: t('dashboard.low'), count: alertSeverityCounts.low || 0, color: theme.palette.success.main },
   ]
 
   const statusCounts = {
@@ -225,7 +242,7 @@ export default function ReportsPage() {
       date.setHours(0, 0, 0, 0)
       date.setDate(date.getDate() - i)
       const dayKey = date.toISOString().slice(0, 10)
-      const label = date.toLocaleDateString(undefined, { weekday: 'short' })
+      const label = date.toLocaleDateString(locale, { weekday: 'short' })
       const incidentsCount = filteredIncidents.filter((incident: any) => {
         const parsed = parseDate(incident.time)
         return parsed ? parsed.toISOString().slice(0, 10) === dayKey : false
@@ -237,7 +254,7 @@ export default function ReportsPage() {
       labels.push({ day: label, incidents: incidentsCount, alerts: alertsCount })
     }
     return labels
-  }, [filteredAlerts, filteredIncidents, timeRange])
+  }, [filteredAlerts, filteredIncidents, timeRange, locale])
 
   const reportExportData = [{
     generatedAt: new Date().toISOString(),
@@ -274,30 +291,30 @@ export default function ReportsPage() {
       {/* Header Section */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: -0.5 }}>Reports & Analytics</Typography>
-          <Typography color="text.secondary">Actionable officer briefing from accident and alert activity</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: -0.5 }}>{t('reports.title')}</Typography>
+          <Typography color="text.secondary">{t('reports.subtitle')}</Typography>
         </Box>
-        <Stack direction="row" spacing={2}>
+        <Stack direction={rowDirection} spacing={2}>
            <TextField
              select
              size="small"
              value={timeRange}
              onChange={(e) => setTimeRange(e.target.value)}
              InputProps={{
-               startAdornment: <FilterListRoundedIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+               startAdornment: <FilterListRoundedIcon fontSize="small" sx={{ marginInlineEnd: 1, color: 'text.secondary' }} />,
                sx: { borderRadius: '100px', bgcolor: 'background.paper', px: 1 }
              }}
            >
-             <MenuItem value="day">Today</MenuItem>
-             <MenuItem value="week">This Week</MenuItem>
-             <MenuItem value="month">This Month</MenuItem>
-             <MenuItem value="year">This Year</MenuItem>
+             <MenuItem value="day">{t('common.today')}</MenuItem>
+             <MenuItem value="week">{t('common.week')}</MenuItem>
+             <MenuItem value="month">{t('common.month')}</MenuItem>
+             <MenuItem value="year">{t('common.year')}</MenuItem>
            </TextField>
           <ExportButton
             data={reportExportData}
             filename={`officer-briefing-${timeRange}`}
-            label="Export Briefing"
-            title="Officer Briefing"
+            label={t('common.view_all')}
+            title={t('reports.officer_briefing')}
             variant="report"
           />
         </Stack>
@@ -307,7 +324,7 @@ export default function ReportsPage() {
       {fetchError && (
         <Card sx={{ p: 2.5, border: `1px solid ${alpha(theme.palette.error.main, 0.25)}`, bgcolor: alpha(theme.palette.error.main, 0.06) }}>
           <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 600 }}>
-            Unable to load complete report data: {fetchError}
+            {t('reports.unable_to_load_complete_report_data')}: {fetchError}
           </Typography>
         </Card>
       )}
@@ -315,59 +332,59 @@ export default function ReportsPage() {
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: 'repeat(3, 1fr)' } }}>
         <StatCard 
           icon={<InsightsRoundedIcon />} 
-          label="Total Incidents" 
+          label={t('incidents.title')} 
           value={totalIncidents} 
           trend={totalIncidents > 0 ? "neutral" : "down"} 
-          trendValue={`${openIncidents.length} currently open`} 
+          trendValue={`${openIncidents.length} ${t('reports.currently_open')}`} 
           intent="info"
         />
         <StatCard 
           icon={<WarningRoundedIcon />} 
-          label="Critical Open Cases" 
+          label={t('reports.critical_open_cases')} 
           value={criticalOpen} 
           trend={criticalOpen > 0 ? "up" : "neutral"} 
-          trendValue={criticalOpen > 0 ? "Needs immediate dispatch" : "No critical backlog"} 
+          trendValue={criticalOpen > 0 ? t('reports.needs_immediate_dispatch') : t('reports.no_critical_backlog')} 
           intent="danger"
         />
         <StatCard 
           icon={<CheckCircleRoundedIcon />} 
-          label="Resolution Rate" 
+          label={t('reports.resolution_rate')} 
           value={`${resolutionRate}%`} 
           trend={resolutionRate >= 60 ? "up" : "neutral"} 
-          trendValue={`${resolvedIncidents.length} resolved in selected period`} 
+          trendValue={`${resolvedIncidents.length} ${t('reports.resolved_in_selected_period')}`} 
           intent="success"
         />
         <StatCard 
           icon={<MedicalServicesRoundedIcon />} 
-          label="Average Injuries" 
+          label={t('reports.average_injuries')} 
           value={avgInjuriesPerIncident} 
           trend={Number(avgInjuriesPerIncident) > 0 ? "up" : "neutral"} 
-          trendValue={`${totalInjuries} total injuries recorded`} 
+          trendValue={`${totalInjuries} ${t('reports.total_injuries_recorded')}`} 
           intent="warning"
         />
         <StatCard 
           icon={<NotificationsActiveRoundedIcon />} 
-          label="Alert Pressure" 
+          label={t('reports.alert_pressure')} 
           value={`${alertPressure}%`} 
           trend={alertPressure >= 50 ? "up" : "neutral"} 
-          trendValue={`${highPriorityAlerts} high/critical alerts`} 
+          trendValue={`${highPriorityAlerts} ${t('reports.high_critical_alerts')}`} 
           intent="warning"
         />
         <StatCard 
           icon={<MapRoundedIcon />} 
-          label="Primary Hotspot" 
-          value={dominantHotspot?.location || 'N/A'} 
+          label={t('reports.primary_hotspot')} 
+          value={dominantHotspot?.location || t('reports.no_location_data')} 
           trend="neutral" 
-          trendValue={dominantHotspot ? `${dominantHotspot.count} incidents` : 'No location data'} 
+          trendValue={dominantHotspot ? `${dominantHotspot.count} ${t('reports.accidents')}` : t('reports.no_location_data')} 
           intent="danger"
         />
       </Box>
 
       <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: '1.1fr 1fr 1fr' } }}>
         <Card sx={{ p: 3 }}>
-          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
+          <Stack direction={rowDirection} spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
             <PieChartRoundedIcon color="primary" fontSize="small" />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Incident Severity Mix</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('reports.incident_severity_mix')}</Typography>
           </Stack>
           <Stack direction="row" spacing={2.5} alignItems="center">
             <Box
@@ -397,7 +414,7 @@ export default function ReportsPage() {
             <Stack spacing={1} sx={{ flex: 1 }}>
               {incidentSeverityRows.map((row) => (
                 <Box key={row.label}>
-                  <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                  <Stack direction={rowDirection} justifyContent="space-between" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" sx={{ fontWeight: 700 }}>{row.label}</Typography>
                     <Typography variant="caption" color="text.secondary">{row.count} ({pct(row.count, totalIncidents)}%)</Typography>
                   </Stack>
@@ -411,18 +428,18 @@ export default function ReportsPage() {
         </Card>
 
         <Card sx={{ p: 3 }}>
-          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
+          <Stack direction={rowDirection} spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
             <QueryStatsRoundedIcon color="primary" fontSize="small" />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Incident Status Flow</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('reports.incident_status_flow')}</Typography>
           </Stack>
           <Stack spacing={1.5}>
             {[
-              { label: 'Active', value: statusCounts.active, color: theme.palette.error.main },
-              { label: 'Responded', value: statusCounts.responded, color: theme.palette.warning.main },
-              { label: 'Resolved', value: statusCounts.resolved, color: theme.palette.success.main },
+              { label: t('reports.active'), value: statusCounts.active, color: theme.palette.error.main },
+              { label: t('reports.responded'), value: statusCounts.responded, color: theme.palette.warning.main },
+              { label: t('reports.resolved'), value: statusCounts.resolved, color: theme.palette.success.main },
             ].map((item) => (
               <Box key={item.label}>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                <Stack direction={rowDirection} justifyContent="space-between" sx={{ mb: 0.5 }}>
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>{item.label}</Typography>
                   <Typography variant="body2" color="text.secondary">{item.value}</Typography>
                 </Stack>
@@ -437,7 +454,7 @@ export default function ReportsPage() {
         <Card sx={{ p: 3 }}>
           <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
             <NotificationsActiveRoundedIcon color="primary" fontSize="small" />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Alert Severity Mix</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('reports.alert_severity_mix')}</Typography>
           </Stack>
           <Stack spacing={1.25}>
             {alertSeverityRows.map((row) => (
@@ -457,15 +474,15 @@ export default function ReportsPage() {
 
       <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', xl: '1.5fr 1fr' } }}>
         <Card sx={{ p: 0, overflow: 'hidden' }}>
-          <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', alignItems: 'center', gap: 1.5, flexDirection: rowDirection }}>
              <Box sx={{ p: 1, borderRadius: 'var(--radius-m3-md, 12px)', bgcolor: alpha(theme.palette.error.main, 0.12), color: 'error.main', display: 'flex' }}>
                 <ReportProblemRoundedIcon fontSize="small" />
              </Box>
-             <Typography variant="h6" sx={{ fontWeight: 700 }}>Operational Priorities</Typography>
+             <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('reports.operational_priorities')}</Typography>
           </Box>
           {priorityIncidents.length === 0 ? (
             <Box sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
-              {loading ? 'Analyzing accident activity...' : 'No high-priority unresolved accidents in selected range.'}
+              {loading ? t('reports.analyzing_accident_activity') : t('reports.no_high_priority_unresolved_accidents')}
             </Box>
           ) : (
             <List disablePadding>
@@ -476,7 +493,7 @@ export default function ReportsPage() {
                       sx={{
                         width: 40,
                         height: 40,
-                        mr: 2,
+                        marginInlineEnd: 2,
                         bgcolor: incident.severity === 'critical'
                           ? alpha(theme.palette.error.main, 0.15)
                           : alpha(theme.palette.warning.main, 0.15),
@@ -489,19 +506,19 @@ export default function ReportsPage() {
                       primary={
                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                           <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                            {incident.location || 'Unknown location'}
+                            {incident.location || t('reports.no_location_data')}
                           </Typography>
                           <Chip
                             size="small"
                             color={incident.severity === 'critical' ? 'error' : 'warning'}
-                            label={String(incident.severity || 'high').toUpperCase()}
+                            label={severityLabel[String(incident.severity || 'high')] ?? String(incident.severity || 'high').toUpperCase()}
                             variant="outlined"
                           />
                         </Stack>
                       }
                       secondary={
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                          {incident.injuries || 0} injuries • Status: {incident.status} • {incident.time || 'Unknown time'}
+                          {incident.injuries || 0} {t('reports.accidents')} • {t('incidents.status')}: {statusLabel[incident.status] ?? incident.status} • {incident.time || t('comms.unknown_time')}
                         </Typography>
                       }
                     />
@@ -515,25 +532,25 @@ export default function ReportsPage() {
 
         <Stack spacing={3}>
           <Card sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Shift Risk Breakdown</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>{t('reports.shift_risk_breakdown')}</Typography>
             <Stack spacing={1.25}>
               {shiftBreakdown.map((shift) => (
                 <Box key={shift.label} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{shift.label}</Typography>
-                  <Chip size="small" color={shift.count === peakShift.count && shift.count > 0 ? 'error' : 'default'} label={`${shift.count} incidents`} />
+                  <Chip size="small" color={shift.count === peakShift.count && shift.count > 0 ? 'error' : 'default'} label={`${shift.count} ${t('reports.accidents')}`} />
                 </Box>
               ))}
             </Stack>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-              Peak window: {peakShift.label}
+              {t('reports.peak_window')}: {peakShift.label}
             </Typography>
           </Card>
 
           <Card sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Alert Composition</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>{t('reports.alert_composition')}</Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               {Object.entries(alertTypeCounts).length === 0 ? (
-                <Chip size="small" label="No alert data" />
+                <Chip size="small" label={t('reports.no_alert_data')} />
               ) : (
                 Object.entries(alertTypeCounts).map(([type, count]) => (
                   <Chip
@@ -547,7 +564,7 @@ export default function ReportsPage() {
               )}
             </Stack>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              Unread alerts pending: {unreadCount}
+              {t('reports.unread_alerts_pending')}: {unreadCount}
             </Typography>
           </Card>
         </Stack>
@@ -558,12 +575,12 @@ export default function ReportsPage() {
            <Box sx={{ p: 1, borderRadius: 'var(--radius-m3-md, 12px)', bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', display: 'flex' }}>
               <TrendingUpRoundedIcon fontSize="small" />
            </Box>
-           <Typography variant="h6" sx={{ fontWeight: 700 }}>Hotspot and Alert Correlation</Typography>
+           <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('reports.hotspot_and_alert_correlation')}</Typography>
         </Box>
         <Stack divider={<Box sx={{ borderBottom: `1px solid ${theme.palette.divider}` }} />}>
           {hotspotRows.length === 0 ? (
             <Box sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
-              {loading ? 'Preparing hotspot briefing...' : 'No hotspot data available for selected range.'}
+              {loading ? t('reports.preparing_hotspot_briefing') : t('reports.no_hotspot_data')}
             </Box>
           ) : (
             hotspotRows.map((row, idx) => (
@@ -581,10 +598,10 @@ export default function ReportsPage() {
                 <Box>
                   <Typography sx={{ fontWeight: 800, fontSize: '1.05rem' }}>{row.location}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                    {row.count} accidents • {row.relatedAlerts} related alerts
+                    {row.count} {t('reports.accidents')} • {row.relatedAlerts} {t('reports.related_alerts')}
                   </Typography>
                 </Box>
-                <Chip label={`${row.share}% of incidents`} color="primary" variant="outlined" sx={{ fontWeight: 800, borderRadius: '8px', borderWidth: 2 }} />
+                <Chip label={`${row.share}% ${t('reports.of_incidents')}`} color="primary" variant="outlined" sx={{ fontWeight: 800, borderRadius: '8px', borderWidth: 2 }} />
               </Box>
             ))
           )}

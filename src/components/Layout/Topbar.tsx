@@ -21,6 +21,7 @@ import {
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
+import TranslateRoundedIcon from '@mui/icons-material/TranslateRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded'
@@ -31,7 +32,8 @@ import { RootState } from '../../store/store'
 import { logout } from '../../features/auth/slices/authSlice'
 import { fetchAlerts, markAlertAsRead } from '../../features/alerts/slices/alertsSlice'
 import { apiService } from '../../services/api'
-import { useThemeMode } from '../../themeMode'
+import { useThemeMode, useTranslation } from '../../themeMode'
+import { localeLabels, type LocaleCode } from '../../i18n'
 import { clearAuthStorage } from '../../utils/authSecurity'
 
 interface TopbarProps {
@@ -41,6 +43,7 @@ interface TopbarProps {
 export default function Topbar({ onMenuClick }: TopbarProps) {
   const [notificationsAnchor, setNotificationsAnchor] = useState<null | HTMLElement>(null)
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null)
+  const [languageAnchor, setLanguageAnchor] = useState<null | HTMLElement>(null)
   const [senderNames, setSenderNames] = useState<Record<string, string>>({})
   const navigate = useNavigate()
   const dispatch = useDispatch()
@@ -49,7 +52,10 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
   const alerts = useSelector((state: RootState) => state.alerts?.list || [])
   const alertsLoading = useSelector((state: RootState) => state.alerts?.loading || false)
   const user = useSelector((state: RootState) => state.auth.user)
-  const { mode, toggleMode } = useThemeMode()
+  const { mode, toggleMode, locale, setLocale, direction } = useThemeMode()
+  const { t } = useTranslation()
+  const menuSide = direction === 'rtl' ? 'left' : 'right'
+  const rowDirection = direction === 'rtl' ? 'row-reverse' : 'row'
 
   const receivedAlerts = useMemo(
     () => (alerts as any[]).filter((alert) => alert.direction !== 'sent').slice(0, 6),
@@ -82,7 +88,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
           const lastName = String(raw?.lastName ?? '').trim()
           const displayName = String(raw?.displayName ?? '').trim()
           const fullName = `${firstName} ${lastName}`.trim() || displayName
-          return { id, fullName: fullName || 'Unknown sender' }
+          return { id, fullName: fullName || t('alerts.unknown_sender') }
         })
       )
 
@@ -103,7 +109,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
     return () => {
       mounted = false
     }
-  }, [receivedAlerts, senderNames])
+  }, [receivedAlerts, senderNames, t])
 
   const displayName = user?.displayName || user?.officerId || 'Officer'
   const initials =
@@ -149,9 +155,9 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, md: 2 } }}>
-          <Box sx={{ display: { xs: 'none', lg: 'block' }, mr: 1 }}>
+          <Box sx={{ display: { xs: 'none', lg: 'block' }, marginInlineEnd: 1 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'primary.main', letterSpacing: 0.5, textTransform: 'uppercase', fontSize: 11 }}>
-              Tunisia Operations Center
+              {t('app.name')}
             </Typography>
           </Box>
 
@@ -185,16 +191,26 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
             {mode === 'dark' ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
           </IconButton>
 
+          <IconButton
+            onClick={(event) => setLanguageAnchor(event.currentTarget)}
+            sx={{
+              bgcolor: alpha(theme.palette.action.active, 0.04),
+              '&:hover': { bgcolor: alpha(theme.palette.action.active, 0.08) }
+            }}
+          >
+            <TranslateRoundedIcon />
+          </IconButton>
+
           <Box
             onClick={(e) => setUserMenuAnchor(e.currentTarget)}
             sx={{
-              ml: 1,
+              marginInlineStart: 1,
               display: 'flex',
               alignItems: 'center',
               gap: 1.5,
               cursor: 'pointer',
               p: 0.5,
-              pr: { xs: 0.5, md: 2 },
+              paddingInlineEnd: { xs: 4, md: 16 },
               borderRadius: 100,
               transition: 'all 0.2s',
               '&:hover': { bgcolor: alpha(theme.palette.action.active, 0.04) }
@@ -228,8 +244,8 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         anchorEl={notificationsAnchor}
         open={Boolean(notificationsAnchor)}
         onClose={() => setNotificationsAnchor(null)}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        transformOrigin={{ horizontal: menuSide, vertical: 'top' }}
+        anchorOrigin={{ horizontal: menuSide, vertical: 'bottom' }}
         PaperProps={{
           sx: {
             borderRadius: 'var(--radius-m3-xl, 24px)',
@@ -242,9 +258,9 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         }}
       >
         <Box sx={{ p: 2.5, pb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 800 }}>Notifications</Typography>
+          <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 800 }}>{t('topbar.notifications')}</Typography>
           {unreadAlerts > 0 && (
-            <Badge badgeContent={unreadAlerts} color="primary" sx={{ mr: 1 }} />
+            <Badge badgeContent={unreadAlerts} color="primary" sx={{ marginInlineStart: 1 }} />
           )}
         </Box>
         <Divider />
@@ -255,21 +271,21 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
             </Box>
           ) : receivedAlerts.length === 0 ? (
             <Box sx={{ py: 3, px: 2.5 }}>
-              <Typography variant="body2" color="text.secondary">No received alerts.</Typography>
+              <Typography variant="body2" color="text.secondary">{t('alerts.no_alerts')}</Typography>
             </Box>
           ) : (
             receivedAlerts.map((alert: any) => (
-              <MenuItem key={alert.id} sx={{ py: 1.5, px: 2.5, gap: 1.5, alignItems: 'flex-start' }}>
+              <MenuItem key={alert.id} sx={{ py: 1.5, px: 2.5, gap: 1.5, alignItems: 'flex-start', flexDirection: rowDirection }}>
                 <Box sx={{ p: 1, borderRadius: 'var(--radius-m3-md, 12px)', bgcolor: alpha(alert.read ? theme.palette.success.main : theme.palette.warning.main, 0.15), color: alert.read ? 'success.main' : 'warning.main' }}>
                   <NotificationsNoneRoundedIcon fontSize="small" />
                 </Box>
                 <ListItemText
                   primary={
                     alert.senderId && senderNames[alert.senderId]
-                      ? `From: ${senderNames[alert.senderId]}`
-                      : 'From: Unknown sender'
+                      ? t('topbar.from_sender', { name: senderNames[alert.senderId] })
+                      : t('topbar.from_unknown')
                   }
-                  secondary={`${alert.time || 'Just now'} - ${alert.comment || 'No comment'}`}
+                  secondary={`${alert.time || t('dashboard.just_now')} - ${alert.comment || t('alerts.no_comment')}`}
                   primaryTypographyProps={{ variant: 'body2', fontWeight: 700 }}
                   secondaryTypographyProps={{ variant: 'caption', sx: { mt: 0.5, display: 'block' } }}
                 />
@@ -297,17 +313,38 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         <Divider />
         <Box sx={{ p: 1 }}>
           <MenuItem onClick={() => { navigate('/alerts'); setNotificationsAnchor(null); }} sx={{ borderRadius: 'var(--radius-m3-md, 12px)', justifyContent: 'center' }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main' }}>View All Notifications</Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main' }}>{t('common.view_all')}</Typography>
           </MenuItem>
         </Box>
+      </Menu>
+
+      <Menu
+        anchorEl={languageAnchor}
+        open={Boolean(languageAnchor)}
+        onClose={() => setLanguageAnchor(null)}
+        transformOrigin={{ horizontal: menuSide, vertical: 'top' }}
+        anchorOrigin={{ horizontal: menuSide, vertical: 'bottom' }}
+      >
+        {(['en', 'fr', 'ar'] as LocaleCode[]).map((item) => (
+          <MenuItem
+            key={item}
+            selected={locale === item}
+            onClick={() => {
+              setLocale(item)
+              setLanguageAnchor(null)
+            }}
+          >
+            {localeLabels[item]}
+          </MenuItem>
+        ))}
       </Menu>
 
       <Menu
         anchorEl={userMenuAnchor}
         open={Boolean(userMenuAnchor)}
         onClose={() => setUserMenuAnchor(null)}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        transformOrigin={{ horizontal: menuSide, vertical: 'top' }}
+        anchorOrigin={{ horizontal: menuSide, vertical: 'bottom' }}
         PaperProps={{
           sx: {
             borderRadius: 'var(--radius-m3-xl, 24px)',
@@ -322,7 +359,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         <Box sx={{ p: 2.5, pb: 2 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{displayName}</Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-            ID: {user?.officerId || 'N/A'}
+            {t('topbar.id_label')}: {user?.officerId || 'N/A'}
           </Typography>
         </Box>
         <Divider />
@@ -332,24 +369,24 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
               navigate('/settings')
               setUserMenuAnchor(null)
             }}
-            sx={{ py: 1.5, px: 2, borderRadius: 'var(--radius-m3-md, 12px)' }}
+            sx={{ py: 1.5, px: 2, borderRadius: 'var(--radius-m3-md, 12px)', flexDirection: rowDirection }}
           >
             <ListItemIcon sx={{ color: 'text.secondary' }}>
               <AccountCircleRoundedIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText primary="My Profile" primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} />
+            <ListItemText primary={t('topbar.profile')} primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} />
           </MenuItem>
           <MenuItem
             onClick={() => {
               navigate('/settings')
               setUserMenuAnchor(null)
             }}
-            sx={{ py: 1.5, px: 2, borderRadius: 'var(--radius-m3-md, 12px)' }}
+            sx={{ py: 1.5, px: 2, borderRadius: 'var(--radius-m3-md, 12px)', flexDirection: rowDirection }}
           >
             <ListItemIcon sx={{ color: 'text.secondary' }}>
               <SettingsRoundedIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText primary="Account Settings" primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} />
+            <ListItemText primary={t('common.settings')} primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} />
           </MenuItem>
         </Box>
         <Divider />
@@ -361,13 +398,14 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
               px: 2,
               borderRadius: 'var(--radius-m3-md, 12px)',
               color: 'error.main',
+              flexDirection: rowDirection,
               '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.08) }
             }}
           >
             <ListItemIcon sx={{ color: 'inherit' }}>
               <LogoutRoundedIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText primary="Sign Out" primaryTypographyProps={{ variant: 'body2', fontWeight: 700 }} />
+            <ListItemText primary={t('common.logout')} primaryTypographyProps={{ variant: 'body2', fontWeight: 700 }} />
           </MenuItem>
         </Box>
       </Menu>

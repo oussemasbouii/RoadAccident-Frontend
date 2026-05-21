@@ -1,6 +1,7 @@
 // Common types used in accident module
 export type AttachmentTypeCode = 'photo' | 'sketch_png' | 'sketch_json'
 export type UploadStatusCode = 'pending' | 'uploading' | 'completed' | 'failed'
+export type AttachmentFileTypeCode = 'IMAGE' | 'PDF' | 'OTHER'
 
 // ---- Enums (semantic codes) ----
 

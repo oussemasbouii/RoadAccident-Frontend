@@ -21,6 +21,7 @@ import { useAppDispatch, useAppSelector } from '@/store/store'
 import { clearMute, setMute, toggleReaction, loadPersistedMutes, cleanupExpiredMutes } from '@/features/chat/slices/chatSlice'
 import { getAccessToken, getRefreshToken } from '@/utils/tokenStore'
 import { connectSharedSocket } from '@/services/socketClient'
+import { useTranslation, useThemeMode } from '@/themeMode'
 
 type ChatWindowProps = {
   peer: ChatContact
@@ -36,8 +37,6 @@ type ChatWindowProps = {
   onCall: (type: 'audio' | 'video') => void
 }
 
-const QUICK_REPLIES = ['On my way', 'Need backup', 'ETA 5 min', 'Scene secured', 'Call me']
-
 const REACTION_OPTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡']
 
 function formatMessageTime(value?: string) {
@@ -47,8 +46,18 @@ function formatMessageTime(value?: string) {
   return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function formatRelativeTime(value?: string) {
-  if (!value) return 'Unknown'
+function formatRelativeTime(
+  value?: string,
+  labels = {
+    unknown: 'Unknown',
+    now: 'now',
+    minutesAgo: 'm ago',
+    hoursAgo: 'h ago',
+    daysAgo: 'days ago',
+    yesterday: 'Yesterday',
+  }
+) {
+  if (!value) return labels.unknown
   const parsed = Date.parse(value)
   if (Number.isNaN(parsed)) return value
   const now = new Date()
@@ -59,14 +68,14 @@ function formatRelativeTime(value?: string) {
 
   if (diffDays === 0) {
     if (diffHours === 0) {
-      if (diffMinutes === 0) return 'now'
-      return `${diffMinutes}m ago`
+      if (diffMinutes === 0) return labels.now
+      return `${diffMinutes}${labels.minutesAgo}`
     }
-    return `${diffHours}h ago`
+    return `${diffHours}${labels.hoursAgo}`
   } else if (diffDays === 1) {
-    return 'Yesterday'
+    return labels.yesterday
   } else if (diffDays < 7) {
-    return `${diffDays} days ago`
+    return `${diffDays}${labels.daysAgo}`
   }
   return new Date(parsed).toLocaleDateString()
 }
@@ -76,7 +85,7 @@ function getDateKey(timestamp: number) {
   return date.toDateString()
 }
 
-function formatDateHeader(timestamp: number) {
+function formatDateHeader(timestamp: number, locale = 'en', labels = { today: 'Today', yesterday: 'Yesterday' }) {
   const date = new Date(timestamp)
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -84,12 +93,12 @@ function formatDateHeader(timestamp: number) {
   const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
 
   if (messageDate.getTime() === today.getTime()) {
-    return 'Today'
+    return labels.today
   }
   if (messageDate.getTime() === yesterday.getTime()) {
-    return 'Yesterday'
+    return labels.yesterday
   }
-  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  return date.toLocaleDateString(locale, { weekday: 'long', month: 'short', day: 'numeric' })
 }
 
 function formatDuration(startedAt?: number, endedAt?: number) {
@@ -129,7 +138,16 @@ export default function ChatWindow({
   onCall,
 }: ChatWindowProps) {
   const theme = useTheme()
+  const { t } = useTranslation()
+  const { locale } = useThemeMode()
   const dispatch = useAppDispatch()
+  const QUICK_REPLIES = [
+    t('comms.reply_on_my_way'),
+    t('comms.reply_need_backup'),
+    t('comms.reply_eta_5_min'),
+    t('comms.reply_scene_secured'),
+    t('comms.reply_call_me'),
+  ]
   const muteByPeer = useAppSelector((state) => state.chat.muteByPeer)
   const activeCall = useAppSelector((state) => state.call.activeCall)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -192,7 +210,11 @@ export default function ChatWindow({
       if (currentDateKey !== prevDateKey) {
         acc.push(
           <Box key={`date-${currentDateKey}`} sx={{ textAlign: 'center', my: 2 }}>
-            <Chip label={formatDateHeader(item.timestamp)} size="small" variant="outlined" />
+            <Chip
+              label={formatDateHeader(item.timestamp, locale, { today: t('comms.today'), yesterday: t('comms.yesterday') })}
+              size="small"
+              variant="outlined"
+            />
           </Box>
         )
       }
@@ -228,10 +250,17 @@ export default function ChatWindow({
               </Box>
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {call.callType === 'video' ? 'Video call' : 'Audio call'} {call.status === 'ended' ? 'ended' : call.status}
+                  {call.callType === 'video' ? t('comms.video_call') : t('comms.audio_call')} {call.status === 'ended' ? t('calls.ended') : call.status}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {call.startedAt ? formatRelativeTime(new Date(call.startedAt).toISOString()) : 'Unknown time'}
+                  {call.startedAt ? formatRelativeTime(new Date(call.startedAt).toISOString(), {
+                    unknown: t('comms.unknown'),
+                    now: t('comms.now'),
+                    minutesAgo: t('comms.minutes_ago'),
+                    hoursAgo: t('comms.hours_ago'),
+                    daysAgo: t('comms.days_ago'),
+                    yesterday: t('comms.yesterday'),
+                  }) : t('comms.unknown_time')}
                   {call.endedAt && ` • ${formatDuration(call.startedAt, call.endedAt)}`}
                 </Typography>
               </Box>
@@ -313,7 +342,7 @@ export default function ChatWindow({
                         fontWeight: 600,
                       }}
                     >
-                      Loading attachment...
+                      {t('comms.loading_attachment')}
                     </Box>
                   )}
                   {message.text && (
@@ -566,13 +595,13 @@ export default function ChatWindow({
                 }}
               />
               <Typography variant="caption" color="text.secondary" noWrap>
-                {peer.status === 'online' ? 'Online' : 'Offline'}
+                {peer.status === 'online' ? t('comms.online') : t('comms.offline')}
               </Typography>
             </Stack>
           </Box>
         </Stack>
         <Stack direction="row" spacing={0.8}>
-          <Tooltip title="Audio call">
+          <Tooltip title={t('comms.audio_call')}>
             <IconButton
               size="small"
               onClick={() => onCall('audio')}
@@ -588,7 +617,7 @@ export default function ChatWindow({
               <CallRoundedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Video call">
+          <Tooltip title={t('comms.video_call')}>
             <IconButton
               size="small"
               onClick={() => onCall('video')}
@@ -604,7 +633,7 @@ export default function ChatWindow({
               <VideocamRoundedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title={isMuted ? `Muted (${muteTimeRemaining} remaining)` : 'Mute notifications'}>
+          <Tooltip title={isMuted ? `${t('comms.muted')} (${muteTimeRemaining} ${t('comms.remaining')})` : t('comms.mute_notifications')}>
             <IconButton
               size="small"
               onClick={(event) => setMuteAnchor(event.currentTarget)}
@@ -621,16 +650,16 @@ export default function ChatWindow({
             </IconButton>
           </Tooltip>
           {isMuted && (
-            <Tooltip title={muteTimeRemaining ? `Muted (${muteTimeRemaining} remaining)` : 'Muted'}>
+            <Tooltip title={muteTimeRemaining ? `${t('comms.muted')} (${muteTimeRemaining} ${t('comms.remaining')})` : t('comms.muted')}>
               <Chip
                 size="small"
-                label="Muted"
+                label={t('comms.muted')}
                 color="warning"
-                sx={{ height: 30, ml: 1 }}
+                sx={{ height: 30, marginInlineStart: 8 }}
               />
             </Tooltip>
           )}
-          <Tooltip title={isMinimized ? 'Open' : 'Minimize'}>
+          <Tooltip title={isMinimized ? t('comms.open') : t('comms.minimize')}>
             <IconButton
               size="small"
               onClick={onMinimize}
@@ -645,7 +674,7 @@ export default function ChatWindow({
               <MinimizeRoundedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Close">
+          <Tooltip title={t('comms.close')}>
             <IconButton
               size="small"
               onClick={onClose}
@@ -663,7 +692,7 @@ export default function ChatWindow({
           {unreadCount > 0 && (
             <Box
               sx={{
-                ml: 0.4,
+                marginInlineStart: 3,
                 minWidth: 18,
                 height: 18,
                 borderRadius: 999,
@@ -690,13 +719,13 @@ export default function ChatWindow({
         disablePortal
         PaperProps={{ sx: { zIndex: 2601 } }}
       >
-        <MenuItem
+          <MenuItem
           onClick={() => {
             dispatch(setMute({ peerId: peer.id, until: Date.now() + 15 * 60 * 1000 }))
             setMuteAnchor(null)
           }}
         >
-          Mute 15 min
+          {t('comms.mute_15_min')}
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -704,7 +733,7 @@ export default function ChatWindow({
             setMuteAnchor(null)
           }}
         >
-          Mute 1 hour
+          {t('comms.mute_1_hour')}
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -712,7 +741,7 @@ export default function ChatWindow({
             setMuteAnchor(null)
           }}
         >
-          Mute 8 hours
+          {t('comms.mute_8_hours')}
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -720,7 +749,7 @@ export default function ChatWindow({
             setMuteAnchor(null)
           }}
         >
-          Unmute
+          {t('comms.unmute')}
         </MenuItem>
       </Menu>
 
@@ -786,7 +815,7 @@ export default function ChatWindow({
                 cursor: 'pointer',
               }}
             >
-              {newCount > 1 ? `${newCount} new messages` : 'New message'}
+              {newCount > 1 ? `${newCount} ${t('comms.new_messages')}` : t('comms.new_message')}
             </Box>
           )}
 
@@ -835,7 +864,7 @@ export default function ChatWindow({
             />
             <TextField
               size="small"
-              placeholder="Type a message..."
+                  placeholder={t('comms.type_message')}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               fullWidth
@@ -857,7 +886,7 @@ export default function ChatWindow({
               }}
             />
             <Stack direction="row" spacing={0.6} alignItems="center">
-              <Tooltip title="Attach">
+              <Tooltip title={t('comms.attach')}>
                 <IconButton
                   size="small"
                   onClick={handleFilePick}
@@ -872,7 +901,7 @@ export default function ChatWindow({
                   <AttachFileRoundedIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Send">
+              <Tooltip title={t('comms.send')}>
                 <IconButton
                   size="small"
                   onClick={handleSend}
@@ -894,7 +923,7 @@ export default function ChatWindow({
             <Box sx={{ px: 1.5, pb: 1.2 }}>
               <Chip
                 size="small"
-                label={`Ready: ${pendingAttachment.filename}`}
+                label={`${t('comms.ready_to_send')}: ${pendingAttachment.filename}`}
                 onDelete={() => setPendingAttachment(null)}
               />
             </Box>
@@ -914,7 +943,7 @@ export default function ChatWindow({
             textOverflow: 'ellipsis',
           }}
         >
-          {lastMessage?.text || 'No messages yet'}
+          {lastMessage?.text || t('comms.no_messages_yet')}
         </Box>
       )}
 
@@ -979,4 +1008,3 @@ export default function ChatWindow({
     </Box>
   )
 }
-

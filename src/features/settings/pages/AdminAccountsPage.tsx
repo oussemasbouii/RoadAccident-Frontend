@@ -48,6 +48,7 @@ import Card from '../../../components/Common/Card'
 import Badge from '../../../components/Common/Badge'
 import { apiService } from '../../../services/api'
 import { useAppSelector } from '../../../store/store'
+import { useTranslation } from '../../../themeMode'
 
 type OfficerRecord = {
   id?: string
@@ -79,15 +80,18 @@ function StatusDropdownButton({
   currentStatus, 
   onStatusChange, 
   disabled,
-  theme 
+  theme,
+  t,
 }: { 
   currentStatus: 'active' | 'restricted' | 'blocked'
   onStatusChange: (status: 'active' | 'restricted' | 'blocked') => void
   disabled: boolean
   theme: any
+  t: (key: any, params?: any) => string
 }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const open = Boolean(anchorEl)
+  const rowDirection = theme.direction === 'rtl' ? 'row-reverse' : 'row'
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget)
@@ -107,19 +111,19 @@ function StatusDropdownButton({
       icon: <CheckCircleRoundedIcon fontSize="small" />,
       color: theme.palette.success.main,
       bg: alpha(theme.palette.success.main, 0.15),
-      label: 'Active'
+      label: t('admin_accounts.active')
     },
     restricted: { 
       icon: <WarningRoundedIcon fontSize="small" />,
       color: theme.palette.warning.main,
       bg: alpha(theme.palette.warning.main, 0.15),
-      label: 'Restricted'
+      label: t('admin_accounts.restricted')
     },
     blocked: { 
       icon: <CancelRoundedIcon fontSize="small" />,
       color: theme.palette.error.main,
       bg: alpha(theme.palette.error.main, 0.15),
-      label: 'Blocked'
+      label: t('admin_accounts.blocked')
     },
   }
 
@@ -151,8 +155,8 @@ function StatusDropdownButton({
         anchorEl={anchorEl}
         open={open}
         onClose={handleClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: theme.direction === 'rtl' ? 'right' : 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: theme.direction === 'rtl' ? 'right' : 'left' }}
         PaperProps={{
           sx: { 
             borderRadius: '12px', 
@@ -173,11 +177,11 @@ function StatusDropdownButton({
             '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.1) },
           }}
         >
-          <Stack direction="row" spacing={1.5} alignItems="center">
+          <Stack direction={rowDirection} spacing={1.5} alignItems="center">
             <CheckCircleRoundedIcon fontSize="small" sx={{ color: theme.palette.success.main }} />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>Active</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('admin_accounts.active')}</Typography>
             {currentStatus === 'active' && (
-              <Typography variant="caption" color="success.main" sx={{ ml: 'auto' }}>Current</Typography>
+              <Typography variant="caption" color="success.main" sx={{ marginInlineStart: 'auto' }}>{t('admin_accounts.current')}</Typography>
             )}
           </Stack>
         </MenuItem>
@@ -192,11 +196,11 @@ function StatusDropdownButton({
             '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.1) },
           }}
         >
-          <Stack direction="row" spacing={1.5} alignItems="center">
+          <Stack direction={rowDirection} spacing={1.5} alignItems="center">
             <WarningRoundedIcon fontSize="small" sx={{ color: theme.palette.warning.main }} />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>Restricted</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('admin_accounts.restricted')}</Typography>
             {currentStatus === 'restricted' && (
-              <Typography variant="caption" color="warning.main" sx={{ ml: 'auto' }}>Current</Typography>
+              <Typography variant="caption" color="warning.main" sx={{ marginInlineStart: 'auto' }}>{t('admin_accounts.current')}</Typography>
             )}
           </Stack>
         </MenuItem>
@@ -211,11 +215,11 @@ function StatusDropdownButton({
             '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) },
           }}
         >
-          <Stack direction="row" spacing={1.5} alignItems="center">
+          <Stack direction={rowDirection} spacing={1.5} alignItems="center">
             <CancelRoundedIcon fontSize="small" sx={{ color: theme.palette.error.main }} />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>Blocked</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('admin_accounts.blocked')}</Typography>
             {currentStatus === 'blocked' && (
-              <Typography variant="caption" color="error.main" sx={{ ml: 'auto' }}>Current</Typography>
+              <Typography variant="caption" color="error.main" sx={{ marginInlineStart: 'auto' }}>{t('admin_accounts.current')}</Typography>
             )}
           </Stack>
         </MenuItem>
@@ -227,6 +231,8 @@ function StatusDropdownButton({
 export default function AdminAccountsPage() {
   const currentUser = useAppSelector((s) => s.auth.user)
   const theme = useTheme()
+  const { t } = useTranslation()
+  const rowDirection = theme.direction === 'rtl' ? 'row-reverse' : 'row'
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
@@ -263,9 +269,9 @@ export default function AdminAccountsPage() {
     } catch (err: any) {
       const status = err?.response?.status
       if (status === 404 || status === 501) {
-        setError('Users API is not available yet. Ensure backend exposes GET /users/ and set VITE_API_URL to your API base (e.g. /api/v2).')
+        setError(t('admin_accounts.users_api_not_available_yet'))
       } else {
-        setError(err?.response?.data?.message || err?.message || 'Failed to load users.')
+        setError(err?.response?.data?.message || err?.message || t('admin_accounts.failed_to_load_users'))
       }
       setOfficers([])
     } finally {
@@ -290,7 +296,7 @@ export default function AdminAccountsPage() {
       setSuccess(successMessage)
       await fetchOfficers()
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || 'Action failed.')
+      setError(err?.response?.data?.message || err?.message || t('admin_accounts.action_failed'))
     } finally {
       setLoading(false)
     }
@@ -334,10 +340,10 @@ export default function AdminAccountsPage() {
     <Stack spacing={4} sx={{ pb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: -0.5 }}>User Accounts</Typography>
-          <Typography color="text.secondary">Validate, manage status, and secure administrative accounts.</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: -0.5 }}>{t('admin_accounts.user_accounts')}</Typography>
+          <Typography color="text.secondary">{t('admin_accounts.validate_manage_secure')}</Typography>
         </Box>
-        <Tooltip title="Refresh Records">
+        <Tooltip title={t('admin_accounts.refresh_records')}>
            <IconButton onClick={fetchOfficers} sx={{ bgcolor: 'background.paper', borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
              <RefreshRoundedIcon />
            </IconButton>
@@ -347,7 +353,7 @@ export default function AdminAccountsPage() {
       <Card sx={{ p: 2 }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2, alignItems: 'end' }}>
           <TextField
-            label="Search users"
+            label={t('admin_accounts.search_users')}
             variant="outlined"
             size="small"
             value={query}
@@ -355,7 +361,7 @@ export default function AdminAccountsPage() {
             sx={{ bgcolor: 'background.paper' }}
           />
           <TextField
-            label="Officer ID"
+            label={t('admin_accounts.officer_id')}
             variant="outlined"
             size="small"
             value={roleFilter}
@@ -363,29 +369,29 @@ export default function AdminAccountsPage() {
             sx={{ bgcolor: 'background.paper' }}
           />
           <FormControl size="small" sx={{ bgcolor: 'background.paper' }}>
-            <InputLabel>Role</InputLabel>
+            <InputLabel>{t('admin_accounts.role')}</InputLabel>
             <Select
               value={roleFilter}
-              label="Role"
+              label={t('admin_accounts.role')}
               onChange={(e) => setRoleFilter(e.target.value)}
             >
-              <MenuItem value="">All Roles</MenuItem>
-              <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="dispatch">Dispatch</MenuItem>
-              <MenuItem value="officer">Officer</MenuItem>
+              <MenuItem value="">{t('admin_accounts.all_roles')}</MenuItem>
+              <MenuItem value="admin">{t('admin_accounts.role_admin')}</MenuItem>
+              <MenuItem value="dispatch">{t('admin_accounts.role_dispatch')}</MenuItem>
+              <MenuItem value="officer">{t('admin_accounts.role_officer')}</MenuItem>
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ bgcolor: 'background.paper' }}>
-            <InputLabel>Status</InputLabel>
+            <InputLabel>{t('admin_accounts.status')}</InputLabel>
             <Select
               value={statusFilter}
-              label="Status"
+              label={t('admin_accounts.status')}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <MenuItem value="">All Status</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="restricted">Restricted</MenuItem>
-              <MenuItem value="blocked">Blocked</MenuItem>
+              <MenuItem value="">{t('admin_accounts.all_status')}</MenuItem>
+              <MenuItem value="active">{t('admin_accounts.active')}</MenuItem>
+              <MenuItem value="restricted">{t('admin_accounts.restricted')}</MenuItem>
+              <MenuItem value="blocked">{t('admin_accounts.blocked')}</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -396,18 +402,18 @@ export default function AdminAccountsPage() {
 
       <Card sx={{ p: 0, overflow: 'hidden' }}>
         <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>Account Registry</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>{t('admin_accounts.account_registry')}</Typography>
           <Stack direction="row" spacing={1} alignItems="center">
             {filteredOfficers.length !== officers.length && (
               <Chip 
-                label={`${filteredOfficers.length} of ${officers.length} filtered`}
+                label={`${filteredOfficers.length} / ${officers.length}`}
                 size="small"
                 onDelete={() => { setQuery(''); setRoleFilter(''); setStatusFilter(''); }}
                 sx={{ fontWeight: 600, fontSize: 11 }}
               />
             )}
             <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', px: 2, py: 0.5, bgcolor: alpha(theme.palette.action.active, 0.05), borderRadius: 1 }}>
-              {officers.length} Registered Officers
+              {officers.length} {t('admin_accounts.registered_officers')}
             </Typography>
           </Stack>
         </Box>
@@ -415,14 +421,14 @@ export default function AdminAccountsPage() {
           <Table>
             <TableHead sx={{ bgcolor: alpha(theme.palette.action.active, 0.02) }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700, py: 2, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Officer</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Officer ID</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Role</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Phone</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Center</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Validation</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Status</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 700, py: 2, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.officer')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.officer_id')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.role')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.phone')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('settings.center')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.validation')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.status')}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -432,10 +438,10 @@ export default function AdminAccountsPage() {
                     <Stack spacing={2} alignItems="center">
                       <PersonRoundedIcon sx={{ fontSize: 64, color: 'text.disabled', opacity: 0.5 }} />
                       <Typography variant="h6" color="text.secondary">
-                        {loading ? 'Loading account database...' : 'No officer accounts found'}
+                        {loading ? t('admin_accounts.loading_account_database') : t('admin_accounts.no_officer_accounts_found')}
                       </Typography>
                       <Typography variant="body2" color="text.disabled">
-                        {loading ? 'Please wait...' : 'Try adjusting your search criteria'}
+                        {loading ? t('admin_accounts.please_wait') : t('admin_accounts.try_adjusting_search_criteria')}
                       </Typography>
                     </Stack>
                   </TableCell>
@@ -475,11 +481,11 @@ export default function AdminAccountsPage() {
                       </Avatar>
                       <Stack spacing={0.5}>
                         <Typography variant="body1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                          {o.firstName && o.lastName ? `${o.firstName} ${o.lastName}` : (o.displayName || o.name || 'Unknown Officer')}
+                          {o.firstName && o.lastName ? `${o.firstName} ${o.lastName}` : (o.displayName || o.name || t('admin_accounts.unknown_officer'))}
                         </Typography>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <PersonRoundedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                          <Typography variant="caption" color="text.disabled">{o.email || 'No email'}</Typography>
+                          <Typography variant="caption" color="text.disabled">{o.email || t('admin_accounts.no_email')}</Typography>
                         </Stack>
                       </Stack>
                     </Stack>
@@ -493,9 +499,9 @@ export default function AdminAccountsPage() {
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    <Chip 
+                    <Chip
                       icon={<AdminPanelSettingsRoundedIcon sx={{ fontSize: 16 }} />}
-                      label={(o.role || 'officer').toUpperCase()} 
+                      label={o.role === 'admin' ? t('admin_accounts.role_admin') : o.role === 'dispatch' ? t('admin_accounts.role_dispatch') : t('admin_accounts.role_officer')}
                       size="small"
                       sx={{ 
                         bgcolor: roleStyle.bg, 
@@ -525,7 +531,7 @@ export default function AdminAccountsPage() {
                   <TableCell>
                     <Chip 
                       icon={o.validated ? <CheckCircleRoundedIcon sx={{ fontSize: 16 }} /> : <PendingRoundedIcon sx={{ fontSize: 16 }} />}
-                      label={o.validated ? 'VALIDATED' : 'PENDING'} 
+                      label={o.validated ? t('admin_accounts.validated') : t('admin_accounts.pending')} 
                       size="small"
                       sx={{ 
                         bgcolor: o.validated ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.grey[500], 0.1),
@@ -537,10 +543,11 @@ export default function AdminAccountsPage() {
                     />
                   </TableCell>
                   <TableCell>
-                    <StatusDropdownButton
+                      <StatusDropdownButton
                       currentStatus={status}
                       disabled={loading}
                       theme={theme}
+                      t={t}
                       onStatusChange={(newStatus) => {
                         const statusData = {
                           active: { isValid: true, isFrozen: false },
@@ -549,18 +556,18 @@ export default function AdminAccountsPage() {
                         }[newStatus]
                         doAction(
                           () => apiService.users.updateStatus(apiId(o), statusData),
-                          `Status set to ${newStatus}.`
+                          t('admin_accounts.status_set_to').replace('{status}', newStatus)
                         )
                       }}
                     />
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
-                      <Tooltip title="Validate account">
+                      <Tooltip title={t('admin_accounts.validate_account')}>
                         <IconButton
                           size="small"
                           color="primary"
-                          onClick={() => doAction(() => apiService.users.update(apiId(o), { validated: true }), 'User validated.')}
+                          onClick={() => doAction(() => apiService.users.update(apiId(o), { validated: true }), t('admin_accounts.validated'))}
                           disabled={loading || !!o.validated}
                           sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}
                         >
@@ -568,18 +575,18 @@ export default function AdminAccountsPage() {
                         </IconButton>
                       </Tooltip>
 
-                      <Tooltip title="Reset password">
+                      <Tooltip title={t('admin_accounts.reset_password')}>
                         <IconButton
                           size="small"
                           onClick={() => {
-                            const newPassword = window.prompt('Enter new temporary password for this user (they should change it on next login):')
+                            const newPassword = window.prompt(t('admin_accounts.reset_password'))
                             if (newPassword == null || newPassword.length < 8) {
-                              if (newPassword !== null) setError('Password must be at least 8 characters.')
+                              if (newPassword !== null) setError(t('admin_accounts.password_must_be_at_least_8_characters'))
                               return
                             }
                             doAction(
                               () => apiService.users.updatePassword(apiId(o), { newPassword }),
-                              'Password updated. User should change it on next login.'
+                              t('admin_accounts.password_updated_user_should_change_it_on_next_login')
                             )
                           }}
                           disabled={loading}
@@ -589,10 +596,10 @@ export default function AdminAccountsPage() {
                         </IconButton>
                       </Tooltip>
 
-                      <Tooltip title="Revoke sessions">
+                      <Tooltip title={t('admin_accounts.revoke_sessions')}>
                         <IconButton
                           size="small"
-                          onClick={() => doAction(() => apiService.users.revokeSessions(apiId(o)), 'Sessions revoked.')}
+                          onClick={() => doAction(() => apiService.users.revokeSessions(apiId(o)), t('admin_accounts.sessions_revoked'))}
                           disabled={loading}
                           sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}
                         >
@@ -600,7 +607,7 @@ export default function AdminAccountsPage() {
                         </IconButton>
                       </Tooltip>
 
-                      <Tooltip title="Delete user (not available)">
+                      <Tooltip title={t('admin_accounts.delete_user_not_available')}>
                         <span>
                           <IconButton
                             size="small"

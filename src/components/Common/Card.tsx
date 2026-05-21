@@ -1,5 +1,9 @@
 import React from 'react'
 import { Card as MuiCard, alpha, useTheme } from '@mui/material'
+import { motion } from 'framer-motion'
+import { spring } from '../../utils/motion'
+
+const MotionCard = motion(MuiCard)
 
 interface CardProps {
   children: React.ReactNode
@@ -16,28 +20,38 @@ export default function Card({
   hoverable = false,
   className,
 }: CardProps) {
-  const theme = useTheme();
-  
+  const theme = useTheme()
+
   return (
-    <MuiCard
+    <MotionCard
       onClick={onClick}
       className={className}
+      // Only apply press feedback when the card itself is clickable
+      whileTap={hoverable ? { scale: 0.99 } : undefined}
+      whileHover={
+        hoverable
+          ? { y: -3, transition: spring.smooth }
+          : undefined
+      }
+      // tap override — faster than the hover spring
       sx={{
-        transition: theme.transitions.create(['box-shadow', 'transform', 'border-color']),
+        // CSS handles box-shadow and border transitions; framer-motion handles transform
+        transition: theme.transitions.create(['box-shadow', 'border-color'], {
+          duration: theme.transitions.duration.short,
+        }),
         cursor: hoverable ? 'pointer' : 'default',
         position: 'relative',
         overflow: 'hidden',
         '&:hover': hoverable
           ? {
-              transform: 'translateY(-2px)',
-              boxShadow: (theme) => `0 12px 24px ${alpha(theme.palette.common.black, 0.08)}`,
+              boxShadow: `0 12px 28px ${alpha(theme.palette.common.black, 0.09)}`,
               borderColor: 'primary.main',
             }
           : undefined,
-        ...sx
+        ...sx,
       }}
     >
       {children}
-    </MuiCard>
+    </MotionCard>
   )
 }

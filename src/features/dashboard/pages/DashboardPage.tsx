@@ -1,11 +1,11 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { 
-  Box, 
-  Stack, 
-  Typography, 
-  alpha, 
-  useTheme, 
+import {
+  Box,
+  Stack,
+  Typography,
+  alpha,
+  useTheme,
   IconButton,
   Tooltip,
   List,
@@ -16,6 +16,9 @@ import {
   Chip,
   Button as MuiButton
 } from "@mui/material";
+import { motion, AnimatePresence } from "framer-motion";
+import { listParent, listChild, fadeIn, spring } from "../../../utils/motion";
+import { ListRowSkeleton } from "../../../components/Common/Skeletons";
 
 // Icons
 import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
@@ -31,13 +34,21 @@ import CircleIcon from "@mui/icons-material/Circle";
 // Redux & Components
 import { useAppDispatch, useAppSelector } from "../../../store/store";
 import { fetchIncidents } from "../../incidents/slices/incidentsSlice";
+import type { Incident } from "../../incidents/slices/incidentsSlice";
 import { fetchAlerts } from "../../alerts/slices/alertsSlice";
+import type { Alert } from "../../alerts/slices/alertsSlice";
 import StatCard from "../../../components/Common/StatCard";
 import Card from "../../../components/Common/Card";
+import NationalKpiDashboard from "../components/NationalKpiDashboard";
+import { useTranslation } from "../../../themeMode";
+
+const MotionBox = motion(Box)
 
 export default function DashboardPage() {
   const dispatch = useAppDispatch();
   const theme = useTheme();
+  const { t } = useTranslation();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const {
     list: incidents,
@@ -52,8 +63,10 @@ export default function DashboardPage() {
   } = useAppSelector((state) => state.alerts);
 
   const refreshData = () => {
-    dispatch(fetchIncidents({ page: 1, limit: 5 }) as any);
-    dispatch(fetchAlerts({ page: 1, limit: 10 }) as any);
+    setIsRefreshing(true);
+    dispatch(fetchIncidents({ page: 1, limit: 50 }) as any);
+    dispatch(fetchAlerts({ page: 1, limit: 50 }) as any);
+    setTimeout(() => setIsRefreshing(false), 800);
   };
 
   useEffect(() => {
@@ -74,34 +87,34 @@ export default function DashboardPage() {
   const stats = [
     {
       icon: <WarningRoundedIcon />,
-      label: "Open Incidents",
+      label: t('dashboard.open_incidents'),
       value: openIncidents,
       trend: openIncidents > resolvedIncidents ? "up" as const : "neutral" as const,
-      trendValue: `${resolutionRate}% resolved`,
+      trendValue: t('dashboard.percent_resolved', { n: resolutionRate }),
       intent: "danger" as const,
     },
     {
       icon: <NotificationsActiveRoundedIcon />,
-      label: "Unread Alerts",
+      label: t('dashboard.unread_alerts'),
       value: unreadCount,
       trend: unreadCount > 0 ? "up" as const : "neutral" as const,
-      trendValue: unreadCount > 0 ? "Requires attention" : "All caught up",
+      trendValue: unreadCount > 0 ? t('dashboard.requires_attention') : t('dashboard.all_caught_up'),
       intent: "warning" as const,
     },
     {
       icon: <PlaceRoundedIcon />,
-      label: "Active Zones",
+      label: t('dashboard.active_zones'),
       value: activeZones,
       trend: "neutral" as const,
-      trendValue: `${priorityIncidents} priority cases`,
+      trendValue: t('dashboard.priority_cases', { n: priorityIncidents }),
       intent: "info" as const,
     },
     {
       icon: <TimerRoundedIcon />,
-      label: "Avg Response",
-      value: incidentStats.avgResponseTime > 0 ? `${incidentStats.avgResponseTime}m` : "12m",
+      label: t('dashboard.avg_response'),
+      value: incidentStats.avgResponseTime > 0 ? `${incidentStats.avgResponseTime}m` : '12m',
       trend: incidentStats.avgResponseTime > 0 && incidentStats.avgResponseTime <= 12 ? "down" as const : "neutral" as const,
-      trendValue: `${avgInjuriesPerIncident} injuries/incident`,
+      trendValue: t('dashboard.injuries_per_incident', { n: avgInjuriesPerIncident }),
       intent: "success" as const,
     },
   ];
@@ -110,74 +123,100 @@ export default function DashboardPage() {
   const recentAlerts = alerts.slice(0, 4);
 
   const severityConfig: Record<string, { color: "error" | "warning" | "info" | "success" | "default", label: string }> = {
-    critical: { color: "error", label: "Critical" },
-    high: { color: "warning", label: "High" },
-    medium: { color: "info", label: "Medium" },
-    low: { color: "success", label: "Low" },
+    critical: { color: "error", label: t('dashboard.critical') },
+    high: { color: "warning", label: t('dashboard.high') },
+    medium: { color: "info", label: t('dashboard.medium') },
+    low: { color: "success", label: t('dashboard.low') },
   };
 
   return (
-    <Box sx={{ pb: 4, maxWidth: 1600, mx: 'auto' }}>
+    <Box
+      sx={{
+        pb: 5,
+        maxWidth: 1600,
+        mx: 'auto',
+        px: { xs: 0, md: 0.5 },
+      }}
+    >
       {/* Header Section */}
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'flex-end', 
-        mb: 4,
+        mb: 3.5,
         gap: 2,
         flexWrap: 'wrap'
       }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: -0.5, mb: 0.5 }}>
-            Overview
+            <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: -0.5, mb: 0.5 }}>
+            {t('dashboard.overview')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Real-time monitoring and operational insights.
+            {t('dashboard.subtitle')}
           </Typography>
         </Box>
         <Stack direction="row" spacing={2} alignItems="center">
-          <Tooltip title="Refresh Data">
-            <IconButton 
+          <Tooltip title={t('dashboard.refresh_data')}>
+            <IconButton
               onClick={refreshData}
               size="small"
-              sx={{ 
+              sx={{
                 bgcolor: 'background.paper',
                 border: `1px solid ${theme.palette.divider}`,
                 borderRadius: 'var(--radius-m3-full, 100px)',
                 p: 1.25,
-                transition: 'all 0.2s',
-                '&:hover': { bgcolor: alpha(theme.palette.action.active, 0.04) }
+                transition: 'background-color 0.18s ease',
+                '&:hover': { bgcolor: alpha(theme.palette.action.active, 0.04) },
               }}
             >
-              <RefreshRoundedIcon fontSize="small" />
+              <motion.div
+                animate={{ rotate: isRefreshing ? 360 : 0 }}
+                transition={
+                  isRefreshing
+                    ? { duration: 0.7, ease: 'linear', repeat: Infinity, repeatDelay: 0 }
+                    : { duration: 0.4, ease: [0.0, 0.0, 0.2, 1.0] }
+                }
+                style={{ display: 'flex' }}
+              >
+                <RefreshRoundedIcon fontSize="small" />
+              </motion.div>
             </IconButton>
           </Tooltip>
         </Stack>
       </Box>
 
-      {/* Stats Grid */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' }, 
-        gap: 2, 
-        mb: 4 
-      }}>
+      {/* Stats Grid — staggered entrance */}
+      <MotionBox
+        variants={listParent}
+        initial="initial"
+        animate="animate"
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' },
+          gap: 2.25,
+          mb: 3.5,
+        }}
+      >
         {stats.map((stat, idx: number) => (
           <StatCard key={idx} {...stat} />
         ))}
+      </MotionBox>
+
+      <Box sx={{ mb: 3.5 }}>
+        <NationalKpiDashboard incidents={incidents as Incident[]} alerts={alerts as Alert[]} />
       </Box>
 
       <Box sx={{ 
         display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }, 
-        gap: 3 
+        gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.7fr) minmax(320px, 0.95fr)' }, 
+        gap: 2.5 
       }}>
         {/* Main Content Column */}
         <Box>
           <Card sx={{ height: '100%', p: 0, overflow: 'hidden' }}>
             <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Recent Incidents
+                {t('dashboard.recent_incidents')}
               </Typography>
               <MuiButton 
                 component={RouterLink} 
@@ -186,68 +225,74 @@ export default function DashboardPage() {
                 size="small"
                 sx={{ borderRadius: '100px' }}
               >
-                View All
+                {t('common.view_all')}
               </MuiButton>
             </Box>
             
-            {recentIncidents.length === 0 ? (
-              <Box sx={{ py: 8, textAlign: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  {incidentsLoading ? "Loading incidents..." : "No active incidents found."}
-                </Typography>
-              </Box>
-            ) : (
-              <List disablePadding>
-                {recentIncidents.map((incident: any, idx: number) => {
-                  const severity = severityConfig[incident.severity?.toLowerCase()] || { color: "default", label: incident.severity };
-                  return (
-                    <ListItem 
-                      key={incident.id || idx}
-                      divider={idx !== recentIncidents.length - 1}
-                      sx={{ 
-                        px: 3, 
-                        py: 2,
-                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) },
-                        transition: 'background-color 0.2s'
-                      }}
-                      secondaryAction={
-                         <Chip 
-                           label={severity.label} 
-                           color={severity.color} 
-                           size="small" 
-                           variant="outlined"
-                           sx={{ fontWeight: 600, borderRadius: 1.5 }}
-                         />
-                      }
-                    >
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', borderRadius: 'var(--radius-m3-md, 12px)' }}>
-                          <PlaceRoundedIcon fontSize="small" />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText 
-                        primary={
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                            {incident.location}
-                          </Typography>
-                        }
-                        secondary={
-                          <Box component="span" sx={{display: 'flex', gap: 1, alignItems: 'center', mt: 0.5}}>
-                            <Typography component="span" variant="caption" color="text.secondary">
-                              {incident.time || 'Just now'}
-                            </Typography>
-                            <CircleIcon sx={{ fontSize: 4, color: 'text.disabled' }} />
-                            <Typography component="span" variant="caption" color="text.secondary">
-                              {incident.vehicles} Vehicles involved
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                  );
-                })}
-              </List>
-            )}
+            <AnimatePresence mode="wait">
+              {incidentsLoading ? (
+                <motion.div key="loading" variants={fadeIn} initial="initial" animate="animate" exit={{ opacity: 0 }}>
+                  {[0, 1, 2, 3, 4].map((i) => <ListRowSkeleton key={i} index={i} />)}
+                </motion.div>
+              ) : recentIncidents.length === 0 ? (
+                <motion.div key="empty" variants={fadeIn} initial="initial" animate="animate">
+                  <Box sx={{ py: 8, textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">{t('dashboard.no_incidents')}</Typography>
+                  </Box>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="data"
+                  variants={listParent}
+                  initial="initial"
+                  animate="animate"
+                >
+                  <List disablePadding>
+                    {recentIncidents.map((incident: any, idx: number) => {
+                      const severity = severityConfig[incident.severity?.toLowerCase()] || { color: 'default', label: incident.severity };
+                      return (
+                        <motion.div key={incident.id || idx} variants={listChild}>
+                          <ListItem
+                            divider={idx !== recentIncidents.length - 1}
+                            sx={{
+                              px: 3,
+                              py: 2,
+                              transition: 'background-color 0.15s ease',
+                              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.03) },
+                            }}
+                            secondaryAction={
+                              <Chip
+                                label={severity.label}
+                                color={severity.color}
+                                size="small"
+                                variant="outlined"
+                                sx={{ fontWeight: 600, borderRadius: 1.5 }}
+                              />
+                            }
+                          >
+                            <ListItemAvatar>
+                              <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', borderRadius: 'var(--radius-m3-md, 12px)' }}>
+                                <PlaceRoundedIcon fontSize="small" />
+                              </Avatar>
+                            </ListItemAvatar>
+                            <ListItemText
+                              primary={<Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{incident.location}</Typography>}
+                              secondary={
+                                <Box component="span" sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
+                                  <Typography component="span" variant="caption" color="text.secondary">{incident.time || t('dashboard.just_now')}</Typography>
+                                  <CircleIcon sx={{ fontSize: 4, color: 'text.disabled' }} />
+                                  <Typography component="span" variant="caption" color="text.secondary">{incident.vehicles} {t('dashboard.vehicles_involved')}</Typography>
+                                </Box>
+                              }
+                            />
+                          </ListItem>
+                        </motion.div>
+                      );
+                    })}
+                  </List>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Card>
         </Box>
 
@@ -256,33 +301,33 @@ export default function DashboardPage() {
           <Stack spacing={3}>
             {/* Quick Actions */}
             <Card sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Quick Access</Typography>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>{t('dashboard.quick_access')}</Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
                 {[
                   {
-                    label: 'Active Incidents',
-                    sublabel: `${openIncidents} open`,
+                    label: t('dashboard.active_incidents'),
+                    sublabel: `${openIncidents} ${t('dashboard.open_count')}`,
                     to: '/incidents',
                     icon: <WarningRoundedIcon />,
                     color: theme.palette.error.main
                   },
                   {
-                    label: 'Unread Alerts',
-                    sublabel: `${unreadCount} pending`,
+                    label: t('dashboard.unread_alerts'),
+                    sublabel: `${unreadCount} ${t('dashboard.pending_count')}`,
                     to: '/alerts',
                     icon: <NotificationsActiveRoundedIcon />,
                     color: theme.palette.warning.main
                   },
                   {
-                    label: 'Analytics',
-                    sublabel: 'Reports view',
+                    label: t('dashboard.analytics'),
+                    sublabel: t('dashboard.reports_view'),
                     to: '/reports',
                     icon: <InsightsRoundedIcon />,
                     color: theme.palette.info.main
                   },
                   {
-                    label: 'Create Alert',
-                    sublabel: 'Broadcast now',
+                    label: t('dashboard.create_alert'),
+                    sublabel: t('dashboard.broadcast_now'),
                     to: '/alerts',
                     icon: <AddAlertRoundedIcon />,
                     color: theme.palette.success.main
@@ -340,14 +385,14 @@ export default function DashboardPage() {
               <Box sx={{ p: 2, bgcolor: alpha(theme.palette.warning.main, 0.05), borderBottom: `1px solid ${theme.palette.divider}` }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'warning.dark', display: 'flex', alignItems: 'center', gap: 1 }}>
                   <NotificationsActiveRoundedIcon fontSize="small" />
-                  System Alerts
+                  {t('alerts.title')}
                 </Typography>
               </Box>
               
               <List disablePadding>
                 {recentAlerts.length === 0 ? (
                   <Box sx={{ p: 3, textAlign: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">No new alerts.</Typography>
+              <Typography variant="body2" color="text.secondary">{t('dashboard.no_alerts')}</Typography>
                   </Box>
                 ) : (
                   recentAlerts.map((alert: any, idx: number) => (
@@ -360,12 +405,12 @@ export default function DashboardPage() {
                       <ListItemText 
                         primary={
                           <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            {alert.title || "System Notification"}
-                          </Typography>
+                        {(alert as any).direction === 'sent' ? t('alerts.sent_alert') : (alert.title || t('dashboard.system_notification'))}
+                      </Typography>
                         }
                         secondary={
                           <Typography component="span" variant="caption" color="text.secondary">
-                            {alert.time || 'Just now'}
+                            {alert.time || t('dashboard.just_now')}
                           </Typography>
                         }
                       />
@@ -375,7 +420,7 @@ export default function DashboardPage() {
               </List>
               <Box sx={{ p: 1.5, borderTop: `1px solid ${theme.palette.divider}` }}>
                 <MuiButton fullWidth size="small" sx={{ borderRadius: '100px' }}>
-                  View All Alerts
+                  {t('common.view_all')}
                 </MuiButton>
               </Box>
             </Card>

@@ -16,6 +16,7 @@ import { Button } from '@/components/Common'
 import { useCallTimer } from '@/hooks/useCallTimer'
 import type { CallPeer, CallStatus } from '@/types/call'
 import { isUuidLike, shortIdentifier } from '@/utils/callUtils'
+import { useTranslation } from '@/themeMode'
 
 type Props = {
   onAccept: () => void
@@ -36,22 +37,22 @@ type Props = {
 
 const TERMINAL_STATUSES: CallStatus[] = ['ended', 'failed', 'missed']
 
-function formatRole(value?: string | null) {
-  const role = (value || 'Officer').trim()
-  if (!role) return 'Officer'
-  if (/^office?r?$/i.test(role)) return 'Officer'
+function formatRole(value?: string | null, officerLabel = 'Officer') {
+  const role = (value || officerLabel).trim()
+  if (!role) return officerLabel
+  if (/^office?r?$/i.test(role)) return officerLabel
   return role.charAt(0).toUpperCase() + role.slice(1)
 }
 
-function resolvePeerName(peer: CallPeer) {
+function resolvePeerName(peer: CallPeer, officerLabel = 'Officer') {
   if (peer.name && !isUuidLike(peer.name)) return peer.name
   if (peer.officerId && !isUuidLike(peer.officerId)) return peer.officerId
-  if (peer.officerId) return `Officer ${shortIdentifier(peer.officerId)}`
-  return 'Officer'
+  if (peer.officerId) return `${officerLabel} ${shortIdentifier(peer.officerId)}`
+  return officerLabel
 }
 
-function resolvePeerMeta(peer: CallPeer) {
-  const role = formatRole(peer.role)
+function resolvePeerMeta(peer: CallPeer, labels = { officer: 'Officer', idLabel: 'ID' }) {
+  const role = formatRole(peer.role, labels.officer)
   const officerId = peer.officerId || peer.id
   if (!officerId) return role
   if (isUuidLike(officerId)) return `ID ${shortIdentifier(officerId)} · ${role}`
@@ -108,14 +109,15 @@ export default function CallOverlay({
   localVideoRef,
 }: Props) {
   const theme = useTheme()
+  const { t } = useTranslation()
   const call = useAppSelector((state) => state.call.activeCall)
 
   const isIncoming = call?.status === 'ringing'
   const isOutgoing = call?.status === 'outgoing'
   const isActive = call?.status === 'in_call'
   const isVideoCall = call?.callType === 'video'
-  const peerName = call ? resolvePeerName(call.peer) : ''
-  const peerMeta = call ? resolvePeerMeta(call.peer) : ''
+  const peerName = call ? resolvePeerName(call.peer, t('calls.officer')) : ''
+  const peerMeta = call ? resolvePeerMeta(call.peer, { officer: t('calls.officer'), idLabel: t('calls.id_label') }) : ''
   const peerInitial = useMemo(() => getInitial(peerName, 'C'), [peerName])
   const localInitial = useMemo(() => getInitial(localDisplayName, 'U'), [localDisplayName])
   const tone = isIncoming
@@ -145,10 +147,10 @@ export default function CallOverlay({
   )
 
   const title = isIncoming
-    ? 'Incoming call'
+    ? t('calls.incoming_call')
     : isOutgoing
-      ? 'Calling...'
-      : 'Call connected'
+      ? t('calls.calling')
+      : t('calls.call_connected')
 
   useEffect(() => {
     if (!call?.callId) {
@@ -275,7 +277,7 @@ export default function CallOverlay({
               boxShadow: '0 12px 28px rgba(46, 125, 50, 0.22)',
             }}
           >
-            Answer
+            {t('calls.answer')}
           </Button>
           <Button
             size="lg"
@@ -283,7 +285,7 @@ export default function CallOverlay({
             icon={<CallEndRoundedIcon fontSize="small" />}
             onClick={onReject}
           >
-            Reject
+            {t('calls.reject')}
           </Button>
         </>
       )}
@@ -295,7 +297,7 @@ export default function CallOverlay({
           icon={<CallEndRoundedIcon fontSize="small" />}
           onClick={onEnd}
         >
-          Cancel
+          {t('calls.cancel')}
         </Button>
       )}
 
@@ -309,7 +311,7 @@ export default function CallOverlay({
               variant={isCameraEnabled ? 'primary' : 'secondary'}
               disabled={!isConnected || Boolean(connectionError)}
             >
-              {isCameraEnabled ? 'Camera off' : 'Camera on'}
+              {isCameraEnabled ? t('calls.camera_off') : t('calls.camera_on')}
             </Button>
           )}
           <Button
@@ -319,7 +321,7 @@ export default function CallOverlay({
             variant={isMuted ? 'primary' : 'secondary'}
             disabled={!isConnected || Boolean(connectionError)}
           >
-            {isMuted ? 'Unmute' : 'Mute'}
+            {isMuted ? t('calls.unmute') : t('calls.mute')}
           </Button>
           <Button
             size="lg"
@@ -327,7 +329,7 @@ export default function CallOverlay({
             icon={<CallEndRoundedIcon fontSize="small" />}
             onClick={onEnd}
           >
-            End call
+            {t('calls.end_call')}
           </Button>
         </>
       )}
@@ -382,7 +384,7 @@ export default function CallOverlay({
               {peerInitial}
             </Avatar>
             <Typography variant="body2" sx={{ opacity: 0.84 }}>
-              {isConnected ? 'Waiting for video' : 'Connecting...'}
+              {isConnected ? t('calls.waiting_for_video') : t('calls.connecting')}
             </Typography>
           </Stack>
         </Box>
@@ -399,12 +401,12 @@ export default function CallOverlay({
         }}
       >
         <Badge
-          label={isConnected ? (remoteAudioPlaying ? 'Live' : 'Audio') : 'Connecting'}
+          label={isConnected ? (remoteAudioPlaying ? t('calls.live') : t('calls.audio')) : t('calls.connecting')}
           tone={theme.palette.common.white}
           icon={isConnected ? <VolumeUpRoundedIcon /> : <VolumeOffRoundedIcon />}
         />
         <Badge
-          label={isCameraEnabled ? 'Camera on' : 'Camera off'}
+          label={isCameraEnabled ? t('calls.camera_on') : t('calls.camera_off')}
           tone={theme.palette.common.white}
           icon={isCameraEnabled ? <VideocamRoundedIcon /> : <VideocamOffRoundedIcon />}
         />
@@ -554,20 +556,20 @@ export default function CallOverlay({
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
             <Badge
-              label={call.callType === 'video' ? 'Video call' : 'Voice call'}
+              label={call.callType === 'video' ? t('comms.video_call') : t('calls.voice_call')}
               tone={tone}
               icon={call.callType === 'video' ? <VideocamRoundedIcon /> : <PhoneInTalkRoundedIcon />}
             />
             {isActive && (
               <Badge
-                label={isConnected ? (remoteAudioPlaying ? 'Connected' : 'Connecting audio') : 'No connection'}
+                label={isConnected ? (remoteAudioPlaying ? t('calls.connected') : t('calls.connecting_audio')) : t('calls.no_connection')}
                 tone={tone}
                 icon={isConnected ? <VolumeUpRoundedIcon /> : <VolumeOffRoundedIcon />}
               />
             )}
             {isActive && (
               <Badge
-                label={isMuted ? 'Muted' : 'Mic on'}
+                label={isMuted ? t('calls.muted') : t('calls.mic_on')}
                 tone={tone}
                 icon={isMuted ? <MicOffRoundedIcon /> : <MicRoundedIcon />}
               />
@@ -587,7 +589,7 @@ export default function CallOverlay({
                 variant="subtitle2"
                 sx={{ fontWeight: 800, color: theme.palette.error.main, textAlign: 'center' }}
               >
-                Media server unavailable
+                {t('calls.media_server_unavailable')}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
                 {connectionError}
@@ -728,7 +730,7 @@ export default function CallOverlay({
         <Typography
           variant="caption"
           sx={{
-            ml: 0.5,
+            marginInlineStart: 4,
             color: alpha(theme.palette.common.white, 0.9),
             fontWeight: 700,
             letterSpacing: 0.2,
@@ -846,7 +848,7 @@ export default function CallOverlay({
                     {peerInitial}
                   </Avatar>
                   <Typography variant="caption" sx={{ opacity: 0.84 }}>
-                    {isConnected ? 'Waiting video' : 'Connecting'}
+                    {isConnected ? t('calls.waiting_for_video') : t('calls.connecting')}
                   </Typography>
                 </Stack>
               </Box>
@@ -864,12 +866,12 @@ export default function CallOverlay({
               }}
             >
               <Badge
-                label={isConnected ? (remoteAudioPlaying ? 'Live' : 'Audio') : 'Connecting'}
+                label={isConnected ? (remoteAudioPlaying ? t('calls.live') : t('calls.audio')) : t('calls.connecting')}
                 tone={theme.palette.common.white}
                 icon={isConnected ? <VolumeUpRoundedIcon /> : <VolumeOffRoundedIcon />}
               />
               <Badge
-                label={isCameraEnabled ? 'Camera on' : 'Camera off'}
+                label={isCameraEnabled ? t('calls.camera_on') : t('calls.camera_off')}
                 tone={theme.palette.common.white}
                 icon={isCameraEnabled ? <VideocamRoundedIcon /> : <VideocamOffRoundedIcon />}
               />

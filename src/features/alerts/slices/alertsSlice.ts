@@ -8,6 +8,7 @@ export interface Alert {
   description: string
   severity: 'critical' | 'high' | 'medium' | 'low'
   time: string
+  timestamp?: string
   read: boolean
   direction: 'received' | 'sent'
   senderId?: string
@@ -54,6 +55,9 @@ function toUiAlert(raw: any, direction: 'received' | 'sent' = 'received'): Alert
   const formattedTime = typeof timestamp === 'number'
     ? new Date(timestamp).toLocaleString()
     : (timestamp ? new Date(timestamp).toLocaleString() : 'Just now')
+  const rawTimestamp = typeof timestamp === 'number'
+    ? new Date(timestamp).toISOString()
+    : (timestamp ? new Date(timestamp).toISOString() : undefined)
 
   const recipients = Array.isArray(raw?.recipients) ? raw.recipients : []
   const acknowledgedCount = recipients.filter((r: any) => Boolean(r?.acknowledged)).length
@@ -88,6 +92,7 @@ function toUiAlert(raw: any, direction: 'received' | 'sent' = 'received'): Alert
       ? raw.severity
       : inferSeverity(comment || '')) as Alert['severity'],
     time: formattedTime,
+    timestamp: rawTimestamp,
     read,
     direction,
     senderId: senderId || undefined,

@@ -35,6 +35,7 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded'
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded'
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
 import { useIncidentDocuments } from '../hooks/useIncidentDocuments'
+import { useTranslation } from '@/themeMode'
 import type {
   IncidentDocument,
   IncidentDocumentLifecycleStatus,
@@ -43,19 +44,9 @@ import type {
 
 type Props = {
   accidentId?: string | null
+  scopeKey?: string | null
+  enabled?: boolean
 }
-
-const DOCUMENT_TYPE_OPTIONS: { value: IncidentDocumentTypeCode; label: string }[] = [
-  { value: 'PHOTO', label: 'Photo' },
-  { value: 'PDF', label: 'PDF' },
-  { value: 'SCANNED_DOCUMENT', label: 'Scanned document' },
-  { value: 'SKETCH', label: 'Sketch' },
-  { value: 'REPORT', label: 'Report' },
-  { value: 'IDENTITY_DOCUMENT', label: 'Identity document' },
-  { value: 'INSURANCE_DOCUMENT', label: 'Insurance document' },
-  { value: 'VIDEO', label: 'Video' },
-  { value: 'OTHER', label: 'Other' },
-]
 
 const STATUS_COLOR: Record<IncidentDocumentLifecycleStatus, 'default' | 'success' | 'warning' | 'info' | 'error'> = {
   uploaded: 'warning',
@@ -77,11 +68,23 @@ const formatBytes = (bytes: number) => {
   return `${size.toFixed(size >= 10 || index === 0 ? 0 : 1)} ${units[index]}`
 }
 
-const formatDate = (value?: string) => {
-  if (!value) return 'Unknown'
+const formatDate = (value?: string, unknownLabel = 'Unknown') => {
+  if (!value) return unknownLabel
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
 }
+
+const getDocumentTypeOptions = (t: (key: string) => string): { value: IncidentDocumentTypeCode; label: string }[] => [
+  { value: 'PHOTO', label: t('documents.photo') },
+  { value: 'PDF', label: t('documents.pdf') },
+  { value: 'SCANNED_DOCUMENT', label: t('documents.scanned_document') },
+  { value: 'SKETCH', label: t('documents.sketch') },
+  { value: 'REPORT', label: t('documents.report') },
+  { value: 'IDENTITY_DOCUMENT', label: t('documents.identity_document') },
+  { value: 'INSURANCE_DOCUMENT', label: t('documents.insurance_document') },
+  { value: 'VIDEO', label: t('documents.video') },
+  { value: 'OTHER', label: t('documents.other') },
+]
 
 const normalizeTags = (value: string) =>
   value
@@ -91,8 +94,9 @@ const normalizeTags = (value: string) =>
 
 const buildPreviewUrl = (doc: IncidentDocument) => doc.previewUrl || doc.downloadUrl || ''
 
-export default function IncidentDocumentsPanel({ accidentId }: Props) {
+export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled = true }: Props) {
   const theme = useTheme()
+  const { t } = useTranslation()
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const replaceInputRef = useRef<HTMLInputElement | null>(null)
   const [search, setSearch] = useState('')
@@ -104,6 +108,8 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null)
   const [busyActionId, setBusyActionId] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
+  const canInteract = Boolean(enabled && scopeKey)
+  const documentTypeOptions = useMemo(() => getDocumentTypeOptions(t), [t])
 
   const {
     documents,
@@ -117,7 +123,8 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
     removeDocument,
     replaceDocument,
     refresh,
-  } = useIncidentDocuments(accidentId)
+    resolveDownloadUrl,
+  } = useIncidentDocuments(accidentId, scopeKey)
 
   const selectedDocument = useMemo(() => {
     if (!documents.length) return null
@@ -154,17 +161,18 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
   }, [documents, selectedDocumentId])
 
   const handleUploadClick = () => {
-    if (!accidentId) return
+    if (!canInteract) return
     uploadInputRef.current?.click()
   }
 
   const handleReplaceClick = (documentId: string) => {
+    if (!canInteract) return
     setReplaceTargetId(documentId)
     replaceInputRef.current?.click()
   }
 
   const handleFilesUpload = async (files: FileList | File[]) => {
-    if (!accidentId) return
+    if (!canInteract) return
     const list = Array.from(files || [])
     if (!list.length) return
 
@@ -181,7 +189,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
         setSelectedDocumentId(firstCreated.id)
       }
     } catch (err) {
-      setPreviewError((err as any)?.message || 'Unable to upload documents')
+      setPreviewError((err as any)?.message || t('documents.upload_files'))
     } finally {
       setBusyActionId(null)
       if (uploadInputRef.current) uploadInputRef.current.value = ''
@@ -191,7 +199,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
 
   const handleReplaceFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file || !accidentId || !replaceTargetId) return
+    if (!file || !canInteract || !replaceTargetId) return
 
     setBusyActionId(replaceTargetId)
     setPreviewError(null)
@@ -202,7 +210,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
         tags: normalizeTags(tags),
       })
     } catch (err) {
-      setPreviewError((err as any)?.message || 'Unable to replace document')
+      setPreviewError((err as any)?.message || t('documents.replace_file'))
     } finally {
       setBusyActionId(null)
       setReplaceTargetId(null)
@@ -211,24 +219,24 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
   }
 
   const handleArchive = async (doc: IncidentDocument) => {
-    if (!window.confirm(`Archive "${doc.filename}"?`)) return
+    if (!window.confirm(`${t('documents.archive')} "${doc.filename}"?`)) return
     setBusyActionId(doc.id)
     try {
       await archiveDocument(doc.id)
     } catch (err) {
-      setPreviewError((err as any)?.message || 'Unable to archive document')
+      setPreviewError((err as any)?.message || t('documents.archive'))
     } finally {
       setBusyActionId(null)
     }
   }
 
   const handleDelete = async (doc: IncidentDocument) => {
-    if (!window.confirm(`Remove "${doc.filename}" permanently?`)) return
+    if (!window.confirm(`${t('documents.remove')} "${doc.filename}"?`)) return
     setBusyActionId(doc.id)
     try {
       await removeDocument(doc.id)
     } catch (err) {
-      setPreviewError((err as any)?.message || 'Unable to remove document')
+      setPreviewError((err as any)?.message || t('documents.remove'))
     } finally {
       setBusyActionId(null)
     }
@@ -246,7 +254,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
       })
       setEditingDocument(null)
     } catch (err) {
-      setPreviewError((err as any)?.message || 'Unable to save document metadata')
+      setPreviewError((err as any)?.message || t('documents.save_changes'))
     } finally {
       setBusyActionId(null)
     }
@@ -257,10 +265,29 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
   const isPdfPreview =
     Boolean(selectedDocument?.mimeType?.includes('pdf')) || String(selectedDocument?.filename || '').toLowerCase().endsWith('.pdf')
 
+  useEffect(() => {
+    if (!selectedDocument || selectedDocument.downloadUrl || !accidentId) return
+    void resolveDownloadUrl(selectedDocument.id)
+  }, [accidentId, resolveDownloadUrl, selectedDocument])
+
+  const handleDownload = async (doc: IncidentDocument) => {
+    setBusyActionId(doc.id)
+    setPreviewError(null)
+    try {
+      const url = doc.downloadUrl || doc.previewUrl || (accidentId ? await resolveDownloadUrl(doc.id) : null)
+      if (!url) throw new Error(t('documents.download'))
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      setPreviewError((err as any)?.message || t('documents.download'))
+    } finally {
+      setBusyActionId(null)
+    }
+  }
+
   return (
     <Paper
       sx={{
-        p: 2,
+        p: { xs: 1.5, md: 2 },
         borderRadius: 3,
         border: `1px solid ${alpha(theme.palette.divider, 0.72)}`,
         bgcolor: alpha(theme.palette.background.paper, 0.96),
@@ -269,32 +296,40 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
       <Stack spacing={1.5}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-              Incident document management
-            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.25 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                {t('documents.attachments')}
+              </Typography>
+              <Chip
+                size="small"
+                label={canInteract ? t('documents.ready_to_upload') : t('documents.complete_required_fields')}
+                color={canInteract ? 'success' : 'default'}
+                variant={canInteract ? 'filled' : 'outlined'}
+              />
+            </Stack>
             <Typography variant="body2" color="text.secondary">
-              Upload, preview, tag, search, archive, and replace files linked to this accident record.
+              {t('documents.add_photos_or_pdfs')}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Button size="small" onClick={() => void refresh()} startIcon={<RefreshRoundedIcon />} disabled={!accidentId || loading}>
-              Refresh
+            <Button size="small" onClick={() => void refresh()} startIcon={<RefreshRoundedIcon />} disabled={!scopeKey || loading}>
+              {t('common.refresh')}
             </Button>
             <Button
               variant="contained"
               size="small"
               onClick={handleUploadClick}
               startIcon={<UploadFileRoundedIcon />}
-              disabled={!accidentId}
+              disabled={!canInteract}
             >
-              Upload files
+              {t('documents.upload_files')}
             </Button>
           </Stack>
         </Stack>
 
-        {!accidentId && (
-          <Alert severity="info" sx={{ borderRadius: 2 }}>
-            Save the accident record first to enable linked document management.
+        {!canInteract && (
+          <Alert severity="warning" sx={{ borderRadius: 2 }}>
+            {t('documents.fill_required_report_fields')}
           </Alert>
         )}
 
@@ -316,11 +351,11 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                 variant="outlined"
                 onClick={handleUploadClick}
                 onDragOver={(event) => {
-                  if (!accidentId) return
+                  if (!canInteract) return
                   event.preventDefault()
                 }}
                 onDrop={async (event) => {
-                  if (!accidentId) return
+                  if (!canInteract) return
                   event.preventDefault()
                   const dropped = event.dataTransfer.files
                   if (dropped?.length) {
@@ -330,12 +365,12 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                 sx={{
                   p: 2,
                   borderRadius: 3,
-                  cursor: accidentId ? 'pointer' : 'not-allowed',
+                  cursor: canInteract ? 'pointer' : 'not-allowed',
                   borderStyle: 'dashed',
-                  borderColor: accidentId ? alpha(theme.palette.primary.main, 0.4) : alpha(theme.palette.divider, 0.7),
-                  bgcolor: accidentId ? alpha(theme.palette.primary.main, 0.04) : alpha(theme.palette.action.disabledBackground, 0.35),
+                  borderColor: canInteract ? alpha(theme.palette.primary.main, 0.4) : alpha(theme.palette.divider, 0.7),
+                  bgcolor: canInteract ? alpha(theme.palette.primary.main, 0.04) : alpha(theme.palette.action.disabledBackground, 0.35),
                   transition: 'all 0.2s ease',
-                  '&:hover': accidentId
+                  '&:hover': canInteract
                     ? {
                         borderColor: alpha(theme.palette.primary.main, 0.65),
                         bgcolor: alpha(theme.palette.primary.main, 0.06),
@@ -358,13 +393,13 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                     <AttachFileRoundedIcon />
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography sx={{ fontWeight: 700 }}>Drag and drop documents here</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{t('documents.drop_files_here')}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Accepts images and PDF files. The chosen metadata will be attached to each upload.
+                      {t('documents.images_and_pdfs_only')}
                     </Typography>
                   </Box>
-                  <Button size="small" variant="outlined" disabled={!accidentId} startIcon={<UploadFileRoundedIcon />}>
-                    Choose files
+                  <Button size="small" variant="outlined" disabled={!canInteract} startIcon={<UploadFileRoundedIcon />}>
+                    {t('documents.choose_files')}
                   </Button>
                 </Stack>
                 {uploading && (
@@ -388,11 +423,11 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                       select
                       size="small"
                       fullWidth
-                      label="Document type"
+                      label={t('documents.type')}
                       value={documentType}
                       onChange={(e) => setDocumentType(e.target.value as IncidentDocumentTypeCode)}
                     >
-                      {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                      {documentTypeOptions.map((option) => (
                         <MenuItem key={option.value} value={option.value}>
                           {option.label}
                         </MenuItem>
@@ -403,8 +438,8 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                     <TextField
                       size="small"
                       fullWidth
-                      label="Description"
-                      placeholder="Short note about the file"
+                      label={t('documents.note')}
+                      placeholder={t('documents.brief_note')}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                     />
@@ -413,7 +448,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                     <TextField
                       size="small"
                       fullWidth
-                      label="Tags"
+                      label={t('documents.tags')}
                       placeholder="scene, witness, insurance"
                       value={tags}
                       onChange={(e) => setTags(e.target.value)}
@@ -432,20 +467,20 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
               >
                 <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
                   <Box>
-                    <Typography sx={{ fontWeight: 700 }}>Linked files</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{t('documents.linked_files')}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {filteredDocuments.length} document{filteredDocuments.length === 1 ? '' : 's'} in this record
+                      {filteredDocuments.length} {t('incidents.reports_in_view')}
                     </Typography>
                   </Box>
                   <TextField
                     size="small"
-                    placeholder="Search documents"
+                    placeholder={t('documents.search_documents')}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     sx={{ minWidth: { xs: '100%', sm: 260 } }}
                     InputProps={{
                       startAdornment: (
-                        <SearchRoundedIcon fontSize="small" style={{ marginRight: 8, color: theme.palette.text.secondary }} />
+                        <SearchRoundedIcon fontSize="small" style={{ marginInlineEnd: 8, color: theme.palette.text.secondary }} />
                       ),
                     }}
                   />
@@ -454,11 +489,11 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                 <Stack spacing={1}>
                   {loading ? (
                     <Typography variant="body2" color="text.secondary">
-                      Loading incident documents...
+                      {t('documents.loading_incident_documents')}
                     </Typography>
                   ) : filteredDocuments.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
-                      No linked documents yet.
+                      {t('documents.no_files_added_yet')}
                     </Typography>
                   ) : (
                     filteredDocuments.map((doc) => {
@@ -509,10 +544,10 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                                 <Chip size="small" variant="outlined" label={doc.documentType} />
                               </Stack>
                               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
-                                {doc.description || 'No description'} · {formatBytes(doc.size)}
+                                {doc.description || t('documents.no_note')} · {formatBytes(doc.size)}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {formatDate(doc.createdAt)}{doc.createdBy ? ` · ${doc.createdBy}` : ''}
+                                {formatDate(doc.createdAt, t('comms.unknown'))}{doc.createdBy ? ` · ${doc.createdBy}` : ''}
                               </Typography>
                               {doc.tags.length > 0 && (
                                 <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexWrap: 'wrap' }}>
@@ -523,12 +558,12 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                               )}
                             </Box>
                             <Stack direction="row" spacing={0.5} alignItems="center">
-                              <Tooltip title="Preview">
+                              <Tooltip title={t('documents.preview')}>
                                 <IconButton size="small" onClick={(event) => { event.stopPropagation(); setSelectedDocumentId(doc.id) }} disabled={busy}>
                                   <VisibilityRoundedIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Edit metadata">
+                              <Tooltip title={t('documents.edit_metadata')}>
                                 <IconButton
                                   size="small"
                                   onClick={(event) => {
@@ -540,7 +575,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                                   <EditRoundedIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Replace file">
+                              <Tooltip title={t('documents.replace_file')}>
                                 <IconButton
                                   size="small"
                                   onClick={(event) => {
@@ -552,7 +587,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                                   <RefreshRoundedIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Archive">
+                              <Tooltip title={t('documents.archive')}>
                                 <IconButton
                                   size="small"
                                   onClick={(event) => {
@@ -564,7 +599,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                                   <ArchiveRoundedIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Remove">
+                              <Tooltip title={t('documents.remove')}>
                                 <IconButton
                                   size="small"
                                   color="error"
@@ -577,15 +612,14 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                                   <DeleteOutlineRoundedIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Download">
+                              <Tooltip title={t('documents.download')}>
                                 <IconButton
                                   size="small"
-                                  component="a"
-                                  href={buildPreviewUrl(doc) || '#'}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  onClick={(event) => event.stopPropagation()}
-                                  disabled={!buildPreviewUrl(doc)}
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    void handleDownload(doc)
+                                  }}
+                                  disabled={busy}
                                 >
                                   <DownloadRoundedIcon fontSize="small" />
                                 </IconButton>
@@ -625,7 +659,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                     </Box>
                     <Stack direction="row" spacing={1}>
                       <Button size="small" onClick={() => setEditingDocument(selectedDocument)} startIcon={<EditRoundedIcon />}>
-                        Metadata
+                        {t('documents.metadata')}
                       </Button>
                       <Button
                         size="small"
@@ -633,7 +667,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                         startIcon={<RefreshRoundedIcon />}
                         disabled={selectedDocument.status === 'archived'}
                       >
-                        Replace
+                        {t('documents.replace')}
                       </Button>
                     </Stack>
                   </Stack>
@@ -678,10 +712,10 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                     ) : (
                       <Stack sx={{ height: 320 }} alignItems="center" justifyContent="center" spacing={1}>
                         <DescriptionOutlinedIcon sx={{ fontSize: 48, color: theme.palette.text.secondary }} />
-                        <Typography color="text.secondary">Preview unavailable for this file type</Typography>
+                        <Typography color="text.secondary">{t('documents.preview_unavailable_for_this_file_type')}</Typography>
                         {selectedPreviewUrl && (
-                          <Button component="a" href={selectedPreviewUrl} target="_blank" rel="noreferrer" variant="outlined" size="small">
-                            Open file
+                          <Button variant="outlined" size="small" onClick={() => void handleDownload(selectedDocument)}>
+                            {t('documents.open_file')}
                           </Button>
                         )}
                       </Stack>
@@ -692,7 +726,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                     <Grid item xs={12} sm={6}>
                       <Paper variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
                         <Typography variant="caption" color="text.secondary">
-                          Uploaded at
+                          {t('documents.uploaded_at')}
                         </Typography>
                         <Typography sx={{ fontWeight: 700 }}>{formatDate(selectedDocument.createdAt)}</Typography>
                       </Paper>
@@ -700,22 +734,22 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                     <Grid item xs={12} sm={6}>
                       <Paper variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
                         <Typography variant="caption" color="text.secondary">
-                          OCR status
+                          {t('documents.ocr_status')}
                         </Typography>
-                        <Typography sx={{ fontWeight: 700 }}>{selectedDocument.ocrStatus || 'not started'}</Typography>
+                        <Typography sx={{ fontWeight: 700 }}>{selectedDocument.ocrStatus || t('documents.not_started')}</Typography>
                       </Paper>
                     </Grid>
                     <Grid item xs={12}>
                       <Paper variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
                         <Typography variant="caption" color="text.secondary">
-                          Tags
+                          {t('documents.tags')}
                         </Typography>
                         <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.75 }}>
                           {selectedDocument.tags.length ? (
                             selectedDocument.tags.map((tag) => <Chip key={tag} size="small" label={tag} variant="outlined" />)
                           ) : (
                             <Typography variant="body2" color="text.secondary">
-                              No tags
+                              {t('documents.no_tags')}
                             </Typography>
                           )}
                         </Stack>
@@ -725,7 +759,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                       <Grid item xs={12}>
                         <Paper variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
                           <Typography variant="caption" color="text.secondary">
-                            Extracted text
+                            {t('documents.extracted_text')}
                           </Typography>
                           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 0.75 }}>
                             {selectedDocument.extractedText}
@@ -738,9 +772,9 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
               ) : (
                 <Stack sx={{ minHeight: 320 }} alignItems="center" justifyContent="center" spacing={1}>
                   <DescriptionOutlinedIcon sx={{ fontSize: 48, color: theme.palette.text.secondary }} />
-                  <Typography sx={{ fontWeight: 700 }}>No document selected</Typography>
+                  <Typography sx={{ fontWeight: 700 }}>{t('documents.no_file_selected')}</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Pick a file from the list to preview it here.
+                    {t('documents.pick_a_file_from_the_list_to_preview_it_here')}
                   </Typography>
                 </Stack>
               )}
@@ -764,10 +798,10 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
           <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                Edit document metadata
+                {t('documents.edit_document_metadata')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Update the document information shown in this accident record.
+                {t('documents.update')}
               </Typography>
             </Box>
             <IconButton onClick={() => setEditingDocument(null)} size="small">
@@ -781,13 +815,13 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                   select
                   size="small"
                   fullWidth
-                  label="Document type"
+                  label={t('documents.type')}
                   value={editingDocument.documentType}
                   onChange={(event) =>
                     setEditingDocument((prev) => (prev ? { ...prev, documentType: event.target.value } : prev))
                   }
                 >
-                  {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                  {documentTypeOptions.map((option) => (
                     <MenuItem key={option.value} value={option.value}>
                       {option.label}
                     </MenuItem>
@@ -796,7 +830,7 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                 <TextField
                   size="small"
                   fullWidth
-                  label="Description"
+                  label={t('documents.note')}
                   value={editingDocument.description || ''}
                   onChange={(event) =>
                     setEditingDocument((prev) => (prev ? { ...prev, description: event.target.value } : prev))
@@ -807,20 +841,20 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
                 <TextField
                   size="small"
                   fullWidth
-                  label="Tags"
+                  label={t('documents.tags')}
                   value={(editingDocument.tags || []).join(', ')}
                   onChange={(event) =>
                     setEditingDocument((prev) =>
                       prev ? { ...prev, tags: normalizeTags(event.target.value) } : prev
                     )
                   }
-                  helperText="Separate tags with commas"
+                  helperText={t('documents.separate_tags_with_commas')}
                 />
                 <TextField
                   select
                   size="small"
                   fullWidth
-                  label="Status"
+                  label={t('documents.status')}
                   value={editingDocument.status}
                   onChange={(event) =>
                     setEditingDocument((prev) =>
@@ -838,9 +872,9 @@ export default function IncidentDocumentsPanel({ accidentId }: Props) {
             )}
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setEditingDocument(null)}>Cancel</Button>
+            <Button onClick={() => setEditingDocument(null)}>{t('common.cancel')}</Button>
             <Button variant="contained" onClick={() => void handleSaveMetadata()} disabled={!editingDocument}>
-              Save changes
+              {t('documents.save_changes')}
             </Button>
           </DialogActions>
         </Dialog>

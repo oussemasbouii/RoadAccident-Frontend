@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiService } from '@/services/api'
 import type {
+  AttachmentFileTypeCode,
   IncidentDocument,
   IncidentDocumentLifecycleStatus,
   IncidentDocumentTypeCode,
@@ -17,6 +18,8 @@ type UploadDocResult = {
   documents: IncidentDocument[]
 }
 
+const STORAGE_PREFIX = 'roadaccident:incident-documents:'
+
 const unwrapPayload = (payload: any) => payload?.data?.data ?? payload?.data ?? payload ?? {}
 
 const normalizeTags = (tags: unknown): string[] => {
@@ -28,6 +31,12 @@ const normalizeTags = (tags: unknown): string[] => {
       .filter(Boolean)
   }
   return []
+}
+
+const resolveFileType = (file: File): AttachmentFileTypeCode => {
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) return 'PDF'
+  if (file.type.startsWith('image/')) return 'IMAGE'
+  return 'OTHER'
 }
 
 const normalizeDocument = (raw: any, accidentId: string): IncidentDocument => {
@@ -64,7 +73,72 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback
 }
 
-export function useIncidentDocuments(accidentId?: string | null) {
+const getStorageKey = (scopeKey: string) => `${STORAGE_PREFIX}${scopeKey}`
+
+const mergeDocuments = (existing: IncidentDocument[], incoming: IncidentDocument[]) => {
+  const byId = new Map<string, IncidentDocument>()
+  for (const document of existing) byId.set(document.id, document)
+  for (const document of incoming) byId.set(document.id, document)
+  return Array.from(byId.values())
+}
+
+const readStoredDocuments = (scopeKey: string): IncidentDocument[] => {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(getStorageKey(scopeKey))
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((item) => normalizeDocument(item, scopeKey))
+  } catch {
+    return []
+  }
+}
+
+const saveStoredDocuments = (scopeKey: string, documents: IncidentDocument[]) => {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(getStorageKey(scopeKey), JSON.stringify(documents))
+}
+
+const createPreviewUrl = (file: File, downloadUrl?: string) => {
+  if (downloadUrl) return downloadUrl
+  if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    return URL.createObjectURL(file)
+  }
+  return undefined
+}
+
+export const moveStoredDocuments = (sourceKey: string, targetKey: string) => {
+  if (typeof window === 'undefined' || !sourceKey || !targetKey || sourceKey === targetKey) return
+  const source = readStoredDocuments(sourceKey)
+  const target = readStoredDocuments(targetKey)
+  saveStoredDocuments(targetKey, mergeDocuments(target, source))
+  window.localStorage.removeItem(getStorageKey(sourceKey))
+}
+
+const buildLocalDocument = (
+  scopeKey: string,
+  file: File,
+  metadata: IncidentDocumentMetadata,
+  id: string,
+  downloadUrl?: string
+): IncidentDocument => ({
+  id,
+  accidentId: scopeKey,
+  filename: file.name,
+  mimeType: file.type || 'application/octet-stream',
+  size: file.size,
+  documentType: metadata.documentType,
+  description: metadata.description || '',
+  tags: metadata.tags || [],
+  status: 'available',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  downloadUrl,
+  previewUrl: createPreviewUrl(file, downloadUrl),
+})
+
+export function useIncidentDocuments(accidentId?: string | null, storageKey?: string | null) {
   const [documents, setDocuments] = useState<IncidentDocument[]>([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -72,38 +146,98 @@ export function useIncidentDocuments(accidentId?: string | null) {
   const [error, setError] = useState<string | null>(null)
 
   const accidentKey = accidentId ? String(accidentId) : null
+  const scopeKey = storageKey ? String(storageKey) : accidentKey
+
+  const persistDocuments = useCallback(
+    (nextDocuments: IncidentDocument[]) => {
+      setDocuments(nextDocuments)
+      if (scopeKey) {
+        saveStoredDocuments(scopeKey, nextDocuments)
+      }
+    },
+    [scopeKey]
+  )
 
   const refresh = useCallback(async () => {
-    if (!accidentKey) {
+    if (!scopeKey) {
       setDocuments([])
       return []
+    }
+
+    const stored = readStoredDocuments(scopeKey)
+    if (!accidentKey) {
+      setDocuments(stored)
+      return stored
     }
 
     setLoading(true)
     setError(null)
     try {
-      const resp = await apiService.incidentDocuments.list(accidentKey)
-      const data = unwrapPayload(resp.data)
-      const list = Array.isArray(data) ? data : Array.isArray(data?.documents) ? data.documents : Array.isArray(data?.data) ? data.data : []
-      const normalized = list.map((item: any) => normalizeDocument(item, accidentKey))
-      setDocuments(normalized)
-      return normalized
+      const response = await apiService.incidentDocuments.list(accidentKey)
+      const payload = unwrapPayload(response.data)
+      const remote = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
+      const normalizedRemote = remote.map((item: any) => normalizeDocument(item, accidentKey))
+      const merged = mergeDocuments(stored, normalizedRemote)
+      saveStoredDocuments(scopeKey, merged)
+      setDocuments(merged)
+      return merged
     } catch (err) {
+      setDocuments(stored)
       const message = getErrorMessage(err, 'Failed to load incident documents')
       setError(message)
-      return []
+      return stored
     } finally {
       setLoading(false)
     }
-  }, [accidentKey])
+  }, [accidentKey, scopeKey])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
+  const resolveDownloadUrl = useCallback(
+    async (documentId: string) => {
+      const existing = documents.find((document) => document.id === documentId)
+      if (existing?.downloadUrl) return existing.downloadUrl
+
+      try {
+        const response = accidentKey
+          ? await apiService.incidentDocuments.getDownload(accidentKey, documentId)
+          : await apiService.attachments.getDownload(documentId)
+        const data = unwrapPayload(response.data)
+        const downloadUrl = data?.downloadUrl || data?.path
+        if (!downloadUrl) return null
+
+        persistDocuments(
+          documents.map((document) =>
+            document.id === documentId
+              ? {
+                  ...document,
+                  downloadUrl,
+                  previewUrl: document.previewUrl || downloadUrl,
+                  updatedAt: new Date().toISOString(),
+                }
+              : document
+          )
+        )
+
+        return downloadUrl
+      } catch (err) {
+        const message = getErrorMessage(err, 'Failed to resolve download URL')
+        setError(message)
+        return null
+      }
+    },
+    [accidentKey, documents, persistDocuments]
+  )
+
   const requestUpload = useCallback(
     async (file: File, metadata: IncidentDocumentMetadata) => {
-      if (!accidentKey) throw new Error('Incident id is required before uploading documents')
+      if (!scopeKey) throw new Error('A document scope is required before uploading documents')
+
+      if (!accidentKey) {
+        return buildLocalDocument(scopeKey, file, metadata, crypto.randomUUID())
+      }
 
       const requestResp = await apiService.incidentDocuments.requestUpload(accidentKey, {
         filename: file.name,
@@ -111,7 +245,7 @@ export function useIncidentDocuments(accidentId?: string | null) {
         size: file.size,
         documentType: metadata.documentType,
         description: metadata.description,
-        tags: metadata.tags || [],
+        tags: metadata.tags,
       })
 
       const requestData = unwrapPayload(requestResp.data)
@@ -135,30 +269,21 @@ export function useIncidentDocuments(accidentId?: string | null) {
         size: file.size,
         documentType: metadata.documentType,
         description: metadata.description,
-        tags: metadata.tags || [],
+        tags: metadata.tags,
       })
 
       const confirmData = unwrapPayload(confirmResp.data)
-      return normalizeDocument(
-        {
-          ...confirmData,
-          accidentId: accidentKey,
-          filename: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          size: file.size,
-          documentType: metadata.documentType,
-          description: metadata.description,
-          tags: metadata.tags || [],
-        },
-        accidentKey
-      )
+      const documentId = String(confirmData?.id || crypto.randomUUID())
+      const downloadUrl = confirmData?.path || confirmData?.downloadUrl || (await resolveDownloadUrl(documentId)) || undefined
+
+      return buildLocalDocument(scopeKey, file, metadata, documentId, downloadUrl)
     },
-    [accidentKey]
+    [accidentKey, resolveDownloadUrl, scopeKey]
   )
 
   const uploadDocuments = useCallback(
     async (files: File[], metadata: IncidentDocumentMetadata): Promise<UploadDocResult> => {
-      if (!accidentKey) throw new Error('Incident id is required before uploading documents')
+      if (!scopeKey) throw new Error('A document scope is required before uploading documents')
       if (!files.length) return { documents: [] }
 
       setUploading(true)
@@ -166,12 +291,13 @@ export function useIncidentDocuments(accidentId?: string | null) {
       try {
         const created: IncidentDocument[] = []
         for (const file of files) {
-          if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+          if (!file.type.startsWith('image/') && file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
             throw new Error('Only image and PDF documents are supported for incident documents')
           }
           created.push(await requestUpload(file, metadata))
         }
-        await refresh()
+
+        persistDocuments(mergeDocuments(created, documents))
         return { documents: created }
       } catch (err) {
         const message = getErrorMessage(err, 'Failed to upload incident documents')
@@ -181,17 +307,42 @@ export function useIncidentDocuments(accidentId?: string | null) {
         setUploading(false)
       }
     },
-    [accidentKey, requestUpload, refresh]
+    [documents, persistDocuments, requestUpload, scopeKey]
   )
 
   const updateDocument = useCallback(
     async (documentId: string, patch: IncidentDocumentUpdateRequest) => {
-      if (!accidentKey) throw new Error('Incident id is required before updating documents')
+      if (!scopeKey) throw new Error('A document scope is required before updating documents')
       setSavingDocumentId(documentId)
       setError(null)
       try {
-        await apiService.incidentDocuments.update(accidentKey, documentId, patch)
-        await refresh()
+        if (accidentKey) {
+          const response = await apiService.incidentDocuments.update(accidentKey, documentId, patch)
+          const updated = normalizeDocument(
+            unwrapPayload(response.data) || { id: documentId, accidentId: accidentKey, ...patch },
+            accidentKey
+          )
+          persistDocuments(
+            documents.map((document) => (document.id === documentId ? { ...document, ...updated } : document))
+          )
+          return
+        }
+
+        persistDocuments(
+          documents.map((document) =>
+            document.id === documentId
+              ? {
+                  ...document,
+                  documentType: patch.documentType ?? document.documentType,
+                  description: patch.description ?? document.description,
+                  tags: patch.tags ?? document.tags,
+                  status: patch.status ?? document.status,
+                  archivedAt: patch.status === 'archived' ? new Date().toISOString() : document.archivedAt,
+                  updatedAt: new Date().toISOString(),
+                }
+              : document
+          )
+        )
       } catch (err) {
         const message = getErrorMessage(err, 'Failed to update document metadata')
         setError(message)
@@ -200,17 +351,19 @@ export function useIncidentDocuments(accidentId?: string | null) {
         setSavingDocumentId(null)
       }
     },
-    [accidentKey, refresh]
+    [accidentKey, documents, persistDocuments, scopeKey]
   )
 
   const archiveDocument = useCallback(
-    async (documentId: string, reason?: string) => {
-      if (!accidentKey) throw new Error('Incident id is required before archiving documents')
+    async (documentId: string) => {
+      if (!scopeKey) throw new Error('A document scope is required before archiving documents')
       setSavingDocumentId(documentId)
       setError(null)
       try {
-        await apiService.incidentDocuments.archive(accidentKey, documentId, reason ? { reason } : undefined)
-        await refresh()
+        if (accidentKey) {
+          await apiService.incidentDocuments.archive(accidentKey, documentId)
+        }
+        await updateDocument(documentId, { status: 'archived' })
       } catch (err) {
         const message = getErrorMessage(err, 'Failed to archive document')
         setError(message)
@@ -219,17 +372,19 @@ export function useIncidentDocuments(accidentId?: string | null) {
         setSavingDocumentId(null)
       }
     },
-    [accidentKey, refresh]
+    [accidentKey, scopeKey, updateDocument]
   )
 
   const removeDocument = useCallback(
-    async (documentId: string, reason?: string) => {
-      if (!accidentKey) throw new Error('Incident id is required before removing documents')
+    async (documentId: string) => {
+      if (!scopeKey) throw new Error('A document scope is required before removing documents')
       setSavingDocumentId(documentId)
       setError(null)
       try {
-        await apiService.incidentDocuments.remove(accidentKey, documentId, reason ? { reason } : undefined)
-        await refresh()
+        if (accidentKey) {
+          await apiService.incidentDocuments.remove(accidentKey, documentId)
+        }
+        persistDocuments(documents.filter((document) => document.id !== documentId))
       } catch (err) {
         const message = getErrorMessage(err, 'Failed to remove document')
         setError(message)
@@ -238,17 +393,38 @@ export function useIncidentDocuments(accidentId?: string | null) {
         setSavingDocumentId(null)
       }
     },
-    [accidentKey, refresh]
+    [accidentKey, documents, persistDocuments, scopeKey]
   )
 
   const replaceDocument = useCallback(
     async (documentId: string, file: File, metadata: IncidentDocumentMetadata) => {
-      if (!accidentKey) throw new Error('Incident id is required before replacing documents')
+      if (!scopeKey) throw new Error('A document scope is required before replacing documents')
       setSavingDocumentId(documentId)
       setError(null)
       try {
-        if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+        if (!file.type.startsWith('image/') && file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
           throw new Error('Only image and PDF documents are supported for incident documents')
+        }
+
+        if (!accidentKey) {
+          const next = documents.map((document) =>
+            document.id === documentId
+              ? {
+                  ...document,
+                  filename: file.name,
+                  mimeType: file.type || 'application/octet-stream',
+                  size: file.size,
+                  documentType: metadata.documentType,
+                  description: metadata.description || '',
+                  tags: metadata.tags || [],
+                  downloadUrl: undefined,
+                  previewUrl: createPreviewUrl(file),
+                  updatedAt: new Date().toISOString(),
+                }
+              : document
+          )
+          persistDocuments(next)
+          return
         }
 
         const requestResp = await apiService.incidentDocuments.requestUpload(accidentKey, {
@@ -257,7 +433,7 @@ export function useIncidentDocuments(accidentId?: string | null) {
           size: file.size,
           documentType: metadata.documentType,
           description: metadata.description,
-          tags: metadata.tags || [],
+          tags: metadata.tags,
         })
 
         const requestData = unwrapPayload(requestResp.data)
@@ -273,7 +449,7 @@ export function useIncidentDocuments(accidentId?: string | null) {
           },
         })
 
-        await apiService.incidentDocuments.replace(accidentKey, documentId, {
+        const confirmResp = await apiService.incidentDocuments.confirmUpload(accidentKey, {
           clientId: crypto.randomUUID(),
           key,
           filename: file.name,
@@ -281,11 +457,32 @@ export function useIncidentDocuments(accidentId?: string | null) {
           size: file.size,
           documentType: metadata.documentType,
           description: metadata.description,
-          tags: metadata.tags || [],
-          replacedByDocumentId: documentId,
+          tags: metadata.tags,
         })
 
-        await refresh()
+        const confirmData = unwrapPayload(confirmResp.data)
+        const newAttachmentId = String(confirmData?.id || crypto.randomUUID())
+        const downloadUrl = confirmData?.path || confirmData?.downloadUrl || (await resolveDownloadUrl(newAttachmentId)) || undefined
+
+        persistDocuments(
+          documents.map((document) =>
+            document.id === documentId
+              ? {
+                  ...document,
+                  id: newAttachmentId,
+                  filename: file.name,
+                  mimeType: file.type || 'application/octet-stream',
+                  size: file.size,
+                  documentType: metadata.documentType,
+                  description: metadata.description || '',
+                  tags: metadata.tags || [],
+                  downloadUrl,
+                  previewUrl: downloadUrl,
+                  updatedAt: new Date().toISOString(),
+                }
+              : document
+          )
+        )
       } catch (err) {
         const message = getErrorMessage(err, 'Failed to replace document')
         setError(message)
@@ -294,13 +491,10 @@ export function useIncidentDocuments(accidentId?: string | null) {
         setSavingDocumentId(null)
       }
     },
-    [accidentKey, refresh]
+    [accidentKey, documents, persistDocuments, resolveDownloadUrl, scopeKey]
   )
 
-  const selectedDocument = useMemo(
-    () => documents[0] || null,
-    [documents]
-  )
+  const selectedDocument = useMemo(() => documents[0] || null, [documents])
 
   return {
     documents,
@@ -314,7 +508,8 @@ export function useIncidentDocuments(accidentId?: string | null) {
     archiveDocument,
     removeDocument,
     replaceDocument,
+    resolveDownloadUrl,
     selectedDocument,
-    setDocuments,
+    setDocuments: persistDocuments,
   }
 }
