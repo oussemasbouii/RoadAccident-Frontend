@@ -13,6 +13,7 @@ export interface Incident {
   vehicles: number
   injuries: number
   description?: string
+  cause?: string
 }
 
 interface IncidentStats {
@@ -115,6 +116,7 @@ function toUiIncident(raw: any): Incident {
     vehicles: Number(raw?.vehicles ?? raw?.vehicleCount ?? raw?.participants?.length ?? 0),
     injuries: Number(raw?.injuries ?? raw?.injuryCount ?? totalInjuries),
     description: raw?.description || raw?.comment || raw?.damagesReport?.damageDescription,
+    cause: raw?.damagesReport?.accidentCauseId ?? undefined,
   }
 }
 
