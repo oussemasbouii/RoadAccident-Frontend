@@ -185,6 +185,46 @@ export type TranslationMessages = {
     priority_cases: string
     injuries_per_incident: string
     percent_resolved: string
+    filter_period: string
+    filter_custom: string
+    filter_from: string
+    filter_to: string
+    filter_apply: string
+    filter_severity: string
+    filter_status: string
+    export_png: string
+    period_comparison_vs: string
+    time_of_day_grid: string
+    time_of_day_subtitle: string
+    no_time_data: string
+    cause_ranking: string
+    cause_ranking_subtitle: string
+    no_cause_data: string
+    heatmap_title: string
+    heatmap_low: string
+    heatmap_high: string
+    no_location_data: string
+  }
+  accident: {
+    cause: {
+      INATTENTION: string
+      INAPPROPRIATE_SPEED: string
+      INFRACTION: string
+      INEXPERIENCE: string
+      FATIGUE: string
+      ALCOHOL_DRUGS: string
+      ILLNESS: string
+      ROAD_CONDITION: string
+      SIGNAGE_CONDITION: string
+      VEHICLE_CONDITION: string
+      BREAKDOWN: string
+      OVERLOAD: string
+      ADVERSE_WEATHER: string
+      GLARE: string
+      ANIMAL: string
+      OTHER: string
+      NO_OPINION: string
+    }
   }
   incidents: {
     title: string
