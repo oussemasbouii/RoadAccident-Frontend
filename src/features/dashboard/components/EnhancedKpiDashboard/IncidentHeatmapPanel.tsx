@@ -2,71 +2,137 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import {
-  Avatar, Box, Chip, List, ListItem, ListItemAvatar, ListItemText,
+  Avatar, Box, Chip, CircularProgress, List, ListItem, ListItemAvatar, ListItemText,
   Paper, Stack, Typography, alpha, useTheme,
 } from '@mui/material'
 import type { Incident } from '../../../incidents/slices/incidentsSlice'
-import { getMapboxToken } from '@/utils/mapboxToken'
+import { getMapboxToken, getMapboxTokenError } from '@/utils/mapboxToken'
 import { useTranslation } from '../../../../themeMode'
+
+type Coords = { lat: number; lng: number }
 
 interface HotspotRow {
   location: string
   count: number
-  avgLat: number | null
-  avgLng: number | null
+  coords: Coords | null
 }
 
-function buildHotspots(incidents: Incident[]): HotspotRow[] {
-  const acc: Record<string, { location: string; count: number; lats: number[]; lngs: number[] }> = {}
+function parseCoords(location: string): Coords | null {
+  const match = location.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/)
+  if (!match) return null
+  const lat = Number(match[1])
+  const lng = Number(match[2])
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+  return { lat, lng }
+}
+
+function buildHotspots(incidents: Incident[], resolved: Record<string, Coords>): HotspotRow[] {
+  const acc: Record<string, { location: string; count: number; coords: Coords | null }> = {}
   for (const inc of incidents) {
     const key = inc.location.trim().toLowerCase()
-    if (!acc[key]) acc[key] = { location: inc.location.trim(), count: 0, lats: [], lngs: [] }
+    if (!acc[key]) {
+      const direct = (inc.latitude != null && inc.longitude != null)
+        ? { lat: inc.latitude, lng: inc.longitude }
+        : null
+      acc[key] = { location: inc.location.trim(), count: 0, coords: direct ?? parseCoords(inc.location) ?? resolved[key] ?? null }
+    }
     acc[key].count += 1
-    if (inc.latitude != null && inc.longitude != null) {
-      acc[key].lats.push(inc.latitude)
-      acc[key].lngs.push(inc.longitude)
+    if (!acc[key].coords) {
+      const direct = (inc.latitude != null && inc.longitude != null)
+        ? { lat: inc.latitude, lng: inc.longitude }
+        : null
+      acc[key].coords = direct ?? parseCoords(inc.location) ?? resolved[key] ?? null
     }
   }
   return Object.values(acc)
-    .map((v) => ({
-      location: v.location,
-      count: v.count,
-      avgLat: v.lats.length ? v.lats.reduce((a, b) => a + b, 0) / v.lats.length : null,
-      avgLng: v.lngs.length ? v.lngs.reduce((a, b) => a + b, 0) / v.lngs.length : null,
-    }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10)
 }
 
-function buildGeoJson(incidents: Incident[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
-  return {
-    type: 'FeatureCollection',
-    features: incidents
-      .filter((i) => i.latitude != null && i.longitude != null)
-      .map((i) => ({
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [i.longitude!, i.latitude!] },
-        properties: { id: i.id },
-      })),
+function buildGeoJson(incidents: Incident[], resolved: Record<string, Coords>): GeoJSON.FeatureCollection<GeoJSON.Point> {
+  const features: GeoJSON.Feature<GeoJSON.Point>[] = []
+  for (const inc of incidents) {
+    let coords: Coords | null = null
+    if (inc.latitude != null && inc.longitude != null) {
+      coords = { lat: inc.latitude, lng: inc.longitude }
+    } else {
+      const key = inc.location?.trim().toLowerCase() ?? ''
+      coords = resolved[key] ?? parseCoords(inc.location ?? '') ?? null
+    }
+    if (coords) {
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+        properties: { id: inc.id },
+      })
+    }
   }
+  return { type: 'FeatureCollection', features }
 }
 
 export default function IncidentHeatmapPanel({ incidents }: { incidents: Incident[] }) {
   const theme = useTheme()
   const { t } = useTranslation()
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef       = useRef<mapboxgl.Map | null>(null)
-  const sourceLoaded = useRef(false)
-  const [mapError, setMapError] = useState<string | null>(null)
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const mapRef        = useRef<mapboxgl.Map | null>(null)
+  const sourceLoaded  = useRef(false)
+  const [mapError, setMapError]       = useState<string | null>(null)
+  const [resolvedCoords, setResolvedCoords] = useState<Record<string, Coords>>({})
+  const [geocoding, setGeocoding]     = useState(false)
 
-  const hotspots  = useMemo(() => buildHotspots(incidents), [incidents])
-  const hasCoords = useMemo(() => incidents.some((i) => i.latitude != null && i.longitude != null), [incidents])
+  const token      = getMapboxToken()
+  const tokenError = getMapboxTokenError(token)
 
+  // Geocode location names that lack direct coordinates
   useEffect(() => {
-    const token = getMapboxToken()
-    if (!token || !containerRef.current || mapRef.current) return
-    mapboxgl.accessToken = token
+    if (!token || tokenError) return
 
+    const locationsToGeocode = [
+      ...new Set(
+        incidents
+          .filter((i) => i.latitude == null && i.longitude == null)
+          .map((i) => i.location?.trim())
+          .filter((loc): loc is string => !!loc && !parseCoords(loc))
+      ),
+    ].slice(0, 25)
+
+    if (locationsToGeocode.length === 0) return
+
+    let cancelled = false
+    setGeocoding(true)
+
+    Promise.all(
+      locationsToGeocode.map(async (loc) => {
+        try {
+          const res  = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(loc)}.json?access_token=${token}&country=tn&limit=1`
+          )
+          const data = await res.json()
+          const center = data?.features?.[0]?.center
+          if (!Array.isArray(center) || center.length < 2) return null
+          return { key: loc.toLowerCase(), lng: Number(center[0]), lat: Number(center[1]) }
+        } catch {
+          return null
+        }
+      })
+    ).then((results) => {
+      if (cancelled) return
+      const next: Record<string, Coords> = {}
+      results.forEach((r) => { if (r) next[r.key] = { lat: r.lat, lng: r.lng } })
+      setResolvedCoords((prev) => ({ ...prev, ...next }))
+      setGeocoding(false)
+    })
+
+    return () => { cancelled = true }
+  }, [incidents, token, tokenError])
+
+  // Initialise map once
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current || tokenError) return
+    if (!token) { setMapError('Missing Mapbox token'); return }
+
+    mapboxgl.accessToken = token
     try {
       const map = new mapboxgl.Map({
         container: containerRef.current,
@@ -76,7 +142,10 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
       })
       map.addControl(new mapboxgl.NavigationControl(), 'top-right')
       map.on('load', () => {
-        map.addSource('incidents-heat', { type: 'geojson', data: buildGeoJson(incidents) })
+        map.addSource('incidents-heat', {
+          type: 'geojson',
+          data: buildGeoJson(incidents, resolvedCoords),
+        })
         map.addLayer({
           id: 'incidents-heat-layer',
           type: 'heatmap',
@@ -92,7 +161,7 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
               0.8, 'rgba(239,68,68,0.9)',
               1,   'rgb(185,28,28)',
             ] as any,
-            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 5, 18, 10, 35] as any,
+            'heatmap-radius':  ['interpolate', ['linear'], ['zoom'], 5, 18, 10, 35] as any,
             'heatmap-opacity': 0.85,
           },
         })
@@ -103,22 +172,29 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
     } catch {
       setMapError('Map initialization failed')
     }
+
     return () => {
       mapRef.current?.remove()
       mapRef.current = null
       sourceLoaded.current = false
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, tokenError]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Update heatmap data when incidents or resolved coords change
   useEffect(() => {
     if (!mapRef.current || !sourceLoaded.current) return
     ;(mapRef.current.getSource('incidents-heat') as mapboxgl.GeoJSONSource | undefined)
-      ?.setData(buildGeoJson(incidents))
-  }, [incidents])
+      ?.setData(buildGeoJson(incidents, resolvedCoords))
+  }, [incidents, resolvedCoords])
+
+  const hotspots = useMemo(
+    () => buildHotspots(incidents, resolvedCoords),
+    [incidents, resolvedCoords]
+  )
 
   const handleHotspotClick = (row: HotspotRow) => {
-    if (!mapRef.current || row.avgLat == null || row.avgLng == null) return
-    mapRef.current.flyTo({ center: [row.avgLng, row.avgLat], zoom: 10 })
+    if (!mapRef.current || !row.coords) return
+    mapRef.current.flyTo({ center: [row.coords.lng, row.coords.lat], zoom: 10 })
   }
 
   return (
@@ -133,44 +209,24 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
         flexDirection: 'column',
       }}
     >
-      <Box sx={{ px: 2.25, pt: 2.25, pb: 1 }}>
-        <Typography sx={{ fontWeight: 800 }}>{t('dashboard.heatmap_title')}</Typography>
+      <Box sx={{ px: 2.25, pt: 2.25, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography sx={{ fontWeight: 800, flex: 1 }}>{t('dashboard.heatmap_title')}</Typography>
+        {geocoding && <CircularProgress size={14} />}
       </Box>
 
-      <Box sx={{ position: 'relative', height: 320, flexShrink: 0 }}>
+      <Box sx={{ position: 'relative', height: 380, flexShrink: 0 }}>
         <Box ref={containerRef} sx={{ width: '100%', height: '100%' }} />
-        {mapError && (
-          <Box
-            sx={{
-              position: 'absolute', inset: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              bgcolor: alpha(theme.palette.background.paper, 0.9),
-            }}
-          >
-            <Typography variant="body2" color="text.secondary">{mapError}</Typography>
-          </Box>
-        )}
-        {!hasCoords && !mapError && (
-          <Box
-            sx={{
-              position: 'absolute', inset: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              bgcolor: alpha(theme.palette.background.paper, 0.85),
-            }}
-          >
-            <Typography variant="body2" color="text.secondary">{t('dashboard.no_location_data')}</Typography>
+
+        {(mapError || tokenError) && (
+          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(theme.palette.background.paper, 0.9) }}>
+            <Typography variant="body2" color="text.secondary">{mapError ?? tokenError}</Typography>
           </Box>
         )}
       </Box>
 
       <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 0.75 }}>
         <Typography variant="caption" color="text.secondary">{t('dashboard.heatmap_low')}</Typography>
-        <Box
-          sx={{
-            flex: 1, height: 5, borderRadius: 1,
-            background: 'linear-gradient(to right, rgba(29,78,216,0.6), rgba(251,146,60,0.8), rgb(185,28,28))',
-          }}
-        />
+        <Box sx={{ flex: 1, height: 5, borderRadius: 1, background: 'linear-gradient(to right, rgba(29,78,216,0.6), rgba(251,146,60,0.8), rgb(185,28,28))' }} />
         <Typography variant="caption" color="text.secondary">{t('dashboard.heatmap_high')}</Typography>
       </Stack>
 
@@ -181,9 +237,7 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
         <List disablePadding dense sx={{ maxHeight: 220, overflow: 'auto', mt: 0.5 }}>
           {hotspots.length === 0 ? (
             <Box sx={{ py: 2, textAlign: 'center' }}>
-              <Typography variant="caption" color="text.secondary">
-                {t('dashboard.no_hotspot_data_yet')}
-              </Typography>
+              <Typography variant="caption" color="text.secondary">{t('dashboard.no_hotspot_data_yet')}</Typography>
             </Box>
           ) : (
             hotspots.map((row, idx) => (
@@ -191,18 +245,12 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
                 key={`${row.location}-${idx}`}
                 onClick={() => handleHotspotClick(row)}
                 sx={{
-                  px: 1, py: 0.5, borderRadius: 2, cursor: 'pointer', mb: 0.25,
-                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                  px: 1, py: 0.5, borderRadius: 2, cursor: row.coords ? 'pointer' : 'default', mb: 0.25,
+                  '&:hover': row.coords ? { bgcolor: alpha(theme.palette.primary.main, 0.06) } : {},
                 }}
               >
                 <ListItemAvatar sx={{ minWidth: 32 }}>
-                  <Avatar
-                    sx={{
-                      width: 24, height: 24, fontSize: 10, fontWeight: 800,
-                      bgcolor: alpha(theme.palette.primary.main, 0.12),
-                      color: 'primary.main',
-                    }}
-                  >
+                  <Avatar sx={{ width: 24, height: 24, fontSize: 10, fontWeight: 800, bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main' }}>
                     {idx + 1}
                   </Avatar>
                 </ListItemAvatar>

@@ -39,7 +39,6 @@ import { fetchAlerts } from "../../alerts/slices/alertsSlice";
 import type { Alert } from "../../alerts/slices/alertsSlice";
 import StatCard from "../../../components/Common/StatCard";
 import Card from "../../../components/Common/Card";
-import EnhancedKpiDashboard from "../components/EnhancedKpiDashboard";
 import { useTranslation } from "../../../themeMode";
 
 const MotionBox = motion(Box)
@@ -201,10 +200,6 @@ export default function DashboardPage() {
           <StatCard key={idx} {...stat} />
         ))}
       </MotionBox>
-
-      <Box sx={{ mb: 3.5 }}>
-        <EnhancedKpiDashboard incidents={incidents as Incident[]} alerts={alerts as Alert[]} />
-      </Box>
 
       <Box sx={{ 
         display: 'grid', 

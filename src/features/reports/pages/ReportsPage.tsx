@@ -28,11 +28,14 @@ import QueryStatsRoundedIcon from '@mui/icons-material/QueryStatsRounded'
 
 import { useAppDispatch, useAppSelector } from '../../../store/store'
 import { fetchIncidents } from '../../incidents/slices/incidentsSlice'
+import type { Incident } from '../../incidents/slices/incidentsSlice'
 import { fetchAlerts } from '../../alerts/slices/alertsSlice'
 import Card from '../../../components/Common/Card'
 import StatCard from '../../../components/Common/StatCard'
 import { ExportButton } from '../../../components/Common'
 import { useTranslation, useThemeMode } from '../../../themeMode'
+import IncidentHeatmapPanel from '../../dashboard/components/EnhancedKpiDashboard/IncidentHeatmapPanel'
+import CauseRanking from '../../dashboard/components/EnhancedKpiDashboard/CauseRanking'
 
 const severityRank: Record<string, number> = {
   critical: 4,
@@ -607,6 +610,12 @@ export default function ReportsPage() {
           )}
         </Stack>
       </Card>
+
+      {/* Geospatial heatmap + cause ranking */}
+      <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', xl: '1fr 380px' }, alignItems: 'start' }}>
+        <IncidentHeatmapPanel incidents={filteredIncidents as Incident[]} />
+        <CauseRanking incidents={filteredIncidents as Incident[]} />
+      </Box>
     </Stack>
   )
 }
