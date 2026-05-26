@@ -39,7 +39,7 @@ import { fetchAlerts } from "../../alerts/slices/alertsSlice";
 import type { Alert } from "../../alerts/slices/alertsSlice";
 import StatCard from "../../../components/Common/StatCard";
 import Card from "../../../components/Common/Card";
-import NationalKpiDashboard from "../components/NationalKpiDashboard";
+import EnhancedKpiDashboard from "../components/EnhancedKpiDashboard";
 import { useTranslation } from "../../../themeMode";
 
 const MotionBox = motion(Box)
@@ -203,7 +203,7 @@ export default function DashboardPage() {
       </MotionBox>
 
       <Box sx={{ mb: 3.5 }}>
-        <NationalKpiDashboard incidents={incidents as Incident[]} alerts={alerts as Alert[]} />
+        <EnhancedKpiDashboard incidents={incidents as Incident[]} alerts={alerts as Alert[]} />
       </Box>
 
       <Box sx={{ 
