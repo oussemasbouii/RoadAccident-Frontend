@@ -50,10 +50,10 @@ function parseDate(input: string | undefined): Date | null {
 }
 
 function SectionHeader({
-  icon, title, subtitle, accent,
-}: { icon: React.ReactNode; title: string; subtitle?: string; accent: string }) {
+  icon, title, subtitle, accent, mb = 2.25,
+}: { icon: React.ReactNode; title: string; subtitle?: string; accent: string; mb?: number }) {
   return (
-    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2.25 }}>
+    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb }}>
       <Box sx={{ p: 0.875, borderRadius: 2, bgcolor: alpha(accent, 0.12), color: accent, display: 'flex' }}>
         {icon}
       </Box>
@@ -96,11 +96,11 @@ export default function ReportsPage() {
   }, [timeRange])
 
   const filteredIncidents = useMemo(
-    () => incidents.filter((i: any) => { const d = parseDate(i.time); return d ? d >= cutoffDate : true }),
+    () => incidents.filter((i: any) => { const d = parseDate(i.timestamp || i.time); return d ? d >= cutoffDate : true }),
     [incidents, cutoffDate]
   )
   const filteredAlerts = useMemo(
-    () => alerts.filter((a: any) => { const d = parseDate(a.time); return d ? d >= cutoffDate : true }),
+    () => alerts.filter((a: any) => { const d = parseDate((a as any).timestamp || a.time); return d ? d >= cutoffDate : true }),
     [alerts, cutoffDate]
   )
 
@@ -406,7 +406,7 @@ export default function ReportsPage() {
         {/* Priority Incidents */}
         <Paper variant="outlined" sx={{ borderRadius: 3, borderColor: alpha(theme.palette.divider, 0.65), overflow: 'hidden' }}>
           <Box sx={{ px: 2.5, py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`, background: `linear-gradient(135deg, ${alpha(theme.palette.error.main, 0.06)} 0%, transparent 50%)` }}>
-            <SectionHeader icon={<ReportProblemRoundedIcon fontSize="small" />} title={t('reports.operational_priorities')} accent={theme.palette.error.main} />
+            <SectionHeader icon={<ReportProblemRoundedIcon fontSize="small" />} title={t('reports.operational_priorities')} accent={theme.palette.error.main} mb={0} />
           </Box>
           {priorityIncidents.length === 0 ? (
             <Box sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
@@ -497,7 +497,7 @@ export default function ReportsPage() {
       {/* ── Hotspot Table ─────────────────────────────────────── */}
       <Paper variant="outlined" sx={{ borderRadius: 3, borderColor: alpha(theme.palette.divider, 0.65), overflow: 'hidden' }}>
         <Box sx={{ px: 2.5, py: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`, background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, transparent 50%)` }}>
-          <SectionHeader icon={<TrendingUpRoundedIcon fontSize="small" />} title={t('reports.hotspot_and_alert_correlation')} accent={theme.palette.primary.main} />
+          <SectionHeader icon={<TrendingUpRoundedIcon fontSize="small" />} title={t('reports.hotspot_and_alert_correlation')} accent={theme.palette.primary.main} mb={0} />
         </Box>
         {hotspotRows.length === 0 ? (
           <Box sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
