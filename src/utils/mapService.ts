@@ -92,9 +92,11 @@ export class MapService {
 export const mapService = new MapService()
 
 export const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
-  const base = import.meta.env.VITE_PHOTON_BASE_URL
+  const base = import.meta.env.VITE_PHOTON_BASE_URL as string | undefined
+  if (!base) return null
   try {
     const res = await fetch(`${base}/api?q=${encodeURIComponent(address)}&limit=1`)
+    if (!res.ok) throw new Error(`Photon geocode failed: ${res.status}`)
     const data = await res.json()
     if (!data.features?.length) return null
     const [lng, lat] = data.features[0].geometry.coordinates
@@ -105,9 +107,11 @@ export const geocodeAddress = async (address: string): Promise<{ lat: number; ln
 }
 
 export const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
-  const base = import.meta.env.VITE_PHOTON_BASE_URL
+  const base = import.meta.env.VITE_PHOTON_BASE_URL as string | undefined
+  if (!base) return null
   try {
     const res = await fetch(`${base}/reverse?lat=${lat}&lon=${lng}&limit=1`)
+    if (!res.ok) throw new Error(`Photon reverse geocode failed: ${res.status}`)
     const data = await res.json()
     if (!data.features?.length) return null
     const p = data.features[0].properties as Record<string, string | undefined>

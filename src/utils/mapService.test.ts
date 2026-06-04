@@ -50,6 +50,17 @@ describe('geocodeAddress', () => {
     const result = await geocodeAddress('Tunis')
     expect(result).toBeNull()
   })
+
+  it('returns null when Photon returns a non-2xx status', async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+    } as Response)
+
+    const result = await geocodeAddress('Tunis')
+    expect(result).toBeNull()
+  })
 })
 
 describe('reverseGeocode', () => {
