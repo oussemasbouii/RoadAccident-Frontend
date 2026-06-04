@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import mapboxgl from 'mapbox-gl'
+import maplibregl from 'maplibre-gl'
 import {
   Box,
   Chip,
@@ -71,7 +71,7 @@ export default function OfficerTrackingPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'live' | 'stale'>('all')
   const [sortMode, setSortMode] = useState<'recent' | 'name'>('recent')
   const [lastInitCount, setLastInitCount] = useState<number | null>(null)
-  const mapRef = useRef<mapboxgl.Map | null>(null)
+  const mapRef = useRef<maplibregl.Map | null>(null)
   const tsMapRef = useRef<Map<string, number>>(new Map())
   const subscribeAckTimerRef = useRef<number | null>(null)
 
@@ -228,7 +228,7 @@ export default function OfficerTrackingPage() {
 
   const handleFitBounds = () => {
     if (!mapRef.current || orderedOfficers.length === 0) return
-    const bounds = new mapboxgl.LngLatBounds()
+    const bounds = new maplibregl.LngLatBounds()
     orderedOfficers.forEach((officer) => {
       bounds.extend([officer.longitude, officer.latitude])
     })
@@ -244,7 +244,7 @@ export default function OfficerTrackingPage() {
     })
   }
 
-  const handleMapReady = useCallback((map: mapboxgl.Map) => {
+  const handleMapReady = useCallback((map: maplibregl.Map) => {
     mapRef.current = map
   }, [])
 
