@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { alpha, Box, TextField, Typography, Paper, IconButton, CircularProgress, useTheme } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
+import CloseIcon from '@mui/icons-material/Close'
 import { useTranslation } from '@/themeMode'
 import { getMapStyle } from '@/utils/mapStyle'
 import { reverseGeocode, geocodeAddress } from '@/utils/mapService'
@@ -44,6 +45,7 @@ export default function AccidentLocationMap({
   const map = useRef<maplibregl.Map | null>(null)
   const marker = useRef<maplibregl.Marker | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isSearching, setIsSearching] = useState(false)
   const [address, setAddress] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -143,12 +145,13 @@ export default function AccidentLocationMap({
   }
 
   const handleSearch = async () => {
-    if (!address.trim()) return
-    setLoading(true)
+    if (!address.trim() || isSearching) return
+    setError(null)
+    setIsSearching(true)
     const result = await geocodeAddress(address.trim())
-    setLoading(false)
+    setIsSearching(false)
     if (!result) {
-      setError('Location not found')
+      setError(t('maps.location_not_found'))
       return
     }
     updateLocation(result.lat, result.lng)
@@ -204,8 +207,11 @@ export default function AccidentLocationMap({
       )}
 
       {error && (
-        <Paper sx={{ position: 'absolute', bottom: 16, left: 16, right: 16, p: 1.2, bgcolor: alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.86 : 0.92), color: theme.palette.error.contrastText, borderRadius: 2, zIndex: 5 }}>
-          <Typography variant="caption">{error}</Typography>
+        <Paper sx={{ position: 'absolute', bottom: 16, left: 16, right: 16, p: 1.2, pl: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, bgcolor: alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.86 : 0.92), color: theme.palette.error.contrastText, borderRadius: 2, zIndex: 5 }}>
+          <Typography variant="caption" sx={{ flex: 1 }}>{error}</Typography>
+          <IconButton size="small" onClick={() => setError(null)} sx={{ color: 'inherit', p: 0.25, opacity: 0.8, '&:hover': { opacity: 1 } }}>
+            <CloseIcon sx={{ fontSize: 16 }} />
+          </IconButton>
         </Paper>
       )}
 
@@ -215,10 +221,11 @@ export default function AccidentLocationMap({
             fullWidth size="small" placeholder="Search address..."
             value={address} onChange={(e) => setAddress(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            disabled={isSearching}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5, bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.default, 0.72) : alpha(theme.palette.common.white, 0.98) } }}
           />
-          <IconButton onClick={handleSearch} sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', borderRadius: 1.5, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.18) } }}>
-            <SearchIcon />
+          <IconButton onClick={handleSearch} disabled={isSearching} sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', borderRadius: 1.5, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.18) } }}>
+            {isSearching ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
           </IconButton>
         </Box>
       )}

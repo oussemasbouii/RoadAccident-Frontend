@@ -149,6 +149,12 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
     }
   }, [alertsWithCoords])
 
+  const isDark = theme.palette.mode === 'dark'
+  const popupBg = isDark ? '#1e293b' : '#ffffff'
+  const textMain = isDark ? '#f1f5f9' : '#0f172a'
+  const textSub  = isDark ? '#94a3b8' : '#475569'
+  const divider  = isDark ? '#334155' : '#e2e8f0'
+
   return (
     <Box
       sx={{
@@ -157,12 +163,25 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
         borderRadius: 2.5,
         overflow: 'hidden',
         border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+        '& .maplibregl-ctrl-group': {
+          border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+          borderRadius: '10px',
+          overflow: 'hidden',
+          boxShadow: `0 6px 16px ${alpha(theme.palette.common.black, isDark ? 0.34 : 0.12)}`,
+        },
+        '& .maplibregl-ctrl-group button': {
+          width: 34, height: 34,
+          backgroundColor: isDark ? '#1f2937' : '#ffffff',
+          transition: 'background-color 120ms ease',
+          '&:hover': { backgroundColor: isDark ? '#374151' : '#f8fafc' },
+        },
+        '& .maplibregl-ctrl-group button + button': { borderTop: `1px solid ${alpha(theme.palette.divider, 0.7)}` },
         '& .maplibregl-popup.alerts-map-popup .maplibregl-popup-content': {
           borderRadius: '14px',
           border: `1px solid ${alpha(theme.palette.divider, 0.95)}`,
-          boxShadow: '0 16px 34px rgba(2,6,23,0.24)',
-          backgroundColor: '#ffffff',
-          color: '#0f172a',
+          boxShadow: `0 16px 34px ${alpha(theme.palette.common.black, isDark ? 0.4 : 0.18)}`,
+          backgroundColor: popupBg,
+          color: textMain,
           padding: 0,
           minWidth: 260,
           maxWidth: 320,
@@ -175,8 +194,8 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
           top: 6,
           right: 6,
           borderRadius: '999px',
-          color: '#475569',
-          backgroundColor: alpha('#f1f5f9', 0.95),
+          color: textSub,
+          backgroundColor: isDark ? alpha('#334155', 0.95) : alpha('#f1f5f9', 0.95),
         },
         '& .maplibregl-popup.alerts-map-popup .alerts-popup-card': {
           fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
@@ -193,7 +212,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
         '& .maplibregl-popup.alerts-map-popup .alerts-popup-title': {
           fontSize: '13px',
           fontWeight: 800,
-          color: '#0f172a',
+          color: textMain,
           letterSpacing: '0.1px',
           lineHeight: 1.35,
         },
@@ -207,7 +226,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
           fontWeight: 700,
           borderRadius: '999px',
           border: '1px solid var(--chip-color)',
-          backgroundColor: '#f8fafc',
+          backgroundColor: isDark ? alpha(divider, 0.5) : '#f8fafc',
           color: 'var(--chip-color)',
           padding: '2px 8px',
           textTransform: 'uppercase',
@@ -215,21 +234,21 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
         },
         '& .maplibregl-popup.alerts-map-popup .alerts-popup-message': {
           fontSize: '12px',
-          color: '#334155',
+          color: textSub,
           lineHeight: 1.4,
         },
         '& .maplibregl-popup.alerts-map-popup .alerts-popup-meta': {
           fontSize: '11px',
-          color: '#475569',
+          color: textSub,
           display: 'flex',
           flexDirection: 'column',
           gap: '2px',
           paddingTop: '6px',
-          borderTop: `1px dashed ${alpha('#94a3b8', 0.45)}`,
+          borderTop: `1px dashed ${alpha(divider, 0.6)}`,
         },
         '& .maplibregl-popup.alerts-map-popup .maplibregl-popup-tip': {
-          borderTopColor: '#ffffff !important',
-          borderBottomColor: '#ffffff !important',
+          borderTopColor: `${popupBg} !important`,
+          borderBottomColor: `${popupBg} !important`,
         },
       }}
     >

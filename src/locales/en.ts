@@ -519,6 +519,7 @@ const en: TranslationMessages = {
     failed_to_load_map: 'Failed to load map',
     resolving_locations: 'Resolving locations...',
     select_location: 'Click on the map to select accident location',
+    location_not_found: 'Location not found. Try a more specific address.',
   },
   comms: {
     title: 'Communications',
@@ -579,6 +580,9 @@ const en: TranslationMessages = {
   add_incident: {
     title_new: 'New Accident Report',
     title_update: 'Update Accident Report',
+    title_review: 'Review Incident',
+    close: 'Close',
+    day_type_label: 'Day type',
     step_of: 'Step {n} of {total}',
     step_n: 'Step {n}',
     back: 'Back',
@@ -662,6 +666,20 @@ const en: TranslationMessages = {
     discard_body: 'All unsaved data will be lost.',
     discard_cancel: 'Keep editing',
     discard_confirm: 'Discard',
+  },
+  approval: {
+    pending: 'Pending Review',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    supervisor_review: 'Supervisor Review',
+    audit_trail: 'Audit Trail',
+    no_audit_entries: 'No audit entries',
+    review_button: 'Review',
+    confirm_approval: 'Confirm approval?',
+    confirm_rejection: 'Confirm rejection?',
+    comment_placeholder: 'Add a comment (optional)',
+    approve_action: 'Approve',
+    reject_action: 'Reject',
   },
 }
 

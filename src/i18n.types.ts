@@ -484,6 +484,7 @@ export type TranslationMessages = {
     failed_to_load_map: string
     resolving_locations: string
     select_location: string
+    location_not_found: string
   }
   comms: {
     title: string
@@ -580,6 +581,9 @@ export type TranslationMessages = {
   add_incident: {
     title_new: string
     title_update: string
+    title_review: string
+    close: string
+    day_type_label: string
     step_of: string
     step_n: string
     back: string
@@ -663,5 +667,19 @@ export type TranslationMessages = {
     discard_body: string
     discard_cancel: string
     discard_confirm: string
+  }
+  approval: {
+    pending: string
+    approved: string
+    rejected: string
+    supervisor_review: string
+    audit_trail: string
+    no_audit_entries: string
+    review_button: string
+    confirm_approval: string
+    confirm_rejection: string
+    comment_placeholder: string
+    approve_action: string
+    reject_action: string
   }
 }

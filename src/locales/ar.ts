@@ -519,6 +519,7 @@ const ar: TranslationMessages = {
     failed_to_load_map: 'فشل تحميل الخريطة',
     resolving_locations: 'جارٍ تحديد المواقع...',
     select_location: 'انقر على الخريطة لاختيار موقع الحادث',
+    location_not_found: 'الموقع غير موجود. حاول استخدام عنوان أكثر تحديدًا.',
   },
   comms: {
     title: 'الاتصالات',
@@ -579,6 +580,9 @@ const ar: TranslationMessages = {
   add_incident: {
     title_new: 'تقرير حادثة جديد',
     title_update: 'تحديث تقرير الحادثة',
+    title_review: 'مراجعة الحادثة',
+    close: 'إغلاق',
+    day_type_label: 'نوع اليوم',
     step_of: 'الخطوة {n} من {total}',
     step_n: 'الخطوة {n}',
     back: 'رجوع',
@@ -662,6 +666,20 @@ const ar: TranslationMessages = {
     discard_body: 'ستُفقد جميع البيانات غير المحفوظة.',
     discard_cancel: 'تابع التعديل',
     discard_confirm: 'تجاهل',
+  },
+  approval: {
+    pending: 'قيد المراجعة',
+    approved: 'موافق عليه',
+    rejected: 'مرفوض',
+    supervisor_review: 'مراجعة المشرف',
+    audit_trail: 'سجل التدقيق',
+    no_audit_entries: 'لا توجد إدخالات تدقيق',
+    review_button: 'مراجعة',
+    confirm_approval: 'تأكيد الموافقة؟',
+    confirm_rejection: 'تأكيد الرفض؟',
+    comment_placeholder: 'أضف تعليقاً (اختياري)',
+    approve_action: 'موافقة',
+    reject_action: 'رفض',
   },
 }
 

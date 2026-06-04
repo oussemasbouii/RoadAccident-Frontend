@@ -519,6 +519,7 @@ const fr: TranslationMessages = {
     failed_to_load_map: 'Échec du chargement de la carte',
     resolving_locations: 'Résolution des emplacements...',
     select_location: "Cliquez sur la carte pour sélectionner l'emplacement de l'accident",
+    location_not_found: 'Emplacement introuvable. Essayez une adresse plus précise.',
   },
   comms: {
     title: 'Communications',
@@ -579,6 +580,9 @@ const fr: TranslationMessages = {
   add_incident: {
     title_new: "Nouveau rapport d'accident",
     title_update: "Mettre à jour le rapport d'accident",
+    title_review: 'Révision du signalement',
+    close: 'Fermer',
+    day_type_label: 'Type de jour',
     step_of: 'Étape {n} sur {total}',
     step_n: 'Étape {n}',
     back: 'Retour',
@@ -662,6 +666,20 @@ const fr: TranslationMessages = {
     discard_body: 'Toutes les données non sauvegardées seront perdues.',
     discard_cancel: 'Continuer à modifier',
     discard_confirm: 'Abandonner',
+  },
+  approval: {
+    pending: 'En attente de révision',
+    approved: 'Approuvé',
+    rejected: 'Rejeté',
+    supervisor_review: 'Révision du superviseur',
+    audit_trail: "Piste d'audit",
+    no_audit_entries: "Aucune entrée d'audit",
+    review_button: 'Réviser',
+    confirm_approval: 'Confirmer l\'approbation ?',
+    confirm_rejection: 'Confirmer le rejet ?',
+    comment_placeholder: 'Ajouter un commentaire (optionnel)',
+    approve_action: 'Approuver',
+    reject_action: 'Rejeter',
   },
 }
 

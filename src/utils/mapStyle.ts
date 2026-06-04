@@ -1,5 +1,13 @@
+import maplibregl from 'maplibre-gl'
 import type { StyleSpecification } from 'maplibre-gl'
 import styleTemplateRaw from '../assets/map/neutrino/style.json?raw'
+
+// Enable Arabic/Hebrew/RTL label rendering — loaded lazily only when RTL text is encountered
+maplibregl.setRTLTextPlugin(
+  'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
+  null,
+  true,
+)
 
 let cachedStyle: StyleSpecification | null = null
 

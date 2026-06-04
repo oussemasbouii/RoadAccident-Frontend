@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { alpha, Box, CircularProgress, Paper, Typography } from '@mui/material'
+import { alpha, Box, CircularProgress, Paper, Typography, useTheme } from '@mui/material'
 import { getMapStyle } from '@/utils/mapStyle'
 import { geocodeAddress } from '@/utils/mapService'
 import { useTranslation } from '@/themeMode'
+
+const SEVERITY_LEGEND = [
+  { key: 'critical', label: 'Critical', color: '#B91C1C' },
+  { key: 'high',     label: 'High',     color: '#EA580C' },
+  { key: 'medium',   label: 'Medium',   color: '#0284C7' },
+  { key: 'low',      label: 'Low',      color: '#16A34A' },
+] as const
 
 interface IncidentMapItem {
   id: string
@@ -68,7 +75,9 @@ const createIncidentMarkerElement = (severity: IncidentMapItem['severity']): HTM
 }
 
 export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapProps) {
+  const theme = useTheme()
   const { t } = useTranslation()
+  const isDark = theme.palette.mode === 'dark'
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
@@ -200,16 +209,31 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
     incidentsWithCoordinates.forEach(({ incident, coords }) => {
       if (!coords) return
 
-      const safeLocation = String(incident.location || t('reports.no_location_data')).replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      const safeSeverity = String(incident.severity || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      const safeStatus = String(incident.status || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      const safeTime = String(incident.time || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      const popup = new maplibregl.Popup({ offset: 20 }).setHTML(
-        `<div style="padding:8px 10px; color:#0f172a; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height:1.35;">
-          <div style="font-weight:700; margin-bottom:4px;">${safeLocation}</div>
-          <div style="font-size:12px; color:#334155; margin-bottom:4px;">${t('incidents.severity')}: ${safeSeverity.toUpperCase()} | ${t('incidents.status')}: ${safeStatus}</div>
-          <div style="font-size:11px; color:#475569; margin-bottom:3px;">${t('incidents.vehicles')}: ${incident.vehicles} | ${t('incidents.injuries')}: ${incident.injuries}</div>
-          <div style="font-size:11px; color:#475569;">${safeTime}</div>
+      const escape = (v: string) => v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      const safeLocation = escape(String(incident.location || t('reports.no_location_data')))
+      const safeSeverity = escape(String(incident.severity || ''))
+      const safeStatus   = escape(String(incident.status || ''))
+      const safeTime     = escape(String(incident.time || ''))
+      const pinColor = markerPaletteBySeverity[incident.severity]?.pin ?? '#64748b'
+      const bgColor  = isDark ? '#1e293b' : '#ffffff'
+      const textMain = isDark ? '#f1f5f9' : '#0f172a'
+      const textSub  = isDark ? '#94a3b8' : '#475569'
+      const border   = isDark ? '#334155' : '#e2e8f0'
+      const popup = new maplibregl.Popup({ offset: 22, maxWidth: '280px' }).setHTML(
+        `<div style="padding:10px 12px;font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.4;background:${bgColor};border-radius:12px">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${pinColor};flex-shrink:0"></span>
+            <span style="font-weight:700;font-size:13px;color:${textMain}">${safeLocation}</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">
+            <span style="font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:${pinColor}22;color:${pinColor};border:1px solid ${pinColor}44">${safeSeverity.toUpperCase()}</span>
+            <span style="font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:${bgColor};color:${textSub};border:1px solid ${border}">${safeStatus}</span>
+          </div>
+          <div style="font-size:11px;color:${textSub};display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid ${border};padding-top:6px">
+            <span>${t('incidents.vehicles')}: <strong>${incident.vehicles}</strong></span>
+            <span>${t('incidents.injuries')}: <strong style="color:${incident.injuries > 0 ? '#ef4444' : textSub}">${incident.injuries}</strong></span>
+          </div>
+          ${safeTime ? `<div style="font-size:10px;color:${textSub};margin-top:4px">${safeTime}</div>` : ''}
         </div>`
       )
 
@@ -229,6 +253,8 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
     }
   }, [incidentsWithCoordinates])
 
+  const popupBg = isDark ? '#1e293b' : '#ffffff'
+
   return (
     <Box
       sx={{
@@ -236,20 +262,51 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
         height,
         borderRadius: 2,
         overflow: 'hidden',
+        '& .maplibregl-ctrl-group': {
+          border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+          borderRadius: '10px',
+          overflow: 'hidden',
+          boxShadow: `0 6px 16px ${alpha(theme.palette.common.black, isDark ? 0.34 : 0.12)}`,
+        },
+        '& .maplibregl-ctrl-group button': {
+          width: 34, height: 34,
+          backgroundColor: isDark ? '#1f2937' : '#ffffff',
+          transition: 'background-color 120ms ease',
+          '&:hover': { backgroundColor: isDark ? '#374151' : '#f8fafc' },
+        },
+        '& .maplibregl-ctrl-group button + button': { borderTop: `1px solid ${alpha(theme.palette.divider, 0.7)}` },
         '& .maplibregl-popup-content': {
           borderRadius: '12px',
-          border: `1px solid ${alpha('#64748b', 0.25)}`,
-          boxShadow: '0 14px 28px rgba(0,0,0,0.22)',
-          backgroundColor: '#ffffff',
-          color: '#0f172a',
+          border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+          boxShadow: `0 14px 28px ${alpha(theme.palette.common.black, isDark ? 0.4 : 0.18)}`,
+          backgroundColor: popupBg,
+          padding: 0,
         },
         '& .maplibregl-popup-tip': {
-          borderTopColor: '#ffffff !important',
-          borderBottomColor: '#ffffff !important',
+          borderTopColor: `${popupBg} !important`,
+          borderBottomColor: `${popupBg} !important`,
         },
       }}
     >
       <Box ref={mapContainer} sx={{ width: '100%', height: '100%' }} />
+
+      {/* Severity legend */}
+      <Box sx={{
+        position: 'absolute', bottom: 16, left: 12, zIndex: 4,
+        bgcolor: isDark ? alpha(theme.palette.background.paper, 0.9) : alpha('#ffffff', 0.92),
+        border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+        backdropFilter: 'blur(8px)',
+        borderRadius: 2, p: 1.1,
+        boxShadow: `0 4px 10px ${alpha(theme.palette.common.black, 0.1)}`,
+        display: 'flex', flexDirection: 'column', gap: 0.5,
+      }}>
+        {SEVERITY_LEGEND.map(({ label, color }) => (
+          <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
+            <Typography sx={{ fontSize: 10, color: theme.palette.text.secondary, lineHeight: 1 }}>{label}</Typography>
+          </Box>
+        ))}
+      </Box>
 
       {isResolving && (
         <Box
@@ -260,15 +317,17 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
             display: 'flex',
             alignItems: 'center',
             gap: 1,
-            bgcolor: 'rgba(255,255,255,0.9)',
+            bgcolor: isDark ? alpha(theme.palette.background.paper, 0.9) : 'rgba(255,255,255,0.92)',
+            border: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
+            backdropFilter: 'blur(6px)',
             px: 1.25,
             py: 0.75,
-            borderRadius: 1,
+            borderRadius: 1.5,
             zIndex: 10,
           }}
         >
-          <CircularProgress size={16} />
-          <Typography variant="caption">{t('maps.resolving_locations')}</Typography>
+          <CircularProgress size={14} />
+          <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>{t('maps.resolving_locations')}</Typography>
         </Box>
       )}
 

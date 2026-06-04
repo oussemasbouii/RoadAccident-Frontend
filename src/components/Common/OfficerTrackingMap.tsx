@@ -5,6 +5,13 @@ import { Box, Typography, alpha, useTheme } from '@mui/material'
 import { getMapStyle } from '@/utils/mapStyle'
 import type { OfficerLocation } from '@/types/officerTracking'
 
+const STATUS_LEGEND = [
+  { label: 'Active', color: '#22c55e' },
+  { label: 'Busy', color: '#f59e0b' },
+  { label: 'Offline', color: '#94a3b8' },
+  { label: 'Other', color: '#3b82f6' },
+]
+
 interface OfficerTrackingMapProps {
   officers: OfficerLocation[]
   selectedId?: string | null
@@ -36,14 +43,39 @@ function escapeHtml(value: unknown) {
     .replace(/>/g, '&gt;')
 }
 
+function statusBadge(status: string) {
+  const s = status.toLowerCase()
+  if (s.includes('active') || s.includes('online')) return { bg: '#dcfce7', fg: '#15803d' }
+  if (s.includes('busy') || s.includes('respond')) return { bg: '#fef3c7', fg: '#92400e' }
+  if (s.includes('offline') || s.includes('idle')) return { bg: '#f1f5f9', fg: '#475569' }
+  return { bg: '#dbeafe', fg: '#1d4ed8' }
+}
+
 function popupFromProps(properties: Record<string, unknown>) {
   const title = escapeHtml(properties.name || properties.officerId || properties.id || 'Officer')
-  const updated = properties.updatedAt ? new Date(String(properties.updatedAt)).toLocaleString() : 'Unknown'
+  const color = statusColor(String(properties.status || ''))
+  const status = properties.status ? escapeHtml(String(properties.status)) : null
+  const role   = properties.role  ? escapeHtml(String(properties.role))   : null
+  const phone  = properties.phoneNumber ? escapeHtml(String(properties.phoneNumber)) : null
+  const updatedAt = properties.updatedAt
+    ? new Date(String(properties.updatedAt)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null
+
+  const badge = status ? statusBadge(status) : null
+  const rows = [
+    role  ? `<div style="display:flex;gap:6px"><span style="color:#94a3b8;font-size:11px;min-width:40px">Role</span><span>${role}</span></div>` : '',
+    phone ? `<div style="display:flex;gap:6px"><span style="color:#94a3b8;font-size:11px;min-width:40px">Phone</span><a href="tel:${phone}" style="color:#2563eb;text-decoration:none">${phone}</a></div>` : '',
+    updatedAt ? `<div style="display:flex;gap:6px;margin-top:4px"><span style="color:#94a3b8;font-size:11px;min-width:40px">Last</span><span style="color:#94a3b8;font-size:11px">${escapeHtml(updatedAt)}</span></div>` : '',
+  ].filter(Boolean).join('')
 
   return `
-    <div style="min-width:180px;font-family:Inter,system-ui,sans-serif;color:#000000">
-      <div style="font-weight:700;margin-bottom:6px">${title}</div>
-      <div style="font-size:12px"><strong>Updated:</strong> ${escapeHtml(updated)}</div>
+    <div style="min-width:200px;font-family:Inter,system-ui,sans-serif;padding:2px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,0.9)"></div>
+        <div style="font-weight:700;font-size:14px;color:#0f172a;line-height:1.2">${title}</div>
+      </div>
+      ${badge && status ? `<div style="display:inline-block;margin-bottom:8px;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:${badge.bg};color:${badge.fg}">${status}</div>` : ''}
+      <div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:#334155">${rows}</div>
     </div>
   `
 }
@@ -158,11 +190,11 @@ export default function OfficerTrackingMap({
         type: 'circle',
         source: SOURCE_ID,
         paint: {
-          'circle-radius': 6,
+          'circle-radius': 9,
           'circle-color': ['coalesce', ['get', 'color'], '#3b82f6'],
           'circle-stroke-color': theme.palette.common.white,
-          'circle-stroke-width': 2,
-          'circle-opacity': 0.95,
+          'circle-stroke-width': 2.5,
+          'circle-opacity': 1,
         },
       })
 
@@ -171,9 +203,12 @@ export default function OfficerTrackingMap({
         type: 'circle',
         source: SOURCE_ID,
         paint: {
-          'circle-radius': 12,
+          'circle-radius': 18,
           'circle-color': ['coalesce', ['get', 'color'], '#3b82f6'],
-          'circle-opacity': 0.2,
+          'circle-opacity': 0.22,
+          'circle-stroke-color': ['coalesce', ['get', 'color'], '#3b82f6'],
+          'circle-stroke-width': 1.5,
+          'circle-stroke-opacity': 0.5,
         },
         filter: ['==', ['get', 'id'], '__none__'],
       })
@@ -316,23 +351,77 @@ export default function OfficerTrackingMap({
         width: '100%',
         height: '100%',
         '& .maplibregl-ctrl-attrib a[href*="mapbox.com/feedback"]': { display: 'none' },
+        '& .maplibregl-ctrl-group': {
+          border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+          borderRadius: '10px',
+          overflow: 'hidden',
+          boxShadow: `0 8px 20px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.36 : 0.14)}`,
+        },
+        '& .maplibregl-ctrl-group button': {
+          width: 36, height: 36,
+          backgroundColor: theme.palette.mode === 'dark' ? '#1f2937' : '#ffffff',
+          transition: 'background-color 120ms ease',
+          '&:hover': { backgroundColor: theme.palette.mode === 'dark' ? '#374151' : '#f8fafc' },
+        },
+        '& .maplibregl-ctrl-group button + button': { borderTop: `1px solid ${alpha(theme.palette.divider, 0.7)}` },
+        '& .maplibregl-popup-content': {
+          borderRadius: '14px',
+          border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+          boxShadow: `0 16px 32px ${alpha(theme.palette.common.black, 0.2)}`,
+          padding: '12px 14px',
+        },
+        '& .maplibregl-popup-tip': {
+          borderTopColor: `${theme.palette.background.paper} !important`,
+          borderBottomColor: `${theme.palette.background.paper} !important`,
+        },
       }}
     >
       <Box ref={mapContainer} sx={{ width: '100%', height: '100%' }} />
+
+      {/* Officer count badge */}
+      {officers.length > 0 && (
+        <Box sx={{
+          position: 'absolute', top: 12, left: 12, zIndex: 2,
+          display: 'flex', alignItems: 'center', gap: 1,
+          bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.9) : alpha('#ffffff', 0.92),
+          border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+          backdropFilter: 'blur(8px)',
+          borderRadius: 2, px: 1.5, py: 0.7,
+          boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.12)}`,
+        }}>
+          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#22c55e', flexShrink: 0,
+            boxShadow: '0 0 0 2px rgba(34,197,94,0.25)' }} />
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: theme.palette.text.primary, lineHeight: 1 }}>
+            {officers.length} officer{officers.length !== 1 ? 's' : ''} live
+          </Typography>
+        </Box>
+      )}
+
+      {/* Status legend */}
+      <Box sx={{
+        position: 'absolute', bottom: 24, left: 12, zIndex: 2,
+        bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.9) : alpha('#ffffff', 0.92),
+        border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+        backdropFilter: 'blur(8px)',
+        borderRadius: 2, p: 1.25,
+        boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.1)}`,
+        display: 'flex', flexDirection: 'column', gap: 0.6,
+      }}>
+        {STATUS_LEGEND.map(({ label, color }) => (
+          <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
+            <Typography sx={{ fontSize: 11, color: theme.palette.text.secondary, lineHeight: 1 }}>{label}</Typography>
+          </Box>
+        ))}
+      </Box>
+
       {error && (
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            bgcolor: alpha(theme.palette.background.paper, 0.92),
-            zIndex: 2,
-            p: 2,
-            textAlign: 'center',
-          }}
-        >
+        <Box sx={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          bgcolor: alpha(theme.palette.background.paper, 0.92),
+          zIndex: 4, p: 2, textAlign: 'center',
+        }}>
           <Typography color="error.main">{error}</Typography>
         </Box>
       )}
