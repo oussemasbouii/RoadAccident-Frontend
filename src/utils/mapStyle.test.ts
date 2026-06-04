@@ -14,6 +14,7 @@ vi.mock('../assets/map/neutrino/style.json?raw', () => ({
 
 describe('getMapStyle', () => {
   beforeEach(() => {
+    vi.resetModules()
     vi.stubEnv('VITE_MARTIN_BASE_URL', 'https://martin.example.com')
     vi.stubEnv('VITE_MARTIN_TILESET_ID', 'basemap')
     vi.stubEnv('VITE_MAP_GLYPHS_URL', 'https://glyphs.example.com/{fontstack}/{range}.pbf')
@@ -46,5 +47,15 @@ describe('getMapStyle', () => {
     expect(raw).not.toContain('__MARTIN_SOURCE_URL__')
     expect(raw).not.toContain('__GLYPHS_URL__')
     expect(raw).not.toContain('__SPRITE_BASICS_URL__')
+  })
+
+  it('throws when VITE_MARTIN_BASE_URL is not set', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_MARTIN_BASE_URL', '')
+    vi.stubEnv('VITE_MARTIN_TILESET_ID', 'basemap')
+    vi.stubEnv('VITE_MAP_GLYPHS_URL', 'https://g.example.com/{fontstack}/{range}.pbf')
+    vi.stubEnv('VITE_MAP_SPRITE_BASICS_URL', 'https://s.example.com/basics')
+    const { getMapStyle } = await import('./mapStyle')
+    expect(() => getMapStyle()).toThrow('VITE_MARTIN_BASE_URL and VITE_MARTIN_TILESET_ID must be set')
   })
 })
