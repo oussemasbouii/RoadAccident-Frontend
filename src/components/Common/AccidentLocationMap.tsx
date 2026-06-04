@@ -99,6 +99,8 @@ export default function AccidentLocationMap({
     })
 
     return () => {
+      marker.current?.remove()
+      marker.current = null
       map.current?.remove()
       map.current = null
     }
