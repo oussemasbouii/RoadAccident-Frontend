@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import mapboxgl from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { Box, Typography, alpha, useTheme } from '@mui/material'
-import { getMapboxToken, getMapboxTokenError } from '@/utils/mapboxToken'
+import { getMapStyle } from '@/utils/mapStyle'
 import type { OfficerLocation } from '@/types/officerTracking'
 
 interface OfficerTrackingMapProps {
   officers: OfficerLocation[]
   selectedId?: string | null
   onSelect?: (id: string) => void
-  onReady?: (map: mapboxgl.Map) => void
+  onReady?: (map: maplibregl.Map) => void
 }
 
 const DEFAULT_CENTER: [number, number] = [10.1815, 36.8065]
@@ -49,7 +49,7 @@ function popupFromProps(properties: Record<string, unknown>) {
 }
 
 type PointState = { lng: number; lat: number }
-type GeoJSONSourceLike = mapboxgl.GeoJSONSource & { setData: (data: GeoJSON.FeatureCollection) => void }
+type GeoJSONSourceLike = maplibregl.GeoJSONSource & { setData: (data: GeoJSON.FeatureCollection) => void }
 
 export default function OfficerTrackingMap({
   officers,
@@ -59,8 +59,8 @@ export default function OfficerTrackingMap({
 }: OfficerTrackingMapProps) {
   const theme = useTheme()
   const mapContainer = useRef<HTMLDivElement | null>(null)
-  const mapRef = useRef<mapboxgl.Map | null>(null)
-  const popupRef = useRef<mapboxgl.Popup | null>(null)
+  const mapRef = useRef<maplibregl.Map | null>(null)
+  const popupRef = useRef<maplibregl.Popup | null>(null)
   const onReadyRef = useRef(onReady)
   const onSelectRef = useRef(onSelect)
   const metaByIdRef = useRef<Map<string, OfficerLocation>>(new Map())
@@ -129,23 +129,16 @@ export default function OfficerTrackingMap({
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
-    const token = getMapboxToken()
-    const tokenError = getMapboxTokenError(token)
-    if (tokenError) {
-      setError(tokenError)
-      return
-    }
 
-    mapboxgl.accessToken = token
-    mapRef.current = new mapboxgl.Map({
+    mapRef.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: getMapStyle(),
       center: DEFAULT_CENTER,
       zoom: DEFAULT_ZOOM,
       attributionControl: false,
     })
-    mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
-    mapRef.current.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right')
+    mapRef.current.addControl(new maplibregl.NavigationControl(), 'top-right')
+    mapRef.current.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
     mapRef.current.on('error', () => setError('Failed to load map tiles.'))
     mapRef.current.on('load', () => {
       const map = mapRef.current
@@ -217,7 +210,7 @@ export default function OfficerTrackingMap({
 
         onSelectRef.current?.(id)
         popupRef.current?.remove()
-        popupRef.current = new mapboxgl.Popup({ offset: 16 })
+        popupRef.current = new maplibregl.Popup({ offset: 16 })
           .setLngLat((feature?.geometry as GeoJSON.Point).coordinates as [number, number])
           .setHTML(popupFromProps(props))
           .addTo(map)
@@ -300,7 +293,7 @@ export default function OfficerTrackingMap({
     const meta = metaByIdRef.current.get(selectedId)
     if (!coords || !meta) return
     popupRef.current?.remove()
-    popupRef.current = new mapboxgl.Popup({ offset: 16 })
+    popupRef.current = new maplibregl.Popup({ offset: 16 })
       .setLngLat([coords.lng, coords.lat])
       .setHTML(
         popupFromProps({
@@ -322,7 +315,7 @@ export default function OfficerTrackingMap({
         position: 'relative',
         width: '100%',
         height: '100%',
-        '& .mapboxgl-ctrl-attrib a[href*="mapbox.com/feedback"]': { display: 'none' },
+        '& .maplibregl-ctrl-attrib a[href*="mapbox.com/feedback"]': { display: 'none' },
       }}
     >
       <Box ref={mapContainer} sx={{ width: '100%', height: '100%' }} />
