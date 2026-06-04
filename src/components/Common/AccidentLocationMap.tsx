@@ -6,6 +6,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import CloseIcon from '@mui/icons-material/Close'
 import { useTranslation } from '@/themeMode'
 import { getMapStyle } from '@/utils/mapStyle'
+import { getMapControlSx } from '@/utils/mapControlSx'
 import { reverseGeocode, geocodeAddress } from '@/utils/mapService'
 
 interface Location {
@@ -80,8 +81,8 @@ export default function AccidentLocationMap({
       })
       geolocate.on('error', (evt: { code?: number }) => {
         setError(evt?.code === 1
-          ? 'Location permission denied. Enable location access to use this feature.'
-          : 'Unable to retrieve your location right now.')
+          ? t('maps.location_permission_denied')
+          : t('maps.location_unavailable'))
       })
       map.current.addControl(geolocate, 'top-right')
 
@@ -96,11 +97,15 @@ export default function AccidentLocationMap({
 
     map.current.on('load', () => setLoading(false))
     map.current.on('error', () => {
-      setError('Failed to load map style or tiles.')
+      setError(t('maps.failed_to_load_map'))
       setLoading(false)
     })
 
+    const ro = new ResizeObserver(() => map.current?.resize())
+    if (mapContainer.current) ro.observe(mapContainer.current)
+
     return () => {
+      ro.disconnect()
       marker.current?.remove()
       marker.current = null
       map.current?.remove()
@@ -124,7 +129,7 @@ export default function AccidentLocationMap({
       .addTo(map.current)
 
     marker.current.setPopup(new maplibregl.Popup({ offset: 25 }).setHTML(
-      `<div style="padding:4px"><strong>Collision Location</strong><br/><small>Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}</small></div>`
+      `<div style="padding:4px 6px;font-family:system-ui,sans-serif"><strong>${t('maps.collision_location')}</strong><br/><small style="color:#64748b">Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}</small></div>`
     ))
   }
 
@@ -175,19 +180,7 @@ export default function AccidentLocationMap({
           width: '100%',
           height: '100%',
           '& .maplibregl-ctrl-top-right': { top: { xs: 90, sm: 16 }, right: 12, zIndex: 6 },
-          '& .maplibregl-ctrl-group': {
-            border: `1px solid ${alpha(theme.palette.divider, 0.95)}`,
-            borderRadius: 1.75,
-            overflow: 'hidden',
-            boxShadow: `0 12px 26px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.42 : 0.2)}`,
-          },
-          '& .maplibregl-ctrl-group button': {
-            width: 38, height: 38,
-            backgroundColor: theme.palette.mode === 'dark' ? '#1f2937' : '#ffffff',
-            transition: 'background-color 120ms ease',
-            '&:hover': { backgroundColor: theme.palette.mode === 'dark' ? '#374151' : '#f8fafc' },
-          },
-          '& .maplibregl-ctrl-group button + button': { borderTop: `1px solid ${alpha(theme.palette.divider, 0.8)}` },
+          ...getMapControlSx(theme),
           '& .maplibregl-ctrl-attrib': {
             margin: 8, borderRadius: 10,
             border: `1px solid ${alpha(theme.palette.divider, 0.85)}`,
@@ -218,7 +211,7 @@ export default function AccidentLocationMap({
       {!readOnly && showSearch && (
         <Box sx={{ position: 'absolute', top: 16, left: 16, right: { xs: 16, sm: 88 }, display: 'flex', gap: 1, zIndex: 5, p: 1, borderRadius: 2, border: `1px solid ${alpha(theme.palette.divider, 0.85)}`, backgroundColor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.86) : alpha(theme.palette.common.white, 0.9), backdropFilter: 'blur(8px)', boxShadow: `0 10px 26px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.36 : 0.12)}` }}>
           <TextField
-            fullWidth size="small" placeholder="Search address..."
+            fullWidth size="small" placeholder={t('maps.search_address')}
             value={address} onChange={(e) => setAddress(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             disabled={isSearching}

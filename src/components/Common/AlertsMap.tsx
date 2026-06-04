@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { alpha, Box, Paper, Typography, useTheme } from '@mui/material'
 import { getMapStyle } from '@/utils/mapStyle'
+import { getMapControlSx } from '@/utils/mapControlSx'
 import { useTranslation } from '@/themeMode'
 
 interface AlertMapItem {
@@ -90,7 +91,11 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
       setError(t('maps.failed_to_initialize_alerts_map'))
     }
 
+    const ro = new ResizeObserver(() => mapRef.current?.resize())
+    if (mapContainer.current) ro.observe(mapContainer.current)
+
     return () => {
+      ro.disconnect()
       markersRef.current.forEach((marker) => marker.remove())
       markersRef.current = []
       mapRef.current?.remove()
@@ -163,19 +168,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
         borderRadius: 2.5,
         overflow: 'hidden',
         border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
-        '& .maplibregl-ctrl-group': {
-          border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-          borderRadius: '10px',
-          overflow: 'hidden',
-          boxShadow: `0 6px 16px ${alpha(theme.palette.common.black, isDark ? 0.34 : 0.12)}`,
-        },
-        '& .maplibregl-ctrl-group button': {
-          width: 34, height: 34,
-          backgroundColor: isDark ? '#1f2937' : '#ffffff',
-          transition: 'background-color 120ms ease',
-          '&:hover': { backgroundColor: isDark ? '#374151' : '#f8fafc' },
-        },
-        '& .maplibregl-ctrl-group button + button': { borderTop: `1px solid ${alpha(theme.palette.divider, 0.7)}` },
+        ...getMapControlSx(theme),
         '& .maplibregl-popup.alerts-map-popup .maplibregl-popup-content': {
           borderRadius: '14px',
           border: `1px solid ${alpha(theme.palette.divider, 0.95)}`,
@@ -255,13 +248,26 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
       <Box ref={mapContainer} sx={{ width: '100%', height: '100%' }} />
 
       {error && (
-        <Paper sx={{ position: 'absolute', left: 12, right: 12, bottom: 12, p: 1, bgcolor: 'error.main', color: 'error.contrastText' }}>
+        <Paper sx={{ position: 'absolute', left: 12, right: 12, bottom: 12, p: 1, bgcolor: 'error.main', color: 'error.contrastText', zIndex: 5 }}>
           <Typography variant="caption">{error}</Typography>
         </Paper>
       )}
 
+      {!error && alerts.length === 0 && (
+        <Box sx={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', flexDirection: 'column', gap: 1,
+          bgcolor: isDark ? alpha(theme.palette.background.paper, 0.55) : alpha('#f8fafc', 0.7),
+          backdropFilter: 'blur(2px)', zIndex: 3,
+        }}>
+          <Typography sx={{ fontSize: 13, color: theme.palette.text.secondary, fontWeight: 500 }}>
+            {t('maps.no_alert_coordinates_found_yet')}
+          </Typography>
+        </Box>
+      )}
+
       {!error && alerts.length > 0 && alertsWithCoords.length === 0 && (
-        <Paper sx={{ position: 'absolute', left: 12, right: 12, bottom: 12, p: 1, bgcolor: 'warning.main', color: 'warning.contrastText' }}>
+        <Paper sx={{ position: 'absolute', left: 12, right: 12, bottom: 12, p: 1, bgcolor: 'warning.main', color: 'warning.contrastText', zIndex: 5 }}>
           <Typography variant="caption">{t('maps.no_alert_coordinates_found_yet')}</Typography>
         </Paper>
       )}

@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { alpha, Box, CircularProgress, Paper, Typography, useTheme } from '@mui/material'
 import { getMapStyle } from '@/utils/mapStyle'
+import { getMapControlSx } from '@/utils/mapControlSx'
 import { geocodeAddress } from '@/utils/mapService'
 import { useTranslation } from '@/themeMode'
 
@@ -103,7 +104,11 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
     mapRef.current.addControl(new maplibregl.NavigationControl(), 'top-right')
     mapRef.current.on('error', () => setError(t('maps.failed_to_load_map')))
 
+    const ro = new ResizeObserver(() => mapRef.current?.resize())
+    ro.observe(mapContainer.current)
+
     return () => {
+      ro.disconnect()
       markersRef.current.forEach((m) => m.remove())
       markersRef.current = []
       mapRef.current?.remove()
@@ -262,19 +267,7 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
         height,
         borderRadius: 2,
         overflow: 'hidden',
-        '& .maplibregl-ctrl-group': {
-          border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-          borderRadius: '10px',
-          overflow: 'hidden',
-          boxShadow: `0 6px 16px ${alpha(theme.palette.common.black, isDark ? 0.34 : 0.12)}`,
-        },
-        '& .maplibregl-ctrl-group button': {
-          width: 34, height: 34,
-          backgroundColor: isDark ? '#1f2937' : '#ffffff',
-          transition: 'background-color 120ms ease',
-          '&:hover': { backgroundColor: isDark ? '#374151' : '#f8fafc' },
-        },
-        '& .maplibregl-ctrl-group button + button': { borderTop: `1px solid ${alpha(theme.palette.divider, 0.7)}` },
+        ...getMapControlSx(theme),
         '& .maplibregl-popup-content': {
           borderRadius: '12px',
           border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
@@ -361,9 +354,7 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
             zIndex: 10,
           }}
         >
-          <Typography variant="caption">
-            No incident coordinates were found. Add latitude/longitude when creating incidents.
-          </Typography>
+          <Typography variant="caption">{t('maps.no_incident_coordinates')}</Typography>
         </Paper>
       )}
     </Box>

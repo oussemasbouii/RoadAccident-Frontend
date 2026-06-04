@@ -485,6 +485,21 @@ export type TranslationMessages = {
     resolving_locations: string
     select_location: string
     location_not_found: string
+    officers_live: string
+    legend_active: string
+    legend_busy: string
+    legend_offline: string
+    legend_other: string
+    failed_to_load_map_tiles: string
+    popup_role: string
+    popup_phone: string
+    popup_last_seen: string
+    popup_officer: string
+    no_incident_coordinates: string
+    location_permission_denied: string
+    location_unavailable: string
+    collision_location: string
+    search_address: string
   }
   comms: {
     title: string

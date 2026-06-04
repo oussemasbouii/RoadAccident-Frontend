@@ -3,14 +3,9 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Box, Typography, alpha, useTheme } from '@mui/material'
 import { getMapStyle } from '@/utils/mapStyle'
+import { getMapControlSx } from '@/utils/mapControlSx'
+import { useTranslation } from '@/themeMode'
 import type { OfficerLocation } from '@/types/officerTracking'
-
-const STATUS_LEGEND = [
-  { label: 'Active', color: '#22c55e' },
-  { label: 'Busy', color: '#f59e0b' },
-  { label: 'Offline', color: '#94a3b8' },
-  { label: 'Other', color: '#3b82f6' },
-]
 
 interface OfficerTrackingMapProps {
   officers: OfficerLocation[]
@@ -43,7 +38,7 @@ function escapeHtml(value: unknown) {
     .replace(/>/g, '&gt;')
 }
 
-function statusBadge(status: string) {
+function statusBadgeColors(status: string): { bg: string; fg: string } {
   const s = status.toLowerCase()
   if (s.includes('active') || s.includes('online')) return { bg: '#dcfce7', fg: '#15803d' }
   if (s.includes('busy') || s.includes('respond')) return { bg: '#fef3c7', fg: '#92400e' }
@@ -51,31 +46,47 @@ function statusBadge(status: string) {
   return { bg: '#dbeafe', fg: '#1d4ed8' }
 }
 
-function popupFromProps(properties: Record<string, unknown>) {
-  const title = escapeHtml(properties.name || properties.officerId || properties.id || 'Officer')
+interface PopupLabels {
+  role: string
+  phone: string
+  lastSeen: string
+  officer: string
+}
+
+function buildPopupHtml(
+  properties: Record<string, unknown>,
+  isDark: boolean,
+  labels: PopupLabels,
+): string {
+  const bg      = isDark ? '#1e293b' : '#ffffff'
+  const textMain = isDark ? '#f1f5f9' : '#0f172a'
+  const textSub  = isDark ? '#94a3b8' : '#64748b'
+  const linkColor = isDark ? '#60a5fa' : '#2563eb'
+
+  const title = escapeHtml(properties.name || properties.officerId || properties.id || labels.officer)
   const color = statusColor(String(properties.status || ''))
   const status = properties.status ? escapeHtml(String(properties.status)) : null
-  const role   = properties.role  ? escapeHtml(String(properties.role))   : null
+  const role   = properties.role   ? escapeHtml(String(properties.role))   : null
   const phone  = properties.phoneNumber ? escapeHtml(String(properties.phoneNumber)) : null
   const updatedAt = properties.updatedAt
     ? new Date(String(properties.updatedAt)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null
 
-  const badge = status ? statusBadge(status) : null
+  const badge = status ? statusBadgeColors(status) : null
   const rows = [
-    role  ? `<div style="display:flex;gap:6px"><span style="color:#94a3b8;font-size:11px;min-width:40px">Role</span><span>${role}</span></div>` : '',
-    phone ? `<div style="display:flex;gap:6px"><span style="color:#94a3b8;font-size:11px;min-width:40px">Phone</span><a href="tel:${phone}" style="color:#2563eb;text-decoration:none">${phone}</a></div>` : '',
-    updatedAt ? `<div style="display:flex;gap:6px;margin-top:4px"><span style="color:#94a3b8;font-size:11px;min-width:40px">Last</span><span style="color:#94a3b8;font-size:11px">${escapeHtml(updatedAt)}</span></div>` : '',
+    role     ? `<div style="display:flex;gap:6px"><span style="color:${textSub};font-size:11px;min-width:56px">${labels.role}</span><span style="color:${textMain}">${role}</span></div>` : '',
+    phone    ? `<div style="display:flex;gap:6px"><span style="color:${textSub};font-size:11px;min-width:56px">${labels.phone}</span><a href="tel:${phone}" style="color:${linkColor};text-decoration:none">${phone}</a></div>` : '',
+    updatedAt ? `<div style="display:flex;gap:6px;margin-top:3px"><span style="color:${textSub};font-size:11px;min-width:56px">${labels.lastSeen}</span><span style="color:${textSub};font-size:11px">${escapeHtml(updatedAt)}</span></div>` : '',
   ].filter(Boolean).join('')
 
   return `
-    <div style="min-width:200px;font-family:Inter,system-ui,sans-serif;padding:2px">
+    <div style="min-width:200px;font-family:Inter,system-ui,sans-serif;padding:2px;background:${bg}">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,0.9)"></div>
-        <div style="font-weight:700;font-size:14px;color:#0f172a;line-height:1.2">${title}</div>
+        <div style="font-weight:700;font-size:14px;color:${textMain};line-height:1.2">${title}</div>
       </div>
       ${badge && status ? `<div style="display:inline-block;margin-bottom:8px;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:${badge.bg};color:${badge.fg}">${status}</div>` : ''}
-      <div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:#334155">${rows}</div>
+      <div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:${textMain}">${rows}</div>
     </div>
   `
 }
@@ -90,11 +101,17 @@ export default function OfficerTrackingMap({
   onReady,
 }: OfficerTrackingMapProps) {
   const theme = useTheme()
+  const { t } = useTranslation()
+  const isDark = theme.palette.mode === 'dark'
+  const popupBg = isDark ? '#1e293b' : '#ffffff'
+
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const popupRef = useRef<maplibregl.Popup | null>(null)
   const onReadyRef = useRef(onReady)
   const onSelectRef = useRef(onSelect)
+  const tRef = useRef(t)
+  const isDarkRef = useRef(isDark)
   const metaByIdRef = useRef<Map<string, OfficerLocation>>(new Map())
   const currentByIdRef = useRef<Map<string, PointState>>(new Map())
   const targetByIdRef = useRef<Map<string, PointState>>(new Map())
@@ -102,13 +119,17 @@ export default function OfficerTrackingMap({
   const lastFrameRef = useRef<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    onReadyRef.current = onReady
-  }, [onReady])
+  useEffect(() => { onReadyRef.current = onReady }, [onReady])
+  useEffect(() => { onSelectRef.current = onSelect }, [onSelect])
+  useEffect(() => { tRef.current = t }, [t])
+  useEffect(() => { isDarkRef.current = isDark }, [isDark])
 
-  useEffect(() => {
-    onSelectRef.current = onSelect
-  }, [onSelect])
+  const popupLabels = (): PopupLabels => ({
+    role: tRef.current('maps.popup_role'),
+    phone: tRef.current('maps.popup_phone'),
+    lastSeen: tRef.current('maps.popup_last_seen'),
+    officer: tRef.current('maps.popup_officer'),
+  })
 
   const buildFeatureCollection = () => {
     const features: GeoJSON.Feature[] = []
@@ -117,10 +138,7 @@ export default function OfficerTrackingMap({
       if (!officer) return
       features.push({
         type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [coords.lng, coords.lat],
-        },
+        geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
         properties: {
           id: officer.id,
           name: officer.name || '',
@@ -134,29 +152,23 @@ export default function OfficerTrackingMap({
         },
       })
     })
-
-    return {
-      type: 'FeatureCollection',
-      features,
-    } as GeoJSON.FeatureCollection
+    return { type: 'FeatureCollection', features } as GeoJSON.FeatureCollection
   }
 
   const updateSourceData = () => {
     const map = mapRef.current
     if (!map) return
     const source = map.getSource(SOURCE_ID) as GeoJSONSourceLike | undefined
-    if (!source) return
-    source.setData(buildFeatureCollection())
+    source?.setData(buildFeatureCollection())
   }
 
   const ensureSelectedFilter = () => {
     const map = mapRef.current
     if (!map || !map.getLayer(SELECTED_LAYER_ID)) return
-    if (selectedId) {
-      map.setFilter(SELECTED_LAYER_ID, ['==', ['get', 'id'], selectedId])
-      return
-    }
-    map.setFilter(SELECTED_LAYER_ID, ['==', ['get', 'id'], '__none__'])
+    map.setFilter(
+      SELECTED_LAYER_ID,
+      selectedId ? ['==', ['get', 'id'], selectedId] : ['==', ['get', 'id'], '__none__'],
+    )
   }
 
   useEffect(() => {
@@ -171,18 +183,15 @@ export default function OfficerTrackingMap({
     })
     mapRef.current.addControl(new maplibregl.NavigationControl(), 'top-right')
     mapRef.current.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
-    mapRef.current.on('error', () => setError('Failed to load map tiles.'))
+    mapRef.current.on('error', () => setError(tRef.current('maps.failed_to_load_map_tiles')))
+
     mapRef.current.on('load', () => {
       const map = mapRef.current
-      if (!map) return
-      if (map.getSource(SOURCE_ID)) return
+      if (!map || map.getSource(SOURCE_ID)) return
 
       map.addSource(SOURCE_ID, {
         type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: [],
-        },
+        data: { type: 'FeatureCollection', features: [] },
       })
 
       map.addLayer({
@@ -192,9 +201,8 @@ export default function OfficerTrackingMap({
         paint: {
           'circle-radius': 9,
           'circle-color': ['coalesce', ['get', 'color'], '#3b82f6'],
-          'circle-stroke-color': theme.palette.common.white,
+          'circle-stroke-color': '#ffffff',
           'circle-stroke-width': 2.5,
-          'circle-opacity': 1,
         },
       })
 
@@ -227,27 +235,22 @@ export default function OfficerTrackingMap({
         paint: {
           'text-color': '#0f172a',
           'text-halo-color': '#ffffff',
-          'text-halo-width': 1.2,
+          'text-halo-width': 1.5,
         },
       })
 
-      map.on('mouseenter', OFFICERS_LAYER_ID, () => {
-        map.getCanvas().style.cursor = 'pointer'
-      })
-      map.on('mouseleave', OFFICERS_LAYER_ID, () => {
-        map.getCanvas().style.cursor = ''
-      })
+      map.on('mouseenter', OFFICERS_LAYER_ID, () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', OFFICERS_LAYER_ID, () => { map.getCanvas().style.cursor = '' })
       map.on('click', OFFICERS_LAYER_ID, (event) => {
         const feature = event.features?.[0]
         const props = (feature?.properties || {}) as Record<string, unknown>
         const id = String(props.id || '')
         if (!id) return
-
         onSelectRef.current?.(id)
         popupRef.current?.remove()
         popupRef.current = new maplibregl.Popup({ offset: 16 })
           .setLngLat((feature?.geometry as GeoJSON.Point).coordinates as [number, number])
-          .setHTML(popupFromProps(props))
+          .setHTML(buildPopupHtml(props, isDarkRef.current, popupLabels()))
           .addTo(map)
       })
 
@@ -256,7 +259,11 @@ export default function OfficerTrackingMap({
       onReadyRef.current?.(map)
     })
 
+    const ro = new ResizeObserver(() => mapRef.current?.resize())
+    ro.observe(mapContainer.current)
+
     return () => {
+      ro.disconnect()
       popupRef.current?.remove()
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current)
@@ -330,19 +337,24 @@ export default function OfficerTrackingMap({
     popupRef.current?.remove()
     popupRef.current = new maplibregl.Popup({ offset: 16 })
       .setLngLat([coords.lng, coords.lat])
-      .setHTML(
-        popupFromProps({
-          id: meta.id,
-          name: meta.name,
-          officerId: meta.officerId,
-          role: meta.role,
-          status: meta.status,
-          updatedAt: meta.updatedAt,
-          phoneNumber: meta.phoneNumber,
-        })
-      )
+      .setHTML(buildPopupHtml(
+        { id: meta.id, name: meta.name, officerId: meta.officerId, role: meta.role, status: meta.status, updatedAt: meta.updatedAt, phoneNumber: meta.phoneNumber },
+        isDarkRef.current,
+        popupLabels(),
+      ))
       .addTo(map)
   }, [selectedId])
+
+  const STATUS_LEGEND = [
+    { key: 'legend_active' as const, color: '#22c55e' },
+    { key: 'legend_busy'   as const, color: '#f59e0b' },
+    { key: 'legend_offline' as const, color: '#94a3b8' },
+    { key: 'legend_other'  as const, color: '#3b82f6' },
+  ]
+
+  const overlayBg = isDark
+    ? alpha(theme.palette.background.paper, 0.9)
+    : alpha('#ffffff', 0.92)
 
   return (
     <Box
@@ -350,67 +362,55 @@ export default function OfficerTrackingMap({
         position: 'relative',
         width: '100%',
         height: '100%',
+        ...getMapControlSx(theme),
         '& .maplibregl-ctrl-attrib a[href*="mapbox.com/feedback"]': { display: 'none' },
-        '& .maplibregl-ctrl-group': {
-          border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-          borderRadius: '10px',
-          overflow: 'hidden',
-          boxShadow: `0 8px 20px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.36 : 0.14)}`,
-        },
-        '& .maplibregl-ctrl-group button': {
-          width: 36, height: 36,
-          backgroundColor: theme.palette.mode === 'dark' ? '#1f2937' : '#ffffff',
-          transition: 'background-color 120ms ease',
-          '&:hover': { backgroundColor: theme.palette.mode === 'dark' ? '#374151' : '#f8fafc' },
-        },
-        '& .maplibregl-ctrl-group button + button': { borderTop: `1px solid ${alpha(theme.palette.divider, 0.7)}` },
         '& .maplibregl-popup-content': {
           borderRadius: '14px',
           border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-          boxShadow: `0 16px 32px ${alpha(theme.palette.common.black, 0.2)}`,
+          boxShadow: `0 16px 32px ${alpha(theme.palette.common.black, isDark ? 0.4 : 0.2)}`,
+          backgroundColor: popupBg,
           padding: '12px 14px',
         },
         '& .maplibregl-popup-tip': {
-          borderTopColor: `${theme.palette.background.paper} !important`,
-          borderBottomColor: `${theme.palette.background.paper} !important`,
+          borderTopColor: `${popupBg} !important`,
+          borderBottomColor: `${popupBg} !important`,
         },
       }}
     >
       <Box ref={mapContainer} sx={{ width: '100%', height: '100%' }} />
 
-      {/* Officer count badge */}
       {officers.length > 0 && (
         <Box sx={{
           position: 'absolute', top: 12, left: 12, zIndex: 2,
           display: 'flex', alignItems: 'center', gap: 1,
-          bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.9) : alpha('#ffffff', 0.92),
+          bgcolor: overlayBg,
           border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
           backdropFilter: 'blur(8px)',
           borderRadius: 2, px: 1.5, py: 0.7,
           boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.12)}`,
         }}>
-          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#22c55e', flexShrink: 0,
-            boxShadow: '0 0 0 2px rgba(34,197,94,0.25)' }} />
+          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#22c55e', flexShrink: 0, boxShadow: '0 0 0 2px rgba(34,197,94,0.25)' }} />
           <Typography sx={{ fontSize: 12, fontWeight: 600, color: theme.palette.text.primary, lineHeight: 1 }}>
-            {officers.length} officer{officers.length !== 1 ? 's' : ''} live
+            {t('maps.officers_live', { count: officers.length })}
           </Typography>
         </Box>
       )}
 
-      {/* Status legend */}
       <Box sx={{
         position: 'absolute', bottom: 24, left: 12, zIndex: 2,
-        bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.9) : alpha('#ffffff', 0.92),
+        bgcolor: overlayBg,
         border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
         backdropFilter: 'blur(8px)',
         borderRadius: 2, p: 1.25,
         boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.1)}`,
         display: 'flex', flexDirection: 'column', gap: 0.6,
       }}>
-        {STATUS_LEGEND.map(({ label, color }) => (
-          <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {STATUS_LEGEND.map(({ key, color }) => (
+          <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
-            <Typography sx={{ fontSize: 11, color: theme.palette.text.secondary, lineHeight: 1 }}>{label}</Typography>
+            <Typography sx={{ fontSize: 11, color: theme.palette.text.secondary, lineHeight: 1 }}>
+              {t(`maps.${key}`)}
+            </Typography>
           </Box>
         ))}
       </Box>
