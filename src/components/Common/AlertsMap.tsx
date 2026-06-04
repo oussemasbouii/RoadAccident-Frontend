@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import mapboxgl from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { alpha, Box, Paper, Typography, useTheme } from '@mui/material'
-import { getMapboxToken, getMapboxTokenError } from '@/utils/mapboxToken'
+import { getMapStyle } from '@/utils/mapStyle'
 import { useTranslation } from '@/themeMode'
 
 interface AlertMapItem {
@@ -58,11 +58,9 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
   const theme = useTheme()
   const { t } = useTranslation()
   const mapContainer = useRef<HTMLDivElement | null>(null)
-  const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<mapboxgl.Marker[]>([])
+  const mapRef = useRef<maplibregl.Map | null>(null)
+  const markersRef = useRef<maplibregl.Marker[]>([])
   const [error, setError] = useState<string | null>(null)
-  const token = getMapboxToken()
-  const tokenError = getMapboxTokenError(token)
 
   const alertsWithCoords = useMemo(
     () =>
@@ -78,20 +76,15 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
-    if (tokenError) {
-      setError(tokenError)
-      return
-    }
 
     try {
-      mapboxgl.accessToken = token
-      mapRef.current = new mapboxgl.Map({
+      mapRef.current = new maplibregl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
+        style: getMapStyle(),
         center: [9.5615, 34.7678],
         zoom: 6,
       })
-      mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
+      mapRef.current.addControl(new maplibregl.NavigationControl(), 'top-right')
       mapRef.current.on('error', () => setError(t('maps.failed_to_load_alerts_map')))
     } catch {
       setError(t('maps.failed_to_initialize_alerts_map'))
@@ -103,7 +96,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [token, tokenError])
+  }, [])
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -112,7 +105,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
 
     if (alertsWithCoords.length === 0) return
 
-    const bounds = new mapboxgl.LngLatBounds()
+    const bounds = new maplibregl.LngLatBounds()
 
     alertsWithCoords.forEach((alert) => {
       const title = escapeHtml(alert.title || t('common.loading_text'))
@@ -123,7 +116,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
       const directionChipColor = alert.direction === 'sent' ? '#1d4ed8' : '#b45309'
       const readChipColor = alert.read ? '#15803d' : '#b91c1c'
 
-      const popup = new mapboxgl.Popup({ offset: 20, className: 'alerts-map-popup' }).setHTML(
+      const popup = new maplibregl.Popup({ offset: 20, className: 'alerts-map-popup' }).setHTML(
         `<div class="alerts-popup-card">
           <div class="alerts-popup-header">
             <div class="alerts-popup-title">${title}</div>
@@ -140,7 +133,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
         </div>`
       )
 
-      const marker = new mapboxgl.Marker({
+      const marker = new maplibregl.Marker({
         element: createAlertMarker(alert.direction || 'received', Boolean(alert.read)),
       })
         .setLngLat([alert.longitude!, alert.latitude!])
@@ -164,7 +157,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
         borderRadius: 2.5,
         overflow: 'hidden',
         border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
-        '& .mapboxgl-popup.alerts-map-popup .mapboxgl-popup-content': {
+        '& .maplibregl-popup.alerts-map-popup .maplibregl-popup-content': {
           borderRadius: '14px',
           border: `1px solid ${alpha(theme.palette.divider, 0.95)}`,
           boxShadow: '0 16px 34px rgba(2,6,23,0.24)',
@@ -174,7 +167,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
           minWidth: 260,
           maxWidth: 320,
         },
-        '& .mapboxgl-popup.alerts-map-popup .mapboxgl-popup-close-button': {
+        '& .maplibregl-popup.alerts-map-popup .maplibregl-popup-close-button': {
           fontSize: '16px',
           width: 22,
           height: 22,
@@ -185,31 +178,31 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
           color: '#475569',
           backgroundColor: alpha('#f1f5f9', 0.95),
         },
-        '& .mapboxgl-popup.alerts-map-popup .alerts-popup-card': {
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-card': {
           fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
           padding: '12px 12px 10px',
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
         },
-        '& .mapboxgl-popup.alerts-map-popup .alerts-popup-header': {
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-header': {
           display: 'flex',
           flexDirection: 'column',
           gap: '6px',
         },
-        '& .mapboxgl-popup.alerts-map-popup .alerts-popup-title': {
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-title': {
           fontSize: '13px',
           fontWeight: 800,
           color: '#0f172a',
           letterSpacing: '0.1px',
           lineHeight: 1.35,
         },
-        '& .mapboxgl-popup.alerts-map-popup .alerts-popup-chips': {
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-chips': {
           display: 'flex',
           gap: '6px',
           flexWrap: 'wrap',
         },
-        '& .mapboxgl-popup.alerts-map-popup .alerts-popup-chip': {
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-chip': {
           fontSize: '10px',
           fontWeight: 700,
           borderRadius: '999px',
@@ -220,12 +213,12 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
           textTransform: 'uppercase',
           letterSpacing: '0.25px',
         },
-        '& .mapboxgl-popup.alerts-map-popup .alerts-popup-message': {
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-message': {
           fontSize: '12px',
           color: '#334155',
           lineHeight: 1.4,
         },
-        '& .mapboxgl-popup.alerts-map-popup .alerts-popup-meta': {
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-meta': {
           fontSize: '11px',
           color: '#475569',
           display: 'flex',
@@ -234,7 +227,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
           paddingTop: '6px',
           borderTop: `1px dashed ${alpha('#94a3b8', 0.45)}`,
         },
-        '& .mapboxgl-popup.alerts-map-popup .mapboxgl-popup-tip': {
+        '& .maplibregl-popup.alerts-map-popup .maplibregl-popup-tip': {
           borderTopColor: '#ffffff !important',
           borderBottomColor: '#ffffff !important',
         },
