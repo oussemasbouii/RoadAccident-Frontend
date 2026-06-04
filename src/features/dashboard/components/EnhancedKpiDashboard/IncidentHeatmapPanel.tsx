@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import mapboxgl from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import {
-  Avatar, Box, Chip, CircularProgress, IconButton,
+  Avatar, Box, Chip, IconButton,
   List, ListItem, ListItemAvatar, ListItemText,
-  Paper, Stack, Tooltip, Typography, alpha, useTheme,
+  Paper, Stack, ToggleButton, ToggleButtonGroup, Tooltip, Typography, alpha, useTheme,
 } from '@mui/material'
 import LocationOnRoundedIcon from '@mui/icons-material/LocationOnRounded'
 import ZoomOutMapRoundedIcon from '@mui/icons-material/ZoomOutMapRounded'
+import LayersRoundedIcon from '@mui/icons-material/LayersRounded'
+import FiberManualRecordRoundedIcon from '@mui/icons-material/FiberManualRecord'
 import type { Incident } from '../../../incidents/slices/incidentsSlice'
-import { getMapboxToken, getMapboxTokenError } from '@/utils/mapboxToken'
+import { getMapStyle } from '@/utils/mapStyle'
 import { useTranslation } from '../../../../themeMode'
 
 type Coords = { lat: number; lng: number }
@@ -76,67 +78,38 @@ function buildHotspots(incidents: Incident[], resolved: Record<string, Coords>):
     .slice(0, 10)
 }
 
-export default function IncidentHeatmapPanel({ incidents }: { incidents: Incident[] }) {
+interface Props {
+  incidents: Incident[]
+  viewMode?: 'pins' | 'heatmap'
+  onViewModeChange?: (mode: 'pins' | 'heatmap') => void
+}
+
+export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode, onViewModeChange }: Props) {
   const theme    = useTheme()
   const { t }    = useTranslation()
-  const isDark   = theme.palette.mode === 'dark'
 
   const containerRef     = useRef<HTMLDivElement>(null)
-  const mapRef           = useRef<mapboxgl.Map | null>(null)
+  const mapRef           = useRef<maplibregl.Map | null>(null)
   const sourceLoaded     = useRef(false)
-  const popupRef         = useRef<mapboxgl.Popup | null>(null)
+  const popupRef         = useRef<maplibregl.Popup | null>(null)
   // Refs to avoid stale closures inside map callbacks
   const incidentsRef     = useRef(incidents)
   const resolvedRef      = useRef<Record<string, Coords>>({})
 
   const [mapError, setMapError]               = useState<string | null>(null)
-  const [resolvedCoords, setResolvedCoords]   = useState<Record<string, Coords>>({})
-  const [geocoding, setGeocoding]             = useState(false)
+  const [resolvedCoords]                      = useState<Record<string, Coords>>({})
   const [pointCount, setPointCount]           = useState(0)
-
-  const token      = getMapboxToken()
-  const tokenError = getMapboxTokenError(token)
+  const [internalViewMode, setInternalViewMode] = useState<'pins' | 'heatmap'>('pins')
+  const viewMode = propViewMode ?? internalViewMode
+  const setViewMode = (mode: 'pins' | 'heatmap') => {
+    setInternalViewMode(mode)
+    onViewModeChange?.(mode)
+  }
+  const [selectedHotspot, setSelectedHotspot] = useState<string | null>(null)
 
   // Keep refs in sync
   incidentsRef.current = incidents
   resolvedRef.current  = resolvedCoords
-
-  // ── Geocode location names ──────────────────────────────────
-  useEffect(() => {
-    if (!token || tokenError) return
-    const toGeocode = [
-      ...new Set(
-        incidents
-          .filter((i) => i.latitude == null && i.longitude == null)
-          .map((i) => i.location?.trim())
-          .filter((loc): loc is string => !!loc && !parseCoords(loc))
-      ),
-    ].slice(0, 30)
-
-    if (toGeocode.length === 0) return
-    let cancelled = false
-    setGeocoding(true)
-
-    Promise.all(
-      toGeocode.map(async (loc) => {
-        try {
-          const res  = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(loc)}.json?access_token=${token}&country=tn&limit=1`)
-          const data = await res.json()
-          const center = data?.features?.[0]?.center
-          if (!Array.isArray(center) || center.length < 2) return null
-          return { key: loc.toLowerCase(), lng: Number(center[0]), lat: Number(center[1]) }
-        } catch { return null }
-      })
-    ).then((results) => {
-      if (cancelled) return
-      const next: Record<string, Coords> = {}
-      results.forEach((r) => { if (r) next[r.key] = { lat: r.lat, lng: r.lng } })
-      setResolvedCoords((prev) => ({ ...prev, ...next }))
-      setGeocoding(false)
-    })
-
-    return () => { cancelled = true }
-  }, [incidents, token, tokenError])
 
   // ── Fit bounds helper ───────────────────────────────────────
   const handleFitBounds = () => {
@@ -150,27 +123,23 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
     if (coords.length === 1) { mapRef.current.flyTo({ center: coords[0], zoom: 11 }); return }
     const bounds = coords.reduce(
       (b, c) => b.extend(c),
-      new mapboxgl.LngLatBounds(coords[0], coords[0])
+      new maplibregl.LngLatBounds(coords[0], coords[0])
     )
     mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 12, duration: 1000 })
   }
 
   // ── Initialise map once ─────────────────────────────────────
   useEffect(() => {
-    if (!containerRef.current || mapRef.current || tokenError) return
-    if (!token) { setMapError('Missing Mapbox token'); return }
-
-    mapboxgl.accessToken = token
-    const mapStyle = isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12'
+    if (!containerRef.current || mapRef.current) return
 
     try {
-      const map = new mapboxgl.Map({
+      const map = new maplibregl.Map({
         container: containerRef.current,
-        style: mapStyle,
+        style: getMapStyle(),
         center: [9.5615, 34.7678],
         zoom: 6,
       })
-      map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
       map.on('load', () => {
         const geo = buildGeoJson(incidentsRef.current, resolvedRef.current)
@@ -184,6 +153,7 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
           type: 'heatmap',
           source: 'incidents-heat',
           maxzoom: 13,
+          layout: { visibility: 'none' },
           paint: {
             'heatmap-weight': 1,
             'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3] as any,
@@ -206,6 +176,7 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
           type: 'circle',
           source: 'incidents-heat',
           minzoom: 8,
+          layout: { visibility: 'visible' },
           paint: {
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 5, 14, 14] as any,
             'circle-color': [
@@ -229,7 +200,7 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
           const [lng, lat] = feat.geometry.coordinates
           const { location, severity, status } = feat.properties ?? {}
           popupRef.current?.remove()
-          popupRef.current = new mapboxgl.Popup({ closeButton: true, offset: 10, maxWidth: '220px' })
+          popupRef.current = new maplibregl.Popup({ closeButton: true, offset: 10, maxWidth: '220px' })
             .setLngLat([lng, lat])
             .setHTML(`
               <div style="font-family:system-ui,sans-serif;padding:2px 0">
@@ -258,15 +229,29 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
       mapRef.current = null
       sourceLoaded.current = false
     }
-  }, [token, tokenError, isDark]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Update data when incidents / resolved coords change ─────
   useEffect(() => {
     if (!mapRef.current || !sourceLoaded.current) return
     const geo = buildGeoJson(incidents, resolvedCoords)
     setPointCount(geo.features.length)
-    ;(mapRef.current.getSource('incidents-heat') as mapboxgl.GeoJSONSource | undefined)?.setData(geo)
+    ;(mapRef.current.getSource('incidents-heat') as maplibregl.GeoJSONSource | undefined)?.setData(geo)
   }, [incidents, resolvedCoords])
+
+  // ── Toggle layer visibility when viewMode changes ───────────
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !sourceLoaded.current) return
+    const circleLayerId = 'incidents-circles'
+    if (viewMode === 'heatmap') {
+      if (map.getLayer(circleLayerId)) map.setLayoutProperty(circleLayerId, 'visibility', 'none')
+      if (map.getLayer('incidents-heatmap')) map.setLayoutProperty('incidents-heatmap', 'visibility', 'visible')
+    } else {
+      if (map.getLayer(circleLayerId)) map.setLayoutProperty(circleLayerId, 'visibility', 'visible')
+      if (map.getLayer('incidents-heatmap')) map.setLayoutProperty('incidents-heatmap', 'visibility', 'none')
+    }
+  }, [viewMode])
 
   const hotspots = useMemo(() => buildHotspots(incidents, resolvedCoords), [incidents, resolvedCoords])
 
@@ -300,7 +285,22 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
             {pointCount > 0 ? `${pointCount} incidents mapped` : 'Locating incidents…'}
           </Typography>
         </Box>
-        {geocoding && <CircularProgress size={14} sx={{ mr: 0.5 }} />}
+        {!propViewMode && (
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => { if (v) setViewMode(v) }}
+            size="small"
+            sx={{ ml: 1 }}
+          >
+            <ToggleButton value="pins" sx={{ px: 1.5, py: 0.5, fontSize: 11, textTransform: 'none' }}>
+              <FiberManualRecordRoundedIcon sx={{ fontSize: 14, mr: 0.5 }} /> Pins
+            </ToggleButton>
+            <ToggleButton value="heatmap" sx={{ px: 1.5, py: 0.5, fontSize: 11, textTransform: 'none' }}>
+              <LayersRoundedIcon sx={{ fontSize: 14, mr: 0.5 }} /> Heatmap
+            </ToggleButton>
+          </ToggleButtonGroup>
+        )}
         <Tooltip title="Fit map to all incidents">
           <span>
             <IconButton size="small" onClick={handleFitBounds} disabled={pointCount === 0}>
@@ -355,9 +355,9 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
           <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>{t('dashboard.heatmap_high')}</Typography>
         </Box>
 
-        {(mapError || tokenError) && (
+        {mapError && (
           <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(theme.palette.background.paper, 0.92) }}>
-            <Typography variant="body2" color="text.secondary">{mapError ?? tokenError}</Typography>
+            <Typography variant="body2" color="text.secondary">{mapError}</Typography>
           </Box>
         )}
       </Box>
@@ -367,6 +367,17 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
         <Typography variant="caption" color="text.secondary" sx={{ px: 0.5, fontWeight: 700, display: 'block', mb: 0.75 }}>
           {t('dashboard.top_10_black_spot_locations')}
         </Typography>
+        {selectedHotspot && (
+          <Box sx={{ mb: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            <Chip
+              label={`Viewing: ${selectedHotspot}`}
+              onDelete={() => setSelectedHotspot(null)}
+              size="small"
+              color="primary"
+              sx={{ fontSize: 11, maxWidth: '100%' }}
+            />
+          </Box>
+        )}
         <List disablePadding dense sx={{ maxHeight: 240, overflow: 'auto' }}>
           {hotspots.length === 0 ? (
             <Box sx={{ py: 2.5, textAlign: 'center' }}>
@@ -379,14 +390,20 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
                 <ListItem
                   key={`${row.location}-${idx}`}
                   onClick={() => {
-                    if (!mapRef.current || !row.coords) return
-                    mapRef.current.flyTo({ center: [row.coords.lng, row.coords.lat], zoom: 11 })
+                    const next = selectedHotspot === row.location ? null : row.location
+                    setSelectedHotspot(next)
+                    if (next && row.coords && mapRef.current) {
+                      mapRef.current.flyTo({ center: [row.coords.lng, row.coords.lat], zoom: 12, duration: 900 })
+                    }
                   }}
                   sx={{
-                    px: 1, py: 0.625, borderRadius: 2, mb: 0.25,
-                    cursor: row.coords ? 'pointer' : 'default',
-                    '&:hover': row.coords ? { bgcolor: alpha(theme.palette.primary.main, 0.05) } : {},
-                    transition: 'background-color 0.12s',
+                    px: 1, py: 0.625, borderRadius: 1.5, mb: 0.25,
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease',
+                    bgcolor: selectedHotspot === row.location
+                      ? alpha(theme.palette.primary.main, 0.08)
+                      : 'transparent',
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) },
                   }}
                 >
                   <ListItemAvatar sx={{ minWidth: 34 }}>
@@ -418,6 +435,15 @@ export default function IncidentHeatmapPanel({ incidents }: { incidents: Inciden
                         bgcolor: alpha(sevColor, 0.1), color: sevColor, border: 'none',
                       }}
                     />
+                    {selectedHotspot === row.location && (
+                      <Chip
+                        label={`${row.count} incident${row.count !== 1 ? 's' : ''}`}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        sx={{ fontSize: 11, fontWeight: 700 }}
+                      />
+                    )}
                   </Stack>
                 </ListItem>
               )
