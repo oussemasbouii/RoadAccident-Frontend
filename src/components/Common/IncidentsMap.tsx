@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import mapboxgl from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { alpha, Box, CircularProgress, Paper, Typography } from '@mui/material'
-import { getMapboxToken, getMapboxTokenError } from '@/utils/mapboxToken'
+import { getMapStyle } from '@/utils/mapStyle'
+import { geocodeAddress } from '@/utils/mapService'
 import { useTranslation } from '@/themeMode'
 
 interface IncidentMapItem {
@@ -69,47 +70,39 @@ const createIncidentMarkerElement = (severity: IncidentMapItem['severity']): HTM
 export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapProps) {
   const { t } = useTranslation()
   const mapContainer = useRef<HTMLDivElement | null>(null)
-  const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<mapboxgl.Marker[]>([])
+  const mapRef = useRef<maplibregl.Map | null>(null)
+  const markersRef = useRef<maplibregl.Marker[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isResolving, setIsResolving] = useState(false)
   const [resolvedCoords, setResolvedCoords] = useState<Record<string, Coordinates>>({})
-  const token = getMapboxToken()
-  const tokenError = getMapboxTokenError(token)
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
-    if (tokenError) {
-      setError(tokenError)
-      return
-    }
 
     try {
-      mapboxgl.accessToken = token
-      mapRef.current = new mapboxgl.Map({
+      mapRef.current = new maplibregl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
+        style: getMapStyle(),
         center: [9.5615, 34.7678],
         zoom: 6,
       })
-    } catch (err) {
+    } catch {
       setError(t('maps.failed_to_initialize_map'))
       return
     }
 
-    mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
+    mapRef.current.addControl(new maplibregl.NavigationControl(), 'top-right')
     mapRef.current.on('error', () => setError(t('maps.failed_to_load_map')))
 
     return () => {
-      markersRef.current.forEach((marker) => marker.remove())
+      markersRef.current.forEach((m) => m.remove())
       markersRef.current = []
       mapRef.current?.remove()
       mapRef.current = null
     }
-  }, [token, tokenError])
+  }, [])
 
   useEffect(() => {
-    if (tokenError) return
     let active = true
 
     const resolve = async () => {
@@ -149,13 +142,9 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
         const geocoded = await Promise.all(
           toGeocode.map(async ({ id, query }) => {
             try {
-              const response = await fetch(
-                `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=tn&limit=1`
-              )
-              const data = await response.json()
-              const center = data?.features?.[0]?.center
-              if (!Array.isArray(center) || center.length < 2) return null
-              return { id, coords: { lng: Number(center[0]), lat: Number(center[1]) } }
+              const coords = await geocodeAddress(query)
+              if (!coords) return null
+              return { id, coords: { lng: coords.lng, lat: coords.lat } }
             } catch {
               return null
             }
@@ -179,7 +168,7 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
     return () => {
       active = false
     }
-  }, [incidents, token, tokenError])
+  }, [incidents])
 
   const incidentsWithCoordinates = useMemo(
     () =>
@@ -206,7 +195,7 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
 
     if (incidentsWithCoordinates.length === 0) return
 
-    const bounds = new mapboxgl.LngLatBounds()
+    const bounds = new maplibregl.LngLatBounds()
 
     incidentsWithCoordinates.forEach(({ incident, coords }) => {
       if (!coords) return
@@ -215,7 +204,7 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
       const safeSeverity = String(incident.severity || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       const safeStatus = String(incident.status || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       const safeTime = String(incident.time || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      const popup = new mapboxgl.Popup({ offset: 20 }).setHTML(
+      const popup = new maplibregl.Popup({ offset: 20 }).setHTML(
         `<div style="padding:8px 10px; color:#0f172a; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height:1.35;">
           <div style="font-weight:700; margin-bottom:4px;">${safeLocation}</div>
           <div style="font-size:12px; color:#334155; margin-bottom:4px;">${t('incidents.severity')}: ${safeSeverity.toUpperCase()} | ${t('incidents.status')}: ${safeStatus}</div>
@@ -224,7 +213,7 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
         </div>`
       )
 
-      const marker = new mapboxgl.Marker({
+      const marker = new maplibregl.Marker({
         element: createIncidentMarkerElement(incident.severity),
       })
         .setLngLat([coords.lng, coords.lat])
@@ -247,14 +236,14 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
         height,
         borderRadius: 2,
         overflow: 'hidden',
-        '& .mapboxgl-popup-content': {
+        '& .maplibregl-popup-content': {
           borderRadius: '12px',
           border: `1px solid ${alpha('#64748b', 0.25)}`,
           boxShadow: '0 14px 28px rgba(0,0,0,0.22)',
           backgroundColor: '#ffffff',
           color: '#0f172a',
         },
-        '& .mapboxgl-popup-tip': {
+        '& .maplibregl-popup-tip': {
           borderTopColor: '#ffffff !important',
           borderBottomColor: '#ffffff !important',
         },
