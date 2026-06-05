@@ -383,11 +383,11 @@ export default function OfficerTrackingMap({
         ...getMapControlSx(theme),
         '& .maplibregl-ctrl-attrib a[href*="mapbox.com/feedback"]': { display: 'none' },
         '& .maplibregl-popup-content': {
-          borderRadius: '14px',
+          borderRadius: '14px !important',
           border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
           boxShadow: `0 20px 40px ${alpha(theme.palette.common.black, isDark ? 0.45 : 0.22)}`,
-          backgroundColor: popupBg,
-          padding: 0,
+          backgroundColor: `${popupBg} !important`,
+          padding: '0 !important',
           overflow: 'hidden',
         },
         '& .maplibregl-popup-close-button': {

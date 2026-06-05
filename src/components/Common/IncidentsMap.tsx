@@ -289,11 +289,11 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
         overflow: 'hidden',
         ...getMapControlSx(theme),
         '& .maplibregl-popup-content': {
-          borderRadius: '12px',
+          borderRadius: '12px !important',
           border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
           boxShadow: `0 20px 40px ${alpha(theme.palette.common.black, isDark ? 0.45 : 0.2)}`,
-          backgroundColor: popupBg,
-          padding: 0,
+          backgroundColor: `${popupBg} !important`,
+          padding: '0 !important',
           overflow: 'hidden',
         },
         '& .maplibregl-popup-close-button': {

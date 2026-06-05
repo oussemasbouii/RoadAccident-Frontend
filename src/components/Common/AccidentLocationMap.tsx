@@ -209,12 +209,12 @@ export default function AccidentLocationMap({
           },
           '& .maplibregl-ctrl-attrib a': { color: theme.palette.text.primary },
           '& .maplibregl-popup.accident-location-popup .maplibregl-popup-content': {
-            padding: 0,
+            padding: '0 !important',
             overflow: 'hidden',
-            borderRadius: '12px',
+            borderRadius: '12px !important',
             border: `1px solid ${alpha(theme.palette.divider, 0.95)}`,
             boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, isDark ? 0.35 : 0.14)}`,
-            backgroundColor: isDark ? '#1e293b' : '#ffffff',
+            backgroundColor: `${isDark ? '#1e293b' : '#ffffff'} !important`,
             minWidth: 175,
           },
           '& .maplibregl-popup.accident-location-popup .maplibregl-popup-close-button': {
