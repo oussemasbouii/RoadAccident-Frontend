@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react'
 import {
   Alert,
   alpha,
@@ -35,14 +35,19 @@ import IncidentDocumentsPanel from './IncidentDocumentsPanel'
 import { moveStoredDocuments } from '../hooks/useIncidentDocuments'
 import { useTranslation, useThemeMode } from '../../../themeMode'
 import { getEnumLabel } from './incidentEnumLabels'
+import ApprovalActionBar from './ApprovalActionBar'
+import AuditTrailPanel from './AuditTrailPanel'
+import type { AuditEntry } from '../slices/incidentsSlice'
 
 export interface AddIncidentDrawerProps {
   open: boolean
   onClose: () => void
   onSubmit?: (payload: any) => Promise<any> | any
   error?: string | null
-  mode?: 'create' | 'edit'
+  mode?: 'create' | 'edit' | 'review'
   initialData?: any | null
+  onApprove?: (comment: string) => void
+  onReject?: (comment: string) => void
 }
 
 const DAY_TYPE_OPTIONS = ['WORKING', 'BEFORE_HOLIDAY', 'HOLIDAY', 'AFTER_HOLIDAY']
@@ -82,6 +87,29 @@ const ACCIDENT_SUBTYPE_OPTIONS = ['FRONT', 'REAR', 'SIDE', 'FRONT_SIDE', 'CHAIN'
 
 const formatEnumLabel = (value: string) =>
   value.replace(/[_-]+/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+
+const ensureEnumStr = (val: any, options: string[], fallback: string): string => {
+  if (typeof val === 'string' && options.includes(val)) return val
+  if (val == null) return fallback
+  if (typeof val === 'object') {
+    const name = val.name ?? val.label ?? val.value
+    if (typeof name === 'string' && options.includes(name)) return name
+  }
+  return fallback
+}
+
+const SEVERITY_BG: Record<string, string> = {
+  critical: 'rgba(211,47,47,0.12)',
+  high: 'rgba(245,124,0,0.12)',
+  medium: 'rgba(2,136,209,0.12)',
+  low: 'rgba(46,125,50,0.12)',
+}
+const SEVERITY_COLOR: Record<string, string> = {
+  critical: 'error.main',
+  high: 'warning.main',
+  medium: 'info.main',
+  low: 'success.main',
+}
 
 function makeInitialForm() {
   const now = new Date()
@@ -208,6 +236,28 @@ const fieldChild: Variants = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: _easeDecel } },
 }
 
+function ReviewInfoCard({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Box
+      sx={{
+        p: 2,
+        borderRadius: 2,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+      }}
+    >
+      <Typography
+        variant="overline"
+        sx={{ fontWeight: 800, fontSize: '0.65rem', letterSpacing: 1.2, color: 'text.secondary', display: 'block', mb: 1 }}
+      >
+        {label}
+      </Typography>
+      {children}
+    </Box>
+  )
+}
+
 export default function AddIncidentDrawer({
   open,
   onClose,
@@ -215,6 +265,8 @@ export default function AddIncidentDrawer({
   error: externalError,
   mode = 'create',
   initialData = null,
+  onApprove,
+  onReject,
 }: AddIncidentDrawerProps) {
   const theme = useTheme()
   const { t } = useTranslation()
@@ -226,6 +278,7 @@ export default function AddIncidentDrawer({
   const [stepDirection, setStepDirection] = useState(1)
   const [form, setForm] = useState(() => makeInitialForm())
   const isEditMode = mode === 'edit'
+  const isReviewMode = mode === 'review'
   const [draftDocumentKey, setDraftDocumentKey] = useState(`incident-draft-${crypto.randomUUID()}`)
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
   const [showErrors, setShowErrors] = useState(false)
@@ -268,11 +321,61 @@ export default function AddIncidentDrawer({
       accidentDate: String(source.accidentDate || fallback.accidentDate).slice(0, 10),
       latitude: Number(source.latitude ?? fallback.latitude),
       longitude: Number(source.longitude ?? fallback.longitude),
-      infoDetails: { ...fallback.infoDetails, ...info, accidentTime: String(info.accidentTime || fallback.infoDetails.accidentTime).slice(0, 8) },
-      roadConditions: { ...fallback.roadConditions, ...road },
-      environmentConditions: { ...fallback.environmentConditions, ...env },
-      participant: { ...fallback.participant, ...participant },
-      damagesReport: { ...fallback.damagesReport, ...damages },
+      infoDetails: {
+        ...fallback.infoDetails,
+        ...info,
+        accidentTime: String(info.accidentTime || fallback.infoDetails.accidentTime).slice(0, 8),
+        dayTypeId: ensureEnumStr(info.dayTypeId, DAY_TYPE_OPTIONS, 'WORKING'),
+        accidentSituationId: ensureEnumStr(info.accidentSituationId, ACCIDENT_SITUATION_OPTIONS, 'ON_ROAD'),
+        zoneId: ensureEnumStr(info.zoneId, ZONE_OPTIONS, 'ROAD'),
+        urbanityId: ensureEnumStr(info.urbanityId, URBANITY_OPTIONS, 'OUTSIDE_AGGLOMERATION'),
+      },
+      roadConditions: {
+        ...fallback.roadConditions,
+        ...road,
+        roadSinuosityId: ensureEnumStr(road.roadSinuosityId, ROAD_SINUOSITY_OPTIONS, 'UNIQUE'),
+        roadMarkingId: ensureEnumStr(road.roadMarkingId, ROAD_MARKING_OPTIONS, 'NONEXISTENT'),
+        planLayoutId: ensureEnumStr(road.planLayoutId, PLAN_LAYOUT_OPTIONS, 'STRAIGHT'),
+        roadTypeId: ensureEnumStr(road.roadTypeId, ROAD_TYPE_OPTIONS, 'CONVENTIONAL_2X1'),
+        networkCategoryId: ensureEnumStr(road.networkCategoryId, NETWORK_CATEGORY_OPTIONS, 'LOCAL'),
+        trafficRegimeId: ensureEnumStr(road.trafficRegimeId, TRAFFIC_REGIME_OPTIONS, 'BIDIRECTIONAL'),
+        trafficDirectionId: ensureEnumStr(road.trafficDirectionId, TRAFFIC_DIRECTION_OPTIONS, 'BOTH'),
+        roadWidthId: ensureEnumStr(road.roadWidthId, ROAD_WIDTH_OPTIONS, 'LESS_325'),
+        laneWidthId: ensureEnumStr(road.laneWidthId, LANE_WIDTH_OPTIONS, 'LESS_6'),
+      },
+      environmentConditions: {
+        ...fallback.environmentConditions,
+        ...env,
+        luminosityId: ensureEnumStr(env.luminosityId, LUMINOSITY_OPTIONS, 'FULL_DAYLIGHT'),
+        atmosphericConditionsId: ensureEnumStr(env.atmosphericConditionsId, ATMOSPHERIC_OPTIONS, 'GOOD_WEATHER'),
+        visibilityId: ensureEnumStr(env.visibilityId, VISIBILITY_OPTIONS, 'CLEAR'),
+        roadPavementConditionId: ensureEnumStr(env.roadPavementConditionId, ROAD_PAVEMENT_OPTIONS, 'PAVED'),
+      },
+      participant: {
+        ...fallback.participant,
+        ...participant,
+        participantType: ensureEnumStr(participant.participantType, PARTICIPANT_TYPE_OPTIONS, 'DRIVER'),
+        vehicleType: ensureEnumStr(participant.vehicleType, VEHICLE_TYPE_OPTIONS, 'VEHICLE_ALONE'),
+        specialType: ensureEnumStr(participant.specialType, SPECIAL_TYPE_OPTIONS, 'NONE'),
+        insurance: ensureEnumStr(participant.insurance, INSURANCE_OPTIONS, 'YES'),
+        vehiclePosition: ensureEnumStr(participant.vehiclePosition, VEHICLE_POSITION_OPTIONS, 'FRONT_LEFT'),
+        pedestrianLocation: ensureEnumStr(participant.pedestrianLocation, PEDESTRIAN_LOCATION_OPTIONS, 'ROAD'),
+        action: ensureEnumStr(participant.action, ACTION_OPTIONS, 'DRIVER_STRAIGHT'),
+        travelReason: ensureEnumStr(participant.travelReason, TRAVEL_REASON_OPTIONS, 'OTHER'),
+        plannedTrip: ensureEnumStr(participant.plannedTrip, PLANNED_TRIP_OPTIONS, 'UNKNOWN'),
+        safetyEquipmentUse: ensureEnumStr(participant.safetyEquipmentUse, SAFETY_OPTIONS, 'SEATBELT'),
+        injurySeverity: ensureEnumStr(participant.injurySeverity, INJURY_OPTIONS, 'UNINJURED'),
+        alcoholTest: ensureEnumStr(participant.alcoholTest, ALCOHOL_OPTIONS, 'NOT_DONE'),
+        drugTest: ensureEnumStr(participant.drugTest, DRUG_OPTIONS, 'NOT_DONE'),
+        infraction: ensureEnumStr(participant.infraction, INFRACTION_OPTIONS, 'NONE'),
+      },
+      damagesReport: {
+        ...fallback.damagesReport,
+        ...damages,
+        accidentCauseId: ensureEnumStr(damages.accidentCauseId, ACCIDENT_CAUSE_OPTIONS, 'INATTENTION'),
+        accidentTypeId: ensureEnumStr(damages.accidentTypeId, ACCIDENT_TYPE_OPTIONS, 'OTHER'),
+        accidentSubTypeId: ensureEnumStr(damages.accidentSubTypeId, ACCIDENT_SUBTYPE_OPTIONS, 'OTHER'),
+      },
     }
   }
 
@@ -285,19 +388,19 @@ export default function AddIncidentDrawer({
       cleanFormRef.current = null
       return
     }
-    if (!isEditMode) {
+    if (!isEditMode && !isReviewMode) {
       setDraftDocumentKey(`incident-draft-${crypto.randomUUID()}`)
       const fresh = makeInitialForm()
       setForm(fresh)
       cleanFormRef.current = structuredClone(fresh)
     }
-    if (isEditMode) {
+    if (isEditMode || isReviewMode) {
       const mapped = mapAccidentToForm(initialData)
       setForm(mapped)
       cleanFormRef.current = structuredClone(mapped)
       setStep(0)
     }
-  }, [open, isEditMode, initialData])
+  }, [open, isEditMode, isReviewMode, initialData])
 
   const setValue = (path: string, value: any) => {
     setForm((prev: any) => {
@@ -419,6 +522,7 @@ export default function AddIncidentDrawer({
       value={path.split('.').reduce((a: any, key) => a[key], form as any)}
       onChange={(e) => setValue(path, e.target.value)}
       fullWidth
+      disabled={isReviewMode}
       SelectProps={{
         displayEmpty: true,
         renderValue: (selected) =>
@@ -489,7 +593,7 @@ export default function AddIncidentDrawer({
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.2 }}>
-              {isEditMode ? t('add_incident.title_update') : t('add_incident.title_new')}
+              {isReviewMode ? t('add_incident.title_review') : isEditMode ? t('add_incident.title_update') : t('add_incident.title_new')}
             </Typography>
             {isEditMode && initialData?.id && (
               <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
@@ -510,121 +614,125 @@ export default function AddIncidentDrawer({
           </IconButton>
         </Stack>
 
-        {/* Step indicator pills — clickable for completed steps */}
-        <Stack direction="row" spacing={0} alignItems="center" sx={{ mb: 2 }}>
-          {steps.map((s, i) => {
-            const isActive = i === step
-            const isDone = i < step
-            const isClickable = isDone
-            return (
-              <Stack key={s.label} direction="row" alignItems="center" sx={{ flex: i < steps.length - 1 ? 1 : 'none' }}>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  spacing={1}
-                  onClick={() => isClickable && jumpTo(i)}
-                  sx={{
-                    px: 1.5,
-                    py: 0.75,
-                    borderRadius: '100px',
-                    cursor: isClickable ? 'pointer' : 'default',
-                    bgcolor: isActive
-                      ? alpha(theme.palette.primary.main, 0.1)
-                      : isDone
-                        ? alpha(theme.palette.success.main, 0.08)
-                        : 'transparent',
-                    border: `1.5px solid`,
-                    borderColor: isActive
-                      ? alpha(theme.palette.primary.main, 0.4)
-                      : isDone
-                        ? alpha(theme.palette.success.main, 0.35)
-                        : alpha(theme.palette.divider, 0.6),
-                    transition: 'all 0.2s ease',
-                    '&:hover': isClickable ? { bgcolor: alpha(theme.palette.success.main, 0.12) } : {},
-                  }}
-                >
-                  <motion.div
-                    animate={{
-                      backgroundColor: isActive
-                        ? theme.palette.primary.main
-                        : isDone
-                          ? theme.palette.success.main
-                          : alpha(theme.palette.action.active, 0.12),
-                      scale: isActive ? 1.08 : 1,
-                    }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-                    style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: '50%',
-                      color: isActive || isDone ? 'white' : theme.palette.text.disabled,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <AnimatePresence mode="wait" initial={false}>
-                      {isDone ? (
-                        <motion.span key="check" variants={iconSwap} initial="initial" animate="animate" exit="exit" style={{ display: 'flex' }}>
-                          <CheckCircleRoundedIcon sx={{ fontSize: 14 }} />
-                        </motion.span>
-                      ) : (
-                        <motion.span key={`num-${i}`} variants={iconSwap} initial="initial" animate="animate" exit="exit">
-                          <Typography sx={{ fontSize: 11, fontWeight: 800, lineHeight: 1 }}>{i + 1}</Typography>
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: isActive ? 700 : 500,
-                      color: isActive ? 'primary.main' : isDone ? 'success.main' : 'text.secondary',
-                      whiteSpace: 'nowrap',
-                      display: { xs: 'none', sm: 'block' },
-                    }}
-                  >
-                    {s.label}
-                  </Typography>
-                </Stack>
-
-                {/* Connector line between steps */}
-                {i < steps.length - 1 && (
-                  <Box sx={{ flex: 1, height: 2, mx: 1, borderRadius: 1, bgcolor: alpha(theme.palette.divider, 0.4), position: 'relative', overflow: 'hidden' }}>
-                    <motion.div
-                      animate={{ scaleX: isDone ? 1 : 0 }}
-                      initial={{ scaleX: 0 }}
-                      transition={{ duration: 0.35, ease: easeOut }}
-                      style={{
-                        position: 'absolute', inset: 0, borderRadius: 4,
-                        backgroundColor: alpha(theme.palette.success.main, 0.5),
-                        transformOrigin: 'left center',
+        {!isReviewMode && (
+          <>
+            {/* Step indicator pills — clickable for completed steps */}
+            <Stack direction="row" spacing={0} alignItems="center" sx={{ mb: 2 }}>
+              {steps.map((s, i) => {
+                const isActive = i === step
+                const isDone = i < step
+                const isClickable = isDone
+                return (
+                  <Stack key={s.label} direction="row" alignItems="center" sx={{ flex: i < steps.length - 1 ? 1 : 'none' }}>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1}
+                      onClick={() => isClickable && jumpTo(i)}
+                      sx={{
+                        px: 1.5,
+                        py: 0.75,
+                        borderRadius: '100px',
+                        cursor: isClickable ? 'pointer' : 'default',
+                        bgcolor: isActive
+                          ? alpha(theme.palette.primary.main, 0.1)
+                          : isDone
+                            ? alpha(theme.palette.success.main, 0.08)
+                            : 'transparent',
+                        border: `1.5px solid`,
+                        borderColor: isActive
+                          ? alpha(theme.palette.primary.main, 0.4)
+                          : isDone
+                            ? alpha(theme.palette.success.main, 0.35)
+                            : alpha(theme.palette.divider, 0.6),
+                        transition: 'all 0.2s ease',
+                        '&:hover': isClickable ? { bgcolor: alpha(theme.palette.success.main, 0.12) } : {},
                       }}
-                    />
-                  </Box>
-                )}
-              </Stack>
-            )
-          })}
-        </Stack>
+                    >
+                      <motion.div
+                        animate={{
+                          backgroundColor: isActive
+                            ? theme.palette.primary.main
+                            : isDone
+                              ? theme.palette.success.main
+                              : alpha(theme.palette.action.active, 0.12),
+                          scale: isActive ? 1.08 : 1,
+                        }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: '50%',
+                          color: isActive || isDone ? 'white' : theme.palette.text.disabled,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <AnimatePresence mode="wait" initial={false}>
+                          {isDone ? (
+                            <motion.span key="check" variants={iconSwap} initial="initial" animate="animate" exit="exit" style={{ display: 'flex' }}>
+                              <CheckCircleRoundedIcon sx={{ fontSize: 14 }} />
+                            </motion.span>
+                          ) : (
+                            <motion.span key={`num-${i}`} variants={iconSwap} initial="initial" animate="animate" exit="exit">
+                              <Typography sx={{ fontSize: 11, fontWeight: 800, lineHeight: 1 }}>{i + 1}</Typography>
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: isActive ? 700 : 500,
+                          color: isActive ? 'primary.main' : isDone ? 'success.main' : 'text.secondary',
+                          whiteSpace: 'nowrap',
+                          display: { xs: 'none', sm: 'block' },
+                        }}
+                      >
+                        {s.label}
+                      </Typography>
+                    </Stack>
 
-        {/* Thin progress bar */}
-        <LinearProgress
-          variant="determinate"
-          value={progressValue}
-          sx={{
-            height: 3,
-            borderRadius: 0,
-            mx: { xs: -2, md: -3 },
-            bgcolor: alpha(theme.palette.primary.main, 0.08),
-            '& .MuiLinearProgress-bar': {
-              borderRadius: 0,
-              transition: 'transform 0.45s cubic-bezier(0.0, 0.0, 0.2, 1)',
-            },
-          }}
-        />
+                    {/* Connector line between steps */}
+                    {i < steps.length - 1 && (
+                      <Box sx={{ flex: 1, height: 2, mx: 1, borderRadius: 1, bgcolor: alpha(theme.palette.divider, 0.4), position: 'relative', overflow: 'hidden' }}>
+                        <motion.div
+                          animate={{ scaleX: isDone ? 1 : 0 }}
+                          initial={{ scaleX: 0 }}
+                          transition={{ duration: 0.35, ease: easeOut }}
+                          style={{
+                            position: 'absolute', inset: 0, borderRadius: 4,
+                            backgroundColor: alpha(theme.palette.success.main, 0.5),
+                            transformOrigin: 'left center',
+                          }}
+                        />
+                      </Box>
+                    )}
+                  </Stack>
+                )
+              })}
+            </Stack>
+
+            {/* Thin progress bar */}
+            <LinearProgress
+              variant="determinate"
+              value={progressValue}
+              sx={{
+                height: 3,
+                borderRadius: 0,
+                mx: { xs: -2, md: -3 },
+                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                '& .MuiLinearProgress-bar': {
+                  borderRadius: 0,
+                  transition: 'transform 0.45s cubic-bezier(0.0, 0.0, 0.2, 1)',
+                },
+              }}
+            />
+          </>
+        )}
       </DialogTitle>
 
       {/* ── Scrollable content ───────────────────────────────────────────── */}
@@ -633,7 +741,104 @@ export default function AddIncidentDrawer({
           <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{externalError}</Alert>
         )}
 
-        <AnimatePresence custom={stepDirection} mode="wait">
+        {isReviewMode ? (
+          <Stack spacing={2}>
+            {/* Sticky approval strip */}
+            <Box
+              sx={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 1,
+                bgcolor: 'background.paper',
+                pt: 0.5,
+                pb: 1.5,
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                mb: 1,
+              }}
+            >
+              <ApprovalActionBar
+                approvalStatus={initialData?.approvalStatus}
+                onApprove={onApprove ?? (() => {})}
+                onReject={onReject ?? (() => {})}
+              />
+            </Box>
+
+            {/* Location */}
+            <ReviewInfoCard label="Location">
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {[
+                  initialData?.infoDetails?.governorate,
+                  initialData?.infoDetails?.delegation,
+                  initialData?.infoDetails?.municipality,
+                ].filter(Boolean).join(', ') || initialData?.location || '—'}
+              </Typography>
+              {(initialData?.latitude != null && initialData?.longitude != null) && (
+                <Typography variant="caption" color="text.secondary">
+                  {Number(initialData.latitude).toFixed(4)}, {Number(initialData.longitude).toFixed(4)}
+                </Typography>
+              )}
+            </ReviewInfoCard>
+
+            {/* Incident details */}
+            <ReviewInfoCard label="Incident Details">
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
+                <Chip
+                  size="small"
+                  label={(initialData?.severity || 'unknown').toUpperCase()}
+                  sx={{
+                    fontWeight: 700, fontSize: 10,
+                    bgcolor: SEVERITY_BG[initialData?.severity as string] ?? 'action.selected',
+                    color: SEVERITY_COLOR[initialData?.severity as string] ?? 'text.secondary',
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  {initialData?.accidentDate || initialData?.time || ''}
+                  {initialData?.infoDetails?.accidentTime ? ` · ${initialData.infoDetails.accidentTime}` : ''}
+                </Typography>
+              </Stack>
+              {initialData?.infoDetails?.dayTypeId && (
+                <Typography variant="body2" color="text.secondary">
+                  {`${t('add_incident.day_type_label')}: `}{initialData.infoDetails.dayTypeId.replace(/_/g, ' ').toLowerCase()}
+                </Typography>
+              )}
+            </ReviewInfoCard>
+
+            {/* Summary / description */}
+            <ReviewInfoCard label="Summary">
+              <Typography variant="body2">
+                {initialData?.infoDetails?.summary || initialData?.description || '—'}
+              </Typography>
+            </ReviewInfoCard>
+
+            {/* Outcome */}
+            <ReviewInfoCard label="Outcome">
+              <Stack direction="row" spacing={3}>
+                {[
+                  { label: 'Fatal', value: initialData?.damagesReport?.deadCount ?? initialData?.fatalities ?? 0 },
+                  { label: 'Hospitalized', value: initialData?.damagesReport?.hospitalizedInjuredCount ?? 0 },
+                  { label: 'Light injuries', value: initialData?.damagesReport?.lightlyInjuredCount ?? 0 },
+                  { label: 'Unharmed', value: initialData?.damagesReport?.unharmedCount ?? 0 },
+                ].map((item) => (
+                  <Box key={item.label} sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1 }}>{item.value}</Typography>
+                    <Typography variant="caption" color="text.secondary">{item.label}</Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </ReviewInfoCard>
+
+            {/* Audit trail */}
+            <Box>
+              <Typography variant="overline" sx={{ fontWeight: 800, fontSize: '0.65rem', letterSpacing: 1.2, color: 'text.secondary' }}>
+                {t('approval.audit_trail')}
+              </Typography>
+              <AuditTrailPanel entries={(initialData?.auditLog ?? []) as AuditEntry[]} />
+            </Box>
+          </Stack>
+        ) : (
+          <>
+          <AnimatePresence custom={stepDirection} mode="wait">
           <motion.div
             key={step}
             custom={stepDirection}
@@ -672,9 +877,9 @@ export default function AddIncidentDrawer({
                           if (sector) setValue('infoDetails.sector', sector)
                         }
                       }}
-                      height={isSmall ? 240 : 380}
+                      height={isSmall ? 300 : 460}
                       showSearch
-                      readOnly={false}
+                      readOnly={isReviewMode}
                       showInstructions={false}
                     />
                   </Box>
@@ -707,6 +912,7 @@ export default function AddIncidentDrawer({
                               InputLabelProps={{ shrink: true }}
                               required
                               fullWidth
+                              disabled={isReviewMode}
                             />
                           </Grid>
                           <Grid item xs={6}>
@@ -719,6 +925,7 @@ export default function AddIncidentDrawer({
                               InputLabelProps={{ shrink: true }}
                               required
                               fullWidth
+                              disabled={isReviewMode}
                             />
                           </Grid>
                         </Grid>
@@ -736,20 +943,21 @@ export default function AddIncidentDrawer({
                           maxRows={4}
                           error={showErrors && !form.infoDetails.summary.trim()}
                           helperText={showErrors && !form.infoDetails.summary.trim() ? t('add_incident.field_required') : undefined}
+                          disabled={isReviewMode}
                         />
 
                         <Grid container spacing={1.5}>
                           <Grid item xs={6}>
-                            <TextField size="small" label={t('add_incident.governorate')} value={form.infoDetails.governorate} onChange={(e) => setValue('infoDetails.governorate', e.target.value)} fullWidth />
+                            <TextField size="small" label={t('add_incident.governorate')} value={form.infoDetails.governorate} onChange={(e) => setValue('infoDetails.governorate', e.target.value)} fullWidth disabled={isReviewMode} />
                           </Grid>
                           <Grid item xs={6}>
-                            <TextField size="small" label={t('add_incident.delegation')} value={form.infoDetails.delegation} onChange={(e) => setValue('infoDetails.delegation', e.target.value)} fullWidth />
+                            <TextField size="small" label={t('add_incident.delegation')} value={form.infoDetails.delegation} onChange={(e) => setValue('infoDetails.delegation', e.target.value)} fullWidth disabled={isReviewMode} />
                           </Grid>
                           <Grid item xs={6}>
-                            <TextField size="small" label={t('add_incident.municipality')} value={form.infoDetails.municipality} onChange={(e) => setValue('infoDetails.municipality', e.target.value)} fullWidth />
+                            <TextField size="small" label={t('add_incident.municipality')} value={form.infoDetails.municipality} onChange={(e) => setValue('infoDetails.municipality', e.target.value)} fullWidth disabled={isReviewMode} />
                           </Grid>
                           <Grid item xs={6}>
-                            <TextField size="small" label={t('add_incident.sector')} value={form.infoDetails.sector} onChange={(e) => setValue('infoDetails.sector', e.target.value)} fullWidth />
+                            <TextField size="small" label={t('add_incident.sector')} value={form.infoDetails.sector} onChange={(e) => setValue('infoDetails.sector', e.target.value)} fullWidth disabled={isReviewMode} />
                           </Grid>
                         </Grid>
                       </Stack>
@@ -775,6 +983,7 @@ export default function AddIncidentDrawer({
                               size="small"
                               checked={form.infoDetails.schoolPoint}
                               onChange={(e) => setValue('infoDetails.schoolPoint', e.target.checked)}
+                              disabled={isReviewMode}
                             />
                           }
                           label={
@@ -808,6 +1017,7 @@ export default function AddIncidentDrawer({
                       required
                       error={showErrors && !form.roadConditions.roadName.trim()}
                       helperText={showErrors && !form.roadConditions.roadName.trim() ? t('add_incident.field_required') : undefined}
+                      disabled={isReviewMode}
                     />
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6} md={4}>{renderEnum('roadConditions.roadTypeId', t('add_incident.road_type'), ROAD_TYPE_OPTIONS)}</Grid>
@@ -845,10 +1055,10 @@ export default function AddIncidentDrawer({
                 <Box>
                   <SectionHeader label={t('add_incident.section_participant')} />
                   <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.first_name')} value={form.participant.firstName} onChange={(e) => setValue('participant.firstName', e.target.value)} fullWidth /></Grid>
-                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.last_name')} value={form.participant.lastName} onChange={(e) => setValue('participant.lastName', e.target.value)} fullWidth /></Grid>
-                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.cin')} value={form.participant.cin} onChange={(e) => setValue('participant.cin', e.target.value)} fullWidth /></Grid>
-                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.registration_number')} value={form.participant.registrationNumber} onChange={(e) => setValue('participant.registrationNumber', e.target.value)} fullWidth /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.first_name')} value={form.participant.firstName} onChange={(e) => setValue('participant.firstName', e.target.value)} fullWidth disabled={isReviewMode} /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.last_name')} value={form.participant.lastName} onChange={(e) => setValue('participant.lastName', e.target.value)} fullWidth disabled={isReviewMode} /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.cin')} value={form.participant.cin} onChange={(e) => setValue('participant.cin', e.target.value)} fullWidth disabled={isReviewMode} /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.registration_number')} value={form.participant.registrationNumber} onChange={(e) => setValue('participant.registrationNumber', e.target.value)} fullWidth disabled={isReviewMode} /></Grid>
                     <Grid item xs={12} sm={6} md={3}>{renderEnum('participant.participantType', t('add_incident.participant_type'), PARTICIPANT_TYPE_OPTIONS)}</Grid>
                   </Grid>
                 </Box>
@@ -913,6 +1123,7 @@ export default function AddIncidentDrawer({
                           checked={form.damagesReport.fatalAccident}
                           onChange={(e) => setValue('damagesReport.fatalAccident', e.target.checked)}
                           color="error"
+                          disabled={isReviewMode}
                         />
                       </Stack>
                       <Grid container spacing={1.5}>
@@ -926,6 +1137,7 @@ export default function AddIncidentDrawer({
                             fullWidth
                             inputProps={{ min: 0 }}
                             sx={{ '& .MuiOutlinedInput-root': { borderColor: alpha(theme.palette.error.main, 0.3) } }}
+                            disabled={isReviewMode}
                           />
                         </Grid>
                         <Grid item xs={6} sm={3}>
@@ -937,6 +1149,7 @@ export default function AddIncidentDrawer({
                             onChange={(e) => setValue('damagesReport.hospitalizedInjuredCount', Number(e.target.value) || 0)}
                             fullWidth
                             inputProps={{ min: 0 }}
+                            disabled={isReviewMode}
                           />
                         </Grid>
                         <Grid item xs={6} sm={3}>
@@ -948,6 +1161,7 @@ export default function AddIncidentDrawer({
                             onChange={(e) => setValue('damagesReport.lightlyInjuredCount', Number(e.target.value) || 0)}
                             fullWidth
                             inputProps={{ min: 0 }}
+                            disabled={isReviewMode}
                           />
                         </Grid>
                         <Grid item xs={6} sm={3}>
@@ -959,6 +1173,7 @@ export default function AddIncidentDrawer({
                             onChange={(e) => setValue('damagesReport.unharmedCount', Number(e.target.value) || 0)}
                             fullWidth
                             inputProps={{ min: 0 }}
+                            disabled={isReviewMode}
                           />
                         </Grid>
                       </Grid>
@@ -974,24 +1189,27 @@ export default function AddIncidentDrawer({
                       multiline
                       minRows={2}
                       maxRows={4}
+                      disabled={isReviewMode}
                     />
                   </Stack>
                 </Box>
               </Stack>
             )}
           </motion.div>
-        </AnimatePresence>
+          </AnimatePresence>
 
-        {/* Documents panel — always at bottom of step 2 */}
-        {step === 2 && (
-          <Box sx={{ mt: 3 }}>
-            <Divider sx={{ mb: 3 }} />
-            <IncidentDocumentsPanel
-              accidentId={isEditMode ? String(initialData?.id || '') || null : null}
-              scopeKey={documentScopeKey}
-              enabled={documentsEnabled}
-            />
-          </Box>
+          {/* Documents panel — always at bottom of step 2 */}
+          {step === 2 && (
+            <Box sx={{ mt: 3 }}>
+              <Divider sx={{ mb: 3 }} />
+              <IncidentDocumentsPanel
+                accidentId={(isEditMode || isReviewMode) ? String(initialData?.id || '') || null : null}
+                scopeKey={documentScopeKey}
+                enabled={documentsEnabled}
+              />
+            </Box>
+          )}
+          </>
         )}
       </DialogContent>
 
@@ -1008,116 +1226,127 @@ export default function AddIncidentDrawer({
           zIndex: theme.zIndex.modal + 6,
         }}
       >
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          {/* Back */}
-          <motion.span
-            whileTap={step === 0 ? undefined : { scale: 0.96 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-            style={{ display: 'inline-flex' }}
-          >
-            <Button
-              variant="outlined"
-              startIcon={<ArrowBackRoundedIcon />}
-              onClick={goBack}
-              disabled={step === 0}
-              sx={{ borderRadius: 100, fontWeight: 600, textTransform: 'none', minWidth: 100 }}
-            >
-              {t('add_incident.back')}
-            </Button>
-          </motion.span>
-
-          {/* Cancel + Continue/Submit */}
-          <Stack direction="row" spacing={1.5} alignItems="center">
+        {!isReviewMode ? (
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            {/* Back */}
             <motion.span
-              whileTap={{ scale: 0.96 }}
+              whileTap={step === 0 ? undefined : { scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 500, damping: 38 }}
               style={{ display: 'inline-flex' }}
             >
               <Button
-                onClick={handleClose}
-                sx={{ borderRadius: 100, fontWeight: 600, textTransform: 'none', color: 'text.secondary' }}
+                variant="outlined"
+                startIcon={<ArrowBackRoundedIcon />}
+                onClick={goBack}
+                disabled={step === 0}
+                sx={{ borderRadius: 100, fontWeight: 600, textTransform: 'none', minWidth: 100 }}
               >
-                {t('add_incident.cancel')}
+                {t('add_incident.back')}
               </Button>
             </motion.span>
 
-            <AnimatePresence mode="wait" initial={false}>
-              {step < steps.length - 1 ? (
-                <motion.span
-                  key="continue"
-                  ref={continueButtonRef}
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0, transition: { duration: 0.18, ease: easeOut } }}
-                  exit={{ opacity: 0, x: -8, transition: { duration: 0.12, ease: easeIn } }}
-                  whileTap={!stepIsValid ? undefined : { scale: 0.96 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-                  style={{ display: 'inline-flex' }}
+            {/* Cancel + Continue/Submit */}
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <motion.span
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                style={{ display: 'inline-flex' }}
+              >
+                <Button
+                  onClick={handleClose}
+                  sx={{ borderRadius: 100, fontWeight: 600, textTransform: 'none', color: 'text.secondary' }}
                 >
-                  <Button
-                    variant="contained"
-                    onClick={goNext}
-                    disabled={!stepIsValid}
-                    endIcon={<ArrowForwardRoundedIcon />}
-                    sx={{
-                      borderRadius: 100,
-                      fontWeight: 700,
-                      textTransform: 'none',
-                      minWidth: 130,
-                      boxShadow: stepIsValid ? `0 4px 14px ${alpha(theme.palette.primary.main, 0.3)}` : 'none',
-                      transition: 'box-shadow 0.2s ease',
-                    }}
+                  {t('add_incident.cancel')}
+                </Button>
+              </motion.span>
+
+              <AnimatePresence mode="wait" initial={false}>
+                {step < steps.length - 1 ? (
+                  <motion.span
+                    key="continue"
+                    ref={continueButtonRef}
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0, transition: { duration: 0.18, ease: easeOut } }}
+                    exit={{ opacity: 0, x: -8, transition: { duration: 0.12, ease: easeIn } }}
+                    whileTap={!stepIsValid ? undefined : { scale: 0.96 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                    style={{ display: 'inline-flex' }}
                   >
-                    {t('add_incident.continue')}
-                  </Button>
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="submit"
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0, transition: { duration: 0.18, ease: easeOut } }}
-                  exit={{ opacity: 0, x: -8, transition: { duration: 0.12, ease: easeIn } }}
-                  whileTap={!canSubmit || submitting ? undefined : { scale: 0.96 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-                  style={{ display: 'inline-flex' }}
-                >
-                  <Button
-                    variant="contained"
-                    color="success"
-                    onClick={handleSubmit}
-                    disabled={!canSubmit || submitting}
-                    startIcon={submitting ? undefined : <CheckCircleRoundedIcon />}
-                    sx={{
-                      borderRadius: 100,
-                      fontWeight: 700,
-                      textTransform: 'none',
-                      minWidth: 160,
-                      boxShadow: canSubmit && !submitting ? `0 4px 14px ${alpha(theme.palette.success.main, 0.3)}` : 'none',
-                      transition: 'box-shadow 0.2s ease',
-                    }}
+                    <Button
+                      variant="contained"
+                      onClick={goNext}
+                      disabled={!stepIsValid}
+                      endIcon={<ArrowForwardRoundedIcon />}
+                      sx={{
+                        borderRadius: 100,
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        minWidth: 130,
+                        boxShadow: stepIsValid ? `0 4px 14px ${alpha(theme.palette.primary.main, 0.3)}` : 'none',
+                        transition: 'box-shadow 0.2s ease',
+                      }}
+                    >
+                      {t('add_incident.continue')}
+                    </Button>
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="submit"
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0, transition: { duration: 0.18, ease: easeOut } }}
+                    exit={{ opacity: 0, x: -8, transition: { duration: 0.12, ease: easeIn } }}
+                    whileTap={!canSubmit || submitting ? undefined : { scale: 0.96 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                    style={{ display: 'inline-flex' }}
                   >
-                    {submitting ? (
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Box
-                          component="span"
-                          sx={{
-                            width: 14, height: 14, borderRadius: '50%',
-                            border: '2px solid currentColor',
-                            borderTopColor: 'transparent',
-                            animation: 'spin 0.7s linear infinite',
-                            '@keyframes spin': { to: { transform: 'rotate(360deg)' } },
-                          }}
-                        />
-                        <span>{t('add_incident.submitting')}</span>
-                      </Stack>
-                    ) : (
-                      isEditMode ? t('add_incident.update') : t('add_incident.submit')
-                    )}
-                  </Button>
-                </motion.span>
-              )}
-            </AnimatePresence>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={handleSubmit}
+                      disabled={!canSubmit || submitting}
+                      startIcon={submitting ? undefined : <CheckCircleRoundedIcon />}
+                      sx={{
+                        borderRadius: 100,
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        minWidth: 160,
+                        boxShadow: canSubmit && !submitting ? `0 4px 14px ${alpha(theme.palette.success.main, 0.3)}` : 'none',
+                        transition: 'box-shadow 0.2s ease',
+                      }}
+                    >
+                      {submitting ? (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Box
+                            component="span"
+                            sx={{
+                              width: 14, height: 14, borderRadius: '50%',
+                              border: '2px solid currentColor',
+                              borderTopColor: 'transparent',
+                              animation: 'spin 0.7s linear infinite',
+                              '@keyframes spin': { to: { transform: 'rotate(360deg)' } },
+                            }}
+                          />
+                          <span>{t('add_incident.submitting')}</span>
+                        </Stack>
+                      ) : (
+                        isEditMode ? t('add_incident.update') : t('add_incident.submit')
+                      )}
+                    </Button>
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </Stack>
           </Stack>
-        </Stack>
+        ) : (
+          <Stack direction="row" justifyContent="flex-end">
+            <Button
+              onClick={handleClose}
+              sx={{ borderRadius: 100, fontWeight: 600, textTransform: 'none', color: 'text.secondary' }}
+            >
+              {t('add_incident.close')}
+            </Button>
+          </Stack>
+        )}
       </Box>
     </Dialog>
 

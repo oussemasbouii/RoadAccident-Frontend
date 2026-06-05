@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   Box,
+  Button as MuiButton,
+  Chip,
+  CircularProgress,
   Stack,
   Table,
   TableBody,
@@ -28,9 +31,10 @@ import DirectionsCarRoundedIcon from '@mui/icons-material/DirectionsCarRounded'
 import LocalHospitalRoundedIcon from '@mui/icons-material/LocalHospitalRounded'
 import AccessTimeFilledRoundedIcon from '@mui/icons-material/AccessTimeFilledRounded'
 import EditRoundedIcon from '@mui/icons-material/EditRounded'
+import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 
 import { useAppDispatch, useAppSelector } from '../../../store/store'
-import { fetchIncidents, fetchIncidentById, createIncident, updateIncident, clearError } from '../slices/incidentsSlice'
+import { fetchIncidents, fetchIncidentById, createIncident, updateIncident, clearError, approveIncident, rejectIncident } from '../slices/incidentsSlice'
 import type { Incident } from '../slices/incidentsSlice'
 import Card from '../../../components/Common/Card'
 import AddIncidentDrawer from '../components/AddIncidentDrawer'
@@ -47,8 +51,10 @@ export default function IncidentsPage() {
   const { t } = useTranslation()
   const { locale } = useThemeMode()
   const { list: incidents, loading, stats, error: incidentsError } = useAppSelector((state) => state.incidents)
+  const user = useAppSelector((state) => state.auth.user)
+  const isAdmin = user?.role === 'admin'
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create')
+  const [drawerMode, setDrawerMode] = useState<'create' | 'edit' | 'review'>('create')
   const [editingIncident, setEditingIncident] = useState<any | null>(null)
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [editingIncidentId, setEditingIncidentId] = useState<string | null>(null)
@@ -77,6 +83,23 @@ export default function IncidentsPage() {
       setDrawerOpen(true)
     } catch {
       // Error is already pushed into slice state via thunk rejectWithValue.
+    } finally {
+      setDrawerLoading(false)
+      setEditingIncidentId(null)
+    }
+  }
+
+  const handleOpenReviewDrawer = async (id: string) => {
+    try {
+      setDrawerLoading(true)
+      setEditingIncidentId(id)
+      dispatch(clearError())
+      const payload = await dispatch(fetchIncidentById(id) as any).unwrap()
+      setEditingIncident(payload?.data ?? payload)
+      setDrawerMode('review' as any)
+      setDrawerOpen(true)
+    } catch {
+      // error pushed to slice
     } finally {
       setDrawerLoading(false)
       setEditingIncidentId(null)
@@ -138,6 +161,7 @@ export default function IncidentsPage() {
     return d.toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })
   }
 
+  const pendingCount = (incidents || []).filter((i: Incident) => i.approvalStatus === 'pending').length
   const activeIncidents = displayedIncidents.filter((i: Incident) => i.status !== 'resolved').length
   const totalVehicles = displayedIncidents.reduce((sum: number, i: Incident) => sum + (i.vehicles || 0), 0)
   const totalInjuries = displayedIncidents.reduce((sum: number, i: Incident) => sum + (i.injuries || 0), 0)
@@ -192,9 +216,7 @@ export default function IncidentsPage() {
             <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('incidents.map_title')}</Typography>
           <Typography variant="body2" color="text.secondary">{t('incidents.map_subtitle')}</Typography>
         </Box>
-        <Box sx={{ p: 2 }}>
-          <IncidentsMap incidents={displayedIncidents} height={420} />
-        </Box>
+        <IncidentsMap incidents={displayedIncidents} height="clamp(480px, 60vh, 640px)" />
       </Card>
 
       {/* Filtering controls */}
@@ -250,7 +272,17 @@ export default function IncidentsPage() {
       <Card sx={{ p: 0, overflow: 'hidden' }}>
         <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('incidents.title')}</Typography>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('incidents.title')}</Typography>
+                {isAdmin && pendingCount > 0 && (
+                  <Chip
+                    size="small"
+                    label={`${pendingCount} pending review`}
+                    color="warning"
+                    sx={{ height: 20, fontSize: 10, fontWeight: 700 }}
+                  />
+                )}
+              </Stack>
               <Typography variant="body2" color="text.secondary">
                 {displayedIncidents.length} {t('incidents.reports_in_view')}
               </Typography>
@@ -315,6 +347,10 @@ export default function IncidentsPage() {
                       sx={{
                         '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
                         transition: 'background-color 0.15s ease',
+                        ...(incident.approvalStatus === 'pending' && {
+                          borderLeft: `3px solid ${theme.palette.warning.main}`,
+                          bgcolor: alpha(theme.palette.warning.main, 0.02),
+                        }),
                       }}
                     >
                       <TableCell sx={{ fontWeight: 800, color: 'primary.main', py: 2.5 }}>
@@ -337,30 +373,70 @@ export default function IncidentsPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          label={statusLabel[incident.status] ?? (incident.status.charAt(0).toUpperCase() + incident.status.slice(1))}
-                          variant={statusColor[incident.status as 'active' | 'responded' | 'resolved']}
-                          size="sm"
-                        />
+                        <Stack spacing={0.5} alignItems="flex-start">
+                          {incident.approvalStatus === 'pending' && (
+                            <Chip
+                              size="small"
+                              label="Pending Review"
+                              color="warning"
+                              variant="outlined"
+                              sx={{ height: 18, fontSize: 9, fontWeight: 700 }}
+                            />
+                          )}
+                          <Badge
+                            label={statusLabel[incident.status] ?? (incident.status.charAt(0).toUpperCase() + incident.status.slice(1))}
+                            variant={statusColor[incident.status as 'active' | 'responded' | 'resolved']}
+                            size="sm"
+                          />
+                        </Stack>
                       </TableCell>
                       <TableCell sx={{ color: 'text.secondary', fontWeight: 500 }}>
                         {formatTime(incident.time)}
                       </TableCell>
                       <TableCell align="right">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          icon={<EditRoundedIcon sx={{ fontSize: 16 }} />}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleOpenEditDrawer(incident.id)
-                          }}
-                          loading={drawerLoading && editingIncidentId === incident.id}
-                          disabled={drawerLoading && editingIncidentId !== incident.id}
-                          aria-label={`${t('common.edit')} incident ${incident.id}`}
-                        >
-                          {drawerLoading && editingIncidentId === incident.id ? t('incidents.opening') : t('common.edit')}
-                        </Button>
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<EditRoundedIcon sx={{ fontSize: 16 }} />}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleOpenEditDrawer(incident.id)
+                            }}
+                            loading={drawerLoading && editingIncidentId === incident.id}
+                            disabled={drawerLoading && editingIncidentId !== incident.id}
+                            aria-label={`${t('common.edit')} incident ${incident.id}`}
+                          >
+                            {drawerLoading && editingIncidentId === incident.id ? t('incidents.opening') : t('common.edit')}
+                          </Button>
+                          {isAdmin && incident.approvalStatus === 'pending' && (
+                            <MuiButton
+                              variant="outlined"
+                              size="small"
+                              startIcon={drawerLoading && editingIncidentId === incident.id
+                                ? <CircularProgress size={14} color="inherit" />
+                                : <RateReviewRoundedIcon sx={{ fontSize: 16 }} />}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleOpenReviewDrawer(incident.id)
+                              }}
+                              disabled={drawerLoading}
+                              aria-label={`review incident ${incident.id}`}
+                              sx={{
+                                borderRadius: 100,
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                fontSize: 12,
+                                py: 0.5,
+                                color: 'warning.main',
+                                borderColor: 'warning.main',
+                                '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.08), borderColor: 'warning.main' },
+                              }}
+                            >
+                              Review
+                            </MuiButton>
+                          )}
+                        </Stack>
                       </TableCell>
                       <TableCell align="right">
                         <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
@@ -394,6 +470,18 @@ export default function IncidentsPage() {
           const created = await dispatch(createIncident(payload) as any).unwrap()
           const createdData = created?.data ?? created
           return createdData
+        }}
+        onApprove={async (comment) => {
+          if (editingIncident?.id) {
+            await dispatch(approveIncident({ id: String(editingIncident.id), comment }) as any).unwrap()
+            handleCloseDrawer()
+          }
+        }}
+        onReject={async (comment) => {
+          if (editingIncident?.id) {
+            await dispatch(rejectIncident({ id: String(editingIncident.id), comment }) as any).unwrap()
+            handleCloseDrawer()
+          }
         }}
       />
 

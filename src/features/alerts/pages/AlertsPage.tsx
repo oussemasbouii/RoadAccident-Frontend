@@ -354,7 +354,7 @@ export default function AlertsPage() {
                   longitude: String(location.longitude),
                 }))
               }}
-              height={320}
+              height="clamp(380px, 48vh, 480px)"
               readOnly={false}
               showSearch
               showInstructions={false}
@@ -379,15 +379,17 @@ export default function AlertsPage() {
         </Stack>
       </Card>
 
-      <Card sx={{ p: 3 }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-          <PlaceRoundedIcon color="primary" fontSize="small" />
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('alerts.title')} {t('incidents.map_title')}</Typography>
-        </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          {t('alerts.subtitle')}
-        </Typography>
-        <AlertsMap alerts={mapAlerts} height={360} />
+      <Card sx={{ p: 0, overflow: 'hidden' }}>
+        <Box sx={{ px: 3, pt: 2.5, pb: 2 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <PlaceRoundedIcon color="primary" fontSize="small" />
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('alerts.title')} {t('incidents.map_title')}</Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {t('alerts.subtitle')}
+          </Typography>
+        </Box>
+        <AlertsMap alerts={mapAlerts} height="clamp(480px, 60vh, 640px)" />
       </Card>
 
       <Card sx={{ p: 0, overflow: 'hidden' }}>

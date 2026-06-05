@@ -353,7 +353,7 @@ export default function OfficerTrackingPage() {
       </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }, gap: 2.5 }}>
-        <Card sx={{ minHeight: 520, overflow: 'hidden', position: 'relative' }}>
+        <Card sx={{ minHeight: 640, overflow: 'hidden', position: 'relative' }}>
           <Box
             sx={{
               position: 'absolute',
@@ -377,7 +377,7 @@ export default function OfficerTrackingPage() {
             </Typography>
             <Chip size="small" label={`${officers.length} ${t('dashboard.tracking')}`} />
           </Box>
-          <Box sx={{ height: { xs: 420, lg: 520 } }}>
+          <Box sx={{ height: { xs: 520, lg: 640 } }}>
             <OfficerTrackingMap
               officers={officers}
               selectedId={selectedId}
