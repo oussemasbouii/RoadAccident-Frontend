@@ -12,6 +12,7 @@ import LayersRoundedIcon from '@mui/icons-material/LayersRounded'
 import FiberManualRecordRoundedIcon from '@mui/icons-material/FiberManualRecord'
 import type { Incident } from '../../../incidents/slices/incidentsSlice'
 import { getMapStyle } from '@/utils/mapStyle'
+import { getMapControlSx } from '@/utils/mapControlSx'
 import { useTranslation } from '../../../../themeMode'
 
 type Coords = { lat: number; lng: number }
@@ -88,10 +89,13 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
   const theme    = useTheme()
   const { t }    = useTranslation()
 
+  const isDark = theme.palette.mode === 'dark'
+
   const containerRef     = useRef<HTMLDivElement>(null)
   const mapRef           = useRef<maplibregl.Map | null>(null)
   const sourceLoaded     = useRef(false)
   const popupRef         = useRef<maplibregl.Popup | null>(null)
+  const isDarkRef        = useRef(isDark)
   // Refs to avoid stale closures inside map callbacks
   const incidentsRef     = useRef(incidents)
   const resolvedRef      = useRef<Record<string, Coords>>({})
@@ -110,6 +114,7 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
   // Keep refs in sync
   incidentsRef.current = incidents
   resolvedRef.current  = resolvedCoords
+  isDarkRef.current    = isDark
 
   // ── Fit bounds helper ───────────────────────────────────────
   const handleFitBounds = () => {
@@ -199,16 +204,22 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
           if (!feat) return
           const [lng, lat] = feat.geometry.coordinates
           const { location, severity, status } = feat.properties ?? {}
+          const dark = isDarkRef.current
+          const bg = dark ? '#1e293b' : '#ffffff'
+          const textMain = dark ? '#f1f5f9' : '#0f172a'
+          const textSub  = dark ? '#94a3b8' : '#64748b'
+          const sevColor = SEV_COLORS[severity] ?? '#64748b'
           popupRef.current?.remove()
-          popupRef.current = new maplibregl.Popup({ closeButton: true, offset: 10, maxWidth: '220px' })
+          popupRef.current = new maplibregl.Popup({ closeButton: true, offset: 10, anchor: 'bottom' })
             .setLngLat([lng, lat])
-            .setHTML(`
-              <div style="font-family:system-ui,sans-serif;padding:2px 0">
-                <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:4px">${location ?? 'Unknown'}</div>
-                <span style="display:inline-block;font-size:10px;font-weight:700;color:${SEV_COLORS[severity] ?? '#64748b'};background:${SEV_COLORS[severity]}20;padding:1px 6px;border-radius:4px;margin-right:4px;text-transform:capitalize">${severity ?? '—'}</span>
-                <span style="font-size:10px;color:#64748b;text-transform:capitalize">${status ?? '—'}</span>
-              </div>
-            `)
+            .setHTML(
+              `<div style="font-family:ui-sans-serif,system-ui,sans-serif;background:${bg};padding:10px 12px 9px;border-radius:8px;min-width:160px">` +
+              `<div style="font-size:12px;font-weight:700;color:${textMain};margin-bottom:6px;line-height:1.35">${location ?? 'Unknown'}</div>` +
+              `<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">` +
+              `<span style="font-size:10px;font-weight:700;color:${sevColor};background:${sevColor}20;padding:2px 7px;border-radius:999px;border:1px solid ${sevColor}40;text-transform:capitalize">${severity ?? '—'}</span>` +
+              `<span style="font-size:10px;color:${textSub};text-transform:capitalize">${status ?? '—'}</span>` +
+              `</div></div>`
+            )
             .addTo(map)
         })
         map.on('mouseenter', 'incidents-circles', () => { map.getCanvas().style.cursor = 'pointer' })
@@ -223,7 +234,11 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
       setMapError('Map initialization failed')
     }
 
+    const ro = new ResizeObserver(() => mapRef.current?.resize())
+    if (containerRef.current) ro.observe(containerRef.current)
+
     return () => {
+      ro.disconnect()
       popupRef.current?.remove()
       mapRef.current?.remove()
       mapRef.current = null
@@ -311,8 +326,32 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
       </Box>
 
       {/* Map */}
-      <Box sx={{ position: 'relative', height: 460, flexShrink: 0 }}>
-        <Box ref={containerRef} sx={{ width: '100%', height: '100%' }} />
+      <Box sx={{ position: 'relative', height: 'clamp(460px, 58vh, 600px)', flexShrink: 0 }}>
+        <Box
+          ref={containerRef}
+          sx={{
+            width: '100%', height: '100%',
+            ...getMapControlSx(theme),
+            '& .maplibregl-popup-content': {
+              padding: '0 !important',
+              borderRadius: '10px !important',
+              border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+              boxShadow: `0 8px 20px ${alpha(theme.palette.common.black, isDark ? 0.35 : 0.14)}`,
+              backgroundColor: `${isDark ? '#1e293b' : '#ffffff'} !important`,
+              overflow: 'hidden',
+            },
+            '& .maplibregl-popup-close-button': {
+              top: 5, right: 5, width: 20, height: 20, borderRadius: '50%',
+              fontSize: '13px', lineHeight: '19px',
+              color: isDark ? '#94a3b8' : '#64748b',
+              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.06)',
+            },
+            '& .maplibregl-popup-tip': {
+              borderTopColor: `${isDark ? '#1e293b' : '#ffffff'} !important`,
+              borderBottomColor: `${isDark ? '#1e293b' : '#ffffff'} !important`,
+            },
+          }}
+        />
 
         {/* Severity legend overlay */}
         <Box
