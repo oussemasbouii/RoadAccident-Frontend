@@ -96,16 +96,16 @@ function buildPopupHtml(
     `<div style="display:flex;align-items:flex-start;gap:9px">${clockIcon}<span style="font-size:11px;color:${textSub};min-width:52px;flex-shrink:0;line-height:1.5">${labels.lastSeen}</span><span style="font-size:11px;color:${textSub};line-height:1.5">${escapeHtml(updatedAt)}</span></div>`
   )
 
-  return `<div style="width:268px;font-family:Inter,system-ui,-apple-system,sans-serif;background:${bg};overflow:hidden;border-radius:14px">
-  <div style="display:flex;align-items:center;gap:12px;padding:14px 38px 13px 14px;border-bottom:1px solid ${border}">
-    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,${color}28 0%,${color}12 100%);border:2px solid ${color}50;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;font-size:14px;color:${color};letter-spacing:0.5px;font-family:inherit">${initials}</div>
+  return `<div style="width:210px;font-family:Inter,system-ui,-apple-system,sans-serif;background:${bg};overflow:hidden;border-radius:14px">
+  <div style="display:flex;align-items:center;gap:10px;padding:11px 32px 10px 12px;border-bottom:1px solid ${border}">
+    <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,${color}28 0%,${color}12 100%);border:2px solid ${color}50;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;font-size:12px;color:${color};letter-spacing:0.5px;font-family:inherit">${initials}</div>
     <div style="overflow:hidden;min-width:0">
-      <div style="font-weight:700;font-size:14px;color:${textMain};line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
-      ${officerId && officerId !== name ? `<div style="font-size:11px;color:${textSub};margin-top:2px;letter-spacing:0.1px">ID · ${officerId}</div>` : ''}
+      <div style="font-weight:700;font-size:13px;color:${textMain};line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+      ${officerId && officerId !== name ? `<div style="font-size:10px;color:${textSub};margin-top:2px;letter-spacing:0.1px">ID · ${officerId}</div>` : ''}
     </div>
   </div>
-  ${badge && status ? `<div style="padding:9px 14px;background:${surface};border-bottom:1px solid ${border}"><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 11px 3px 8px;border-radius:999px;font-size:11px;font-weight:600;background:${badge.bg};color:${badge.fg};box-shadow:inset 0 0 0 1px ${badge.fg}22"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0;box-shadow:0 0 0 2px ${color}30"></span>${status}</span></div>` : ''}
-  ${rows.length > 0 ? `<div style="padding:11px 14px;display:flex;flex-direction:column;gap:9px">${rows.join('')}</div>` : ''}
+  ${badge && status ? `<div style="padding:7px 12px;background:${surface};border-bottom:1px solid ${border}"><span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px 2px 7px;border-radius:999px;font-size:10px;font-weight:600;background:${badge.bg};color:${badge.fg};box-shadow:inset 0 0 0 1px ${badge.fg}22"><span style="width:5px;height:5px;border-radius:50%;background:${color};flex-shrink:0;box-shadow:0 0 0 2px ${color}30"></span>${status}</span></div>` : ''}
+  ${rows.length > 0 ? `<div style="padding:9px 12px;display:flex;flex-direction:column;gap:7px">${rows.join('')}</div>` : ''}
 </div>`
 }
 
@@ -266,7 +266,7 @@ export default function OfficerTrackingMap({
         if (!id) return
         onSelectRef.current?.(id)
         popupRef.current?.remove()
-        popupRef.current = new maplibregl.Popup({ offset: 16 })
+        popupRef.current = new maplibregl.Popup({ offset: 16, anchor: 'bottom' })
           .setLngLat((feature?.geometry as GeoJSON.Point).coordinates as [number, number])
           .setHTML(buildPopupHtml(props, isDarkRef.current, popupLabels()))
           .addTo(map)
@@ -353,7 +353,7 @@ export default function OfficerTrackingMap({
     const meta = metaByIdRef.current.get(selectedId)
     if (!coords || !meta) return
     popupRef.current?.remove()
-    popupRef.current = new maplibregl.Popup({ offset: 16 })
+    popupRef.current = new maplibregl.Popup({ offset: 16, anchor: 'bottom' })
       .setLngLat([coords.lng, coords.lat])
       .setHTML(buildPopupHtml(
         { id: meta.id, name: meta.name, officerId: meta.officerId, role: meta.role, status: meta.status, updatedAt: meta.updatedAt, phoneNumber: meta.phoneNumber },

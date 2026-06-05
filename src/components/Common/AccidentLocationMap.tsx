@@ -134,8 +134,8 @@ export default function AccidentLocationMap({
     const textMainC = isDark ? '#f1f5f9' : '#0f172a'
     const textSubC = isDark ? '#94a3b8' : '#64748b'
     marker.current.setPopup(
-      new maplibregl.Popup({ offset: 25, className: 'accident-location-popup' }).setHTML(
-        `<div style="font-family:ui-sans-serif,system-ui,-apple-system,Roboto,sans-serif;overflow:hidden">` +
+      new maplibregl.Popup({ offset: 25, anchor: 'bottom', className: 'accident-location-popup' }).setHTML(
+        `<div style="font-family:ui-sans-serif,system-ui,-apple-system,Roboto,sans-serif;overflow:hidden;background:${popupBg}">` +
         `<div style="height:3px;background:${accentColor}"></div>` +
         `<div style="padding:11px 14px 12px;display:flex;align-items:center;gap:10px">` +
         `<div style="width:32px;height:32px;border-radius:50%;background:${accentColor}18;border:1.5px solid ${accentColor}3a;display:flex;align-items:center;justify-content:center;flex-shrink:0">` +
@@ -215,7 +215,7 @@ export default function AccidentLocationMap({
             border: `1px solid ${alpha(theme.palette.divider, 0.95)}`,
             boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, isDark ? 0.35 : 0.14)}`,
             backgroundColor: isDark ? '#1e293b' : '#ffffff',
-            minWidth: 220,
+            minWidth: 175,
           },
           '& .maplibregl-popup.accident-location-popup .maplibregl-popup-close-button': {
             top: 6,

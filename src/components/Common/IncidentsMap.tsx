@@ -238,27 +238,27 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
 
       const clockSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
 
-      const popup = new maplibregl.Popup({ offset: 22, maxWidth: '300px' }).setHTML(
-        `<div style="width:272px;font-family:Inter,system-ui,-apple-system,sans-serif;background:${bgColor};overflow:hidden;border-radius:12px">
+      const popup = new maplibregl.Popup({ offset: 22, anchor: 'bottom' }).setHTML(
+        `<div style="width:210px;font-family:Inter,system-ui,-apple-system,sans-serif;background:${bgColor};overflow:hidden;border-radius:12px">
           <div style="height:3px;background:${pinColor};border-radius:12px 12px 0 0"></div>
-          <div style="padding:13px 38px 11px 14px">
-            <div style="font-weight:700;font-size:13px;color:${textMain};line-height:1.4;margin-bottom:9px">${safeLocation}</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:999px;background:${pinColor}18;color:${pinColor};border:1px solid ${pinColor}40;text-transform:uppercase;letter-spacing:0.6px">${safeSeverity}</span>
-              <span style="font-size:10px;font-weight:600;padding:2px 9px;border-radius:999px;background:${sp.bg};color:${sp.fg};border:1px solid ${sp.b}">${safeStatus}</span>
+          <div style="padding:10px 32px 9px 12px">
+            <div style="font-weight:700;font-size:12px;color:${textMain};line-height:1.4;margin-bottom:7px">${safeLocation}</div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap">
+              <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:${pinColor}18;color:${pinColor};border:1px solid ${pinColor}40;text-transform:uppercase;letter-spacing:0.5px">${safeSeverity}</span>
+              <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;background:${sp.bg};color:${sp.fg};border:1px solid ${sp.b}">${safeStatus}</span>
             </div>
           </div>
           <div style="display:flex;border-top:1px solid ${border}">
-            <div style="flex:1;padding:11px 14px;text-align:center;border-right:1px solid ${border}">
-              <div style="font-size:24px;font-weight:800;color:${textMain};line-height:1;letter-spacing:-0.5px">${incident.vehicles}</div>
-              <div style="font-size:10px;color:${textSub};margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">${t('incidents.vehicles')}</div>
+            <div style="flex:1;padding:8px 10px;text-align:center;border-right:1px solid ${border}">
+              <div style="font-size:18px;font-weight:800;color:${textMain};line-height:1;letter-spacing:-0.5px">${incident.vehicles}</div>
+              <div style="font-size:9px;color:${textSub};margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">${t('incidents.vehicles')}</div>
             </div>
-            <div style="flex:1;padding:11px 14px;text-align:center">
-              <div style="font-size:24px;font-weight:800;color:${incident.injuries > 0 ? '#ef4444' : textMain};line-height:1;letter-spacing:-0.5px">${incident.injuries}</div>
-              <div style="font-size:10px;color:${textSub};margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">${t('incidents.injuries')}</div>
+            <div style="flex:1;padding:8px 10px;text-align:center">
+              <div style="font-size:18px;font-weight:800;color:${incident.injuries > 0 ? '#ef4444' : textMain};line-height:1;letter-spacing:-0.5px">${incident.injuries}</div>
+              <div style="font-size:9px;color:${textSub};margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">${t('incidents.injuries')}</div>
             </div>
           </div>
-          ${safeTime ? `<div style="padding:8px 14px;font-size:11px;color:${textSub};display:flex;align-items:center;gap:5px;border-top:1px solid ${border}">${clockSvg}${safeTime}</div>` : ''}
+          ${safeTime ? `<div style="padding:6px 12px;font-size:10px;color:${textSub};display:flex;align-items:center;gap:5px;border-top:1px solid ${border}">${clockSvg}${safeTime}</div>` : ''}
         </div>`
       )
 

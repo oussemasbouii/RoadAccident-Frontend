@@ -123,8 +123,8 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
       const accentColor = alert.direction === 'sent' ? '#2563eb' : '#d97706'
       const chipBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.85)'
 
-      const popup = new maplibregl.Popup({ offset: 20, className: 'alerts-map-popup' }).setHTML(
-        `<div class="alerts-popup-card">
+      const popup = new maplibregl.Popup({ offset: 20, anchor: 'bottom', className: 'alerts-map-popup' }).setHTML(
+        `<div class="alerts-popup-card" style="background:${popupBg}">
           <div class="alerts-popup-accent" style="--accent:${accentColor}"></div>
           <div class="alerts-popup-body">
             <div class="alerts-popup-chips">
@@ -179,8 +179,8 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
           backgroundColor: popupBg,
           color: textMain,
           padding: 0,
-          minWidth: 260,
-          maxWidth: 320,
+          minWidth: 185,
+          maxWidth: 250,
         },
         '& .maplibregl-popup.alerts-map-popup .maplibregl-popup-close-button': {
           fontSize: '16px',
