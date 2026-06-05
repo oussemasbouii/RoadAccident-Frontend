@@ -223,22 +223,42 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
       const bgColor  = isDark ? '#1e293b' : '#ffffff'
       const textMain = isDark ? '#f1f5f9' : '#0f172a'
       const textSub  = isDark ? '#94a3b8' : '#475569'
-      const border   = isDark ? '#334155' : '#e2e8f0'
-      const popup = new maplibregl.Popup({ offset: 22, maxWidth: '280px' }).setHTML(
-        `<div style="padding:10px 12px;font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.4;background:${bgColor};border-radius:12px">
-          <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${pinColor};flex-shrink:0"></span>
-            <span style="font-weight:700;font-size:13px;color:${textMain}">${safeLocation}</span>
+      const border   = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.07)'
+
+      const statusPalette: Record<string, { bg: string; fg: string; b: string }> = {
+        active:    { bg: '#fef3c7', fg: '#92400e', b: '#fcd34d' },
+        responded: { bg: '#dbeafe', fg: '#1d4ed8', b: '#93c5fd' },
+        resolved:  { bg: '#dcfce7', fg: '#15803d', b: '#86efac' },
+      }
+      const sp = statusPalette[incident.status] ?? {
+        bg: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.06)',
+        fg: textSub,
+        b: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.10)',
+      }
+
+      const clockSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
+
+      const popup = new maplibregl.Popup({ offset: 22, maxWidth: '300px' }).setHTML(
+        `<div style="width:272px;font-family:Inter,system-ui,-apple-system,sans-serif;background:${bgColor};overflow:hidden;border-radius:12px">
+          <div style="height:3px;background:${pinColor};border-radius:12px 12px 0 0"></div>
+          <div style="padding:13px 38px 11px 14px">
+            <div style="font-weight:700;font-size:13px;color:${textMain};line-height:1.4;margin-bottom:9px">${safeLocation}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:999px;background:${pinColor}18;color:${pinColor};border:1px solid ${pinColor}40;text-transform:uppercase;letter-spacing:0.6px">${safeSeverity}</span>
+              <span style="font-size:10px;font-weight:600;padding:2px 9px;border-radius:999px;background:${sp.bg};color:${sp.fg};border:1px solid ${sp.b}">${safeStatus}</span>
+            </div>
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">
-            <span style="font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:${pinColor}22;color:${pinColor};border:1px solid ${pinColor}44">${safeSeverity.toUpperCase()}</span>
-            <span style="font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:${bgColor};color:${textSub};border:1px solid ${border}">${safeStatus}</span>
+          <div style="display:flex;border-top:1px solid ${border}">
+            <div style="flex:1;padding:11px 14px;text-align:center;border-right:1px solid ${border}">
+              <div style="font-size:24px;font-weight:800;color:${textMain};line-height:1;letter-spacing:-0.5px">${incident.vehicles}</div>
+              <div style="font-size:10px;color:${textSub};margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">${t('incidents.vehicles')}</div>
+            </div>
+            <div style="flex:1;padding:11px 14px;text-align:center">
+              <div style="font-size:24px;font-weight:800;color:${incident.injuries > 0 ? '#ef4444' : textMain};line-height:1;letter-spacing:-0.5px">${incident.injuries}</div>
+              <div style="font-size:10px;color:${textSub};margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">${t('incidents.injuries')}</div>
+            </div>
           </div>
-          <div style="font-size:11px;color:${textSub};display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid ${border};padding-top:6px">
-            <span>${t('incidents.vehicles')}: <strong>${incident.vehicles}</strong></span>
-            <span>${t('incidents.injuries')}: <strong style="color:${incident.injuries > 0 ? '#ef4444' : textSub}">${incident.injuries}</strong></span>
-          </div>
-          ${safeTime ? `<div style="font-size:10px;color:${textSub};margin-top:4px">${safeTime}</div>` : ''}
+          ${safeTime ? `<div style="padding:8px 14px;font-size:11px;color:${textSub};display:flex;align-items:center;gap:5px;border-top:1px solid ${border}">${clockSvg}${safeTime}</div>` : ''}
         </div>`
       )
 
@@ -271,9 +291,19 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
         '& .maplibregl-popup-content': {
           borderRadius: '12px',
           border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
-          boxShadow: `0 14px 28px ${alpha(theme.palette.common.black, isDark ? 0.4 : 0.18)}`,
+          boxShadow: `0 20px 40px ${alpha(theme.palette.common.black, isDark ? 0.45 : 0.2)}`,
           backgroundColor: popupBg,
           padding: 0,
+          overflow: 'hidden',
+        },
+        '& .maplibregl-popup-close-button': {
+          top: 8, right: 8,
+          width: 24, height: 24, lineHeight: '24px', fontSize: '16px',
+          borderRadius: '50%', fontWeight: 400,
+          color: '#ffffff',
+          backgroundColor: 'rgba(0,0,0,0.25)',
+          '&:hover': { backgroundColor: 'rgba(0,0,0,0.4)' },
+          zIndex: 2,
         },
         '& .maplibregl-popup-tip': {
           borderTopColor: `${popupBg} !important`,

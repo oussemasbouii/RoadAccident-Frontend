@@ -120,20 +120,23 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
       const readStatus = alert.read ? t('common.yes') : t('common.no')
       const directionChipColor = alert.direction === 'sent' ? '#1d4ed8' : '#b45309'
       const readChipColor = alert.read ? '#15803d' : '#b91c1c'
+      const accentColor = alert.direction === 'sent' ? '#2563eb' : '#d97706'
+      const chipBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.85)'
 
       const popup = new maplibregl.Popup({ offset: 20, className: 'alerts-map-popup' }).setHTML(
         `<div class="alerts-popup-card">
-          <div class="alerts-popup-header">
-            <div class="alerts-popup-title">${title}</div>
+          <div class="alerts-popup-accent" style="--accent:${accentColor}"></div>
+          <div class="alerts-popup-body">
             <div class="alerts-popup-chips">
-              <span class="alerts-popup-chip" style="--chip-color:${directionChipColor};">${direction}</span>
-              <span class="alerts-popup-chip" style="--chip-color:${readChipColor};">${readStatus}</span>
+              <span class="alerts-popup-chip" style="--chip-color:${directionChipColor};--chip-bg:${chipBg}">${direction}</span>
+              <span class="alerts-popup-chip" style="--chip-color:${readChipColor};--chip-bg:${chipBg}">${readStatus}</span>
             </div>
+            <div class="alerts-popup-title">${title}</div>
+            ${comment ? `<div class="alerts-popup-message">${comment}</div>` : ''}
           </div>
-          ${comment ? `<div class="alerts-popup-message">${comment}</div>` : ''}
-          <div class="alerts-popup-meta">
-            ${time ? `<div>${time}</div>` : ''}
-            <div>Lat ${alert.latitude?.toFixed(5)} | Lng ${alert.longitude?.toFixed(5)}</div>
+          <div class="alerts-popup-footer">
+            ${time ? `<div class="alerts-popup-time">${time}</div>` : ''}
+            <div class="alerts-popup-coords">${alert.latitude?.toFixed(5)}, ${alert.longitude?.toFixed(5)}</div>
           </div>
         </div>`
       )
@@ -192,15 +195,20 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
         },
         '& .maplibregl-popup.alerts-map-popup .alerts-popup-card': {
           fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-          padding: '12px 12px 10px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
+          overflow: 'hidden',
         },
-        '& .maplibregl-popup.alerts-map-popup .alerts-popup-header': {
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-accent': {
+          height: '3px',
+          background: 'var(--accent)',
+          flexShrink: 0,
+        },
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-body': {
+          padding: '11px 36px 10px 14px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '6px',
+          gap: '7px',
         },
         '& .maplibregl-popup.alerts-map-popup .alerts-popup-title': {
           fontSize: '13px',
@@ -219,7 +227,7 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
           fontWeight: 700,
           borderRadius: '999px',
           border: '1px solid var(--chip-color)',
-          backgroundColor: isDark ? alpha(divider, 0.5) : '#f8fafc',
+          backgroundColor: 'var(--chip-bg)',
           color: 'var(--chip-color)',
           padding: '2px 8px',
           textTransform: 'uppercase',
@@ -230,14 +238,22 @@ export default function AlertsMap({ alerts, height = 360 }: AlertsMapProps) {
           color: textSub,
           lineHeight: 1.4,
         },
-        '& .maplibregl-popup.alerts-map-popup .alerts-popup-meta': {
-          fontSize: '11px',
-          color: textSub,
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-footer': {
+          padding: '7px 14px 8px',
+          borderTop: `1px dashed ${alpha(divider, 0.55)}`,
           display: 'flex',
           flexDirection: 'column',
           gap: '2px',
-          paddingTop: '6px',
-          borderTop: `1px dashed ${alpha(divider, 0.6)}`,
+        },
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-time': {
+          fontSize: '11px',
+          color: textSub,
+        },
+        '& .maplibregl-popup.alerts-map-popup .alerts-popup-coords': {
+          fontSize: '10px',
+          color: textSub,
+          opacity: 0.75,
+          fontFamily: 'ui-monospace, "Cascadia Mono", "Fira Code", monospace',
         },
         '& .maplibregl-popup.alerts-map-popup .maplibregl-popup-tip': {
           borderTopColor: `${popupBg} !important`,

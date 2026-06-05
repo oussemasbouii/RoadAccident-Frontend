@@ -42,6 +42,7 @@ export default function AccidentLocationMap({
 }: AccidentLocationMapProps) {
   const theme = useTheme()
   const { t } = useTranslation()
+  const isDark = theme.palette.mode === 'dark'
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const marker = useRef<maplibregl.Marker | null>(null)
@@ -128,9 +129,26 @@ export default function AccidentLocationMap({
       .setLngLat([lng, lat])
       .addTo(map.current)
 
-    marker.current.setPopup(new maplibregl.Popup({ offset: 25 }).setHTML(
-      `<div style="padding:4px 6px;font-family:system-ui,sans-serif"><strong>${t('maps.collision_location')}</strong><br/><small style="color:#64748b">Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}</small></div>`
-    ))
+    const accentColor = markerVariant === 'alert' ? '#2563eb' : '#dc2626'
+    const popupBg = isDark ? '#1e293b' : '#ffffff'
+    const textMainC = isDark ? '#f1f5f9' : '#0f172a'
+    const textSubC = isDark ? '#94a3b8' : '#64748b'
+    marker.current.setPopup(
+      new maplibregl.Popup({ offset: 25, className: 'accident-location-popup' }).setHTML(
+        `<div style="font-family:ui-sans-serif,system-ui,-apple-system,Roboto,sans-serif;overflow:hidden">` +
+        `<div style="height:3px;background:${accentColor}"></div>` +
+        `<div style="padding:11px 14px 12px;display:flex;align-items:center;gap:10px">` +
+        `<div style="width:32px;height:32px;border-radius:50%;background:${accentColor}18;border:1.5px solid ${accentColor}3a;display:flex;align-items:center;justify-content:center;flex-shrink:0">` +
+        `<svg width="14" height="14" viewBox="0 0 24 24" fill="${accentColor}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>` +
+        `</div>` +
+        `<div>` +
+        `<div style="font-size:12px;font-weight:700;color:${textMainC};letter-spacing:0.1px">${t('maps.collision_location')}</div>` +
+        `<div style="font-size:10.5px;color:${textSubC};font-family:ui-monospace,'Cascadia Mono','Fira Code',monospace;margin-top:3px">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>` +
+        `</div>` +
+        `</div>` +
+        `</div>`
+      )
+    )
   }
 
   const updateLocation = (lat: number, lng: number, description?: string) => {
@@ -190,6 +208,30 @@ export default function AccidentLocationMap({
             fontSize: '11px',
           },
           '& .maplibregl-ctrl-attrib a': { color: theme.palette.text.primary },
+          '& .maplibregl-popup.accident-location-popup .maplibregl-popup-content': {
+            padding: 0,
+            overflow: 'hidden',
+            borderRadius: '12px',
+            border: `1px solid ${alpha(theme.palette.divider, 0.95)}`,
+            boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, isDark ? 0.35 : 0.14)}`,
+            backgroundColor: isDark ? '#1e293b' : '#ffffff',
+            minWidth: 220,
+          },
+          '& .maplibregl-popup.accident-location-popup .maplibregl-popup-close-button': {
+            top: 6,
+            right: 6,
+            width: 22,
+            height: 22,
+            borderRadius: '50%',
+            fontSize: '14px',
+            lineHeight: '20px',
+            color: isDark ? '#94a3b8' : '#64748b',
+            backgroundColor: isDark ? alpha('#334155', 0.9) : alpha('#f1f5f9', 0.9),
+          },
+          '& .maplibregl-popup.accident-location-popup .maplibregl-popup-tip': {
+            borderTopColor: `${isDark ? '#1e293b' : '#ffffff'} !important`,
+            borderBottomColor: `${isDark ? '#1e293b' : '#ffffff'} !important`,
+          },
         }}
       />
 

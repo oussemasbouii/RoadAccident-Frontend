@@ -58,12 +58,16 @@ function buildPopupHtml(
   isDark: boolean,
   labels: PopupLabels,
 ): string {
-  const bg      = isDark ? '#1e293b' : '#ffffff'
+  const bg       = isDark ? '#1e293b' : '#ffffff'
+  const surface  = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.025)'
   const textMain = isDark ? '#f1f5f9' : '#0f172a'
   const textSub  = isDark ? '#94a3b8' : '#64748b'
+  const border   = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.07)'
   const linkColor = isDark ? '#60a5fa' : '#2563eb'
 
-  const title = escapeHtml(properties.name || properties.officerId || properties.id || labels.officer)
+  const rawName = String(properties.name || '')
+  const name = escapeHtml(rawName || properties.officerId || properties.id || labels.officer)
+  const officerId = properties.officerId ? escapeHtml(String(properties.officerId)) : null
   const color = statusColor(String(properties.status || ''))
   const status = properties.status ? escapeHtml(String(properties.status)) : null
   const role   = properties.role   ? escapeHtml(String(properties.role))   : null
@@ -73,22 +77,36 @@ function buildPopupHtml(
     : null
 
   const badge = status ? statusBadgeColors(status) : null
-  const rows = [
-    role     ? `<div style="display:flex;gap:6px"><span style="color:${textSub};font-size:11px;min-width:56px">${labels.role}</span><span style="color:${textMain}">${role}</span></div>` : '',
-    phone    ? `<div style="display:flex;gap:6px"><span style="color:${textSub};font-size:11px;min-width:56px">${labels.phone}</span><a href="tel:${phone}" style="color:${linkColor};text-decoration:none">${phone}</a></div>` : '',
-    updatedAt ? `<div style="display:flex;gap:6px;margin-top:3px"><span style="color:${textSub};font-size:11px;min-width:56px">${labels.lastSeen}</span><span style="color:${textSub};font-size:11px">${escapeHtml(updatedAt)}</span></div>` : '',
-  ].filter(Boolean).join('')
+  const initials = rawName.trim()
+    ? rawName.trim().split(/\s+/).map((w: string) => w[0]?.toUpperCase() ?? '').slice(0, 2).join('')
+    : (labels.officer[0]?.toUpperCase() ?? 'O')
 
-  return `
-    <div style="min-width:200px;font-family:Inter,system-ui,sans-serif;padding:2px;background:${bg}">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,0.9)"></div>
-        <div style="font-weight:700;font-size:14px;color:${textMain};line-height:1.2">${title}</div>
-      </div>
-      ${badge && status ? `<div style="display:inline-block;margin-bottom:8px;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:${badge.bg};color:${badge.fg}">${status}</div>` : ''}
-      <div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:${textMain}">${rows}</div>
+  const phoneIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${textSub}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1A19.5 19.5 0 0 1 4.1 11.8 19.8 19.8 0 0 1 1 3.2 2 2 0 0 1 3 1h3a2 2 0 0 1 2 1.7 12.7 12.7 0 0 0 .7 2.8 2 2 0 0 1-.5 2.1L7.1 8.9a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5 12.7 12.7 0 0 0 2.8.7A2 2 0 0 1 22 16.9z"/></svg>`
+  const roleIcon  = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${textSub}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`
+  const clockIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${textSub}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
+
+  const rows: string[] = []
+  if (role) rows.push(
+    `<div style="display:flex;align-items:flex-start;gap:9px">${roleIcon}<span style="font-size:11px;color:${textSub};min-width:52px;flex-shrink:0;line-height:1.5">${labels.role}</span><span style="font-size:12px;color:${textMain};font-weight:500;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${role}</span></div>`
+  )
+  if (phone) rows.push(
+    `<div style="display:flex;align-items:flex-start;gap:9px">${phoneIcon}<span style="font-size:11px;color:${textSub};min-width:52px;flex-shrink:0;line-height:1.5">${labels.phone}</span><a href="tel:${phone}" style="font-size:12px;color:${linkColor};font-weight:600;text-decoration:none;line-height:1.5">${phone}</a></div>`
+  )
+  if (updatedAt) rows.push(
+    `<div style="display:flex;align-items:flex-start;gap:9px">${clockIcon}<span style="font-size:11px;color:${textSub};min-width:52px;flex-shrink:0;line-height:1.5">${labels.lastSeen}</span><span style="font-size:11px;color:${textSub};line-height:1.5">${escapeHtml(updatedAt)}</span></div>`
+  )
+
+  return `<div style="width:268px;font-family:Inter,system-ui,-apple-system,sans-serif;background:${bg};overflow:hidden;border-radius:14px">
+  <div style="display:flex;align-items:center;gap:12px;padding:14px 38px 13px 14px;border-bottom:1px solid ${border}">
+    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,${color}28 0%,${color}12 100%);border:2px solid ${color}50;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;font-size:14px;color:${color};letter-spacing:0.5px;font-family:inherit">${initials}</div>
+    <div style="overflow:hidden;min-width:0">
+      <div style="font-weight:700;font-size:14px;color:${textMain};line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+      ${officerId && officerId !== name ? `<div style="font-size:11px;color:${textSub};margin-top:2px;letter-spacing:0.1px">ID · ${officerId}</div>` : ''}
     </div>
-  `
+  </div>
+  ${badge && status ? `<div style="padding:9px 14px;background:${surface};border-bottom:1px solid ${border}"><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 11px 3px 8px;border-radius:999px;font-size:11px;font-weight:600;background:${badge.bg};color:${badge.fg};box-shadow:inset 0 0 0 1px ${badge.fg}22"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0;box-shadow:0 0 0 2px ${color}30"></span>${status}</span></div>` : ''}
+  ${rows.length > 0 ? `<div style="padding:11px 14px;display:flex;flex-direction:column;gap:9px">${rows.join('')}</div>` : ''}
+</div>`
 }
 
 type PointState = { lng: number; lat: number }
@@ -367,9 +385,19 @@ export default function OfficerTrackingMap({
         '& .maplibregl-popup-content': {
           borderRadius: '14px',
           border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-          boxShadow: `0 16px 32px ${alpha(theme.palette.common.black, isDark ? 0.4 : 0.2)}`,
+          boxShadow: `0 20px 40px ${alpha(theme.palette.common.black, isDark ? 0.45 : 0.22)}`,
           backgroundColor: popupBg,
-          padding: '12px 14px',
+          padding: 0,
+          overflow: 'hidden',
+        },
+        '& .maplibregl-popup-close-button': {
+          top: 9, right: 9,
+          width: 24, height: 24, lineHeight: '24px', fontSize: '16px',
+          borderRadius: '50%', fontWeight: 400,
+          color: isDark ? '#94a3b8' : '#64748b',
+          backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.06)',
+          '&:hover': { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.12)' },
+          zIndex: 2,
         },
         '& .maplibregl-popup-tip': {
           borderTopColor: `${popupBg} !important`,
