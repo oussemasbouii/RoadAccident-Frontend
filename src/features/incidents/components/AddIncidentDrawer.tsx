@@ -541,6 +541,10 @@ export default function AddIncidentDrawer({
         participants: [{
           ...form.participant,
           id: participantId,
+          age: form.participant.age !== '' ? Number(form.participant.age) : null,
+          gender: form.participant.gender || null,
+          licenseStatus: form.participant.licenseStatus || null,
+          licenseIssueDate: form.participant.licenseIssueDate || null,
           taxId: '', passportNumber: '', eHouwiya: '', commercialType: '', usageType: '',
           vehicleNationality: '', registrationCardNumber: '', chassisNumber: '',
           insuranceContractNumber: '', insuranceContractDate: '', orangeCardNumber: '',
