@@ -32,6 +32,8 @@ interface IncidentsState {
   total: number
   page: number
   stats: IncidentStats
+  reportGenerating: boolean
+  reportError: string | null
 }
 
 const initialState: IncidentsState = {
@@ -42,6 +44,8 @@ const initialState: IncidentsState = {
   total: 0,
   page: 1,
   stats: { open: 0, resolved: 0, fatalities: 0, avgResponseTime: 0 },
+  reportGenerating: false,
+  reportError: null,
 }
 
 const unwrapResponseData = (payload: any) => payload?.data ?? payload
@@ -277,11 +281,22 @@ function toAccidentCreatePayload(payload: Record<string, unknown>): Record<strin
       alcoholLevel: '',
       drugTest: 'NOT_DONE',
       infraction: 'NONE',
+      gender: null,
+      age: null,
+      driverNationality: '',
+      licenseStatus: null,
+      licenseIssueDate: null,
+      speedInfraction: 'NONE',
+      adminInfraction: 'NONE',
+      otherInfraction: 'NONE',
+      pedestrianInfraction: 'NONE',
+      continuousDrivingHoursId: 'UNKNOWN',
     })),
     damagesReport: {
       responsiblePartyIds: [],
       fatalAccident: false,
       accidentCauseId: severityToCauseId[severity] || 'OTHER',
+      accidentCauseId2: null,
       deadCount: 0,
       hospitalizedInjuredCount: injuries,
       lightlyInjuredCount: injuries,
@@ -347,6 +362,20 @@ export const updateIncident = createAsyncThunk(
         error.response?.data?.message
           || error.response?.data?.error
           || (typeof error.response?.data === 'string' ? error.response.data : 'Failed to update incident')
+      )
+    }
+  }
+)
+
+export const generateIncidentReport = createAsyncThunk(
+  'incidents/generateReport',
+  async ({ id, documentType }: { id: string; documentType: 'PDF' | 'DOCX' }, { rejectWithValue }) => {
+    try {
+      const response = await apiService.incidents.generateReport(id, { documentType })
+      return response.data
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || 'Failed to generate report'
       )
     }
   }
@@ -449,6 +478,17 @@ const incidentsSlice = createSlice({
       state.error = action.payload as string
     })
 
+    builder.addCase(generateIncidentReport.pending, (state) => {
+      state.reportGenerating = true
+      state.reportError = null
+    })
+    builder.addCase(generateIncidentReport.fulfilled, (state) => {
+      state.reportGenerating = false
+    })
+    builder.addCase(generateIncidentReport.rejected, (state, action) => {
+      state.reportGenerating = false
+      state.reportError = action.payload as string
+    })
   },
 })
 
