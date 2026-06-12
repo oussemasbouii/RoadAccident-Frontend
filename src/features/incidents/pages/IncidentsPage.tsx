@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
+  Alert,
   Box,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -54,14 +56,23 @@ export default function IncidentsPage() {
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [editingIncidentId, setEditingIncidentId] = useState<string | null>(null)
   const [generatingReportId, setGeneratingReportId] = useState<string | null>(null)
+  const [reportSnackbar, setReportSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' })
 
   const handleGenerateReport = async (id: string) => {
     try {
       setGeneratingReportId(id)
       const result = await dispatch(generateIncidentReport({ id, documentType: 'PDF' }) as any).unwrap()
-      if (result?.url) window.open(result.url, '_blank', 'noopener,noreferrer')
-    } catch {
-      // error handled by slice state
+      // Handle both flat { url } and envelope { data: { url } } responses
+      const url = result?.url || result?.data?.url
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer')
+        setReportSnackbar({ open: true, message: t('incidents.generate_report') + ' OK', severity: 'success' })
+      } else {
+        setReportSnackbar({ open: true, message: 'Report generated but no download URL returned.', severity: 'error' })
+      }
+    } catch (err: any) {
+      const msg = err?.message || err?.response?.data?.message || 'Failed to generate report.'
+      setReportSnackbar({ open: true, message: msg, severity: 'error' })
     } finally {
       setGeneratingReportId(null)
     }
@@ -424,6 +435,21 @@ export default function IncidentsPage() {
           return createdData
         }}
       />
+
+      <Snackbar
+        open={reportSnackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setReportSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity={reportSnackbar.severity}
+          onClose={() => setReportSnackbar((s) => ({ ...s, open: false }))}
+          sx={{ borderRadius: 3 }}
+        >
+          {reportSnackbar.message}
+        </Alert>
+      </Snackbar>
 
     </Stack>
   )
