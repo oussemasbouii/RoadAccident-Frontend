@@ -258,6 +258,8 @@ const en: TranslationMessages = {
     reports_in_view: 'report(s) in current view',
     opening: 'Opening...',
     edit: 'Edit',
+    generate_report: 'Generate PDF',
+    generating_report: 'Generating...',
     vehicles: 'Vehicles',
     injuries: 'Injuries',
   },

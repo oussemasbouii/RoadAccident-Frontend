@@ -28,9 +28,10 @@ import DirectionsCarRoundedIcon from '@mui/icons-material/DirectionsCarRounded'
 import LocalHospitalRoundedIcon from '@mui/icons-material/LocalHospitalRounded'
 import AccessTimeFilledRoundedIcon from '@mui/icons-material/AccessTimeFilledRounded'
 import EditRoundedIcon from '@mui/icons-material/EditRounded'
+import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded'
 
 import { useAppDispatch, useAppSelector } from '../../../store/store'
-import { fetchIncidents, fetchIncidentById, createIncident, updateIncident, clearError } from '../slices/incidentsSlice'
+import { fetchIncidents, fetchIncidentById, createIncident, updateIncident, clearError, generateIncidentReport } from '../slices/incidentsSlice'
 import type { Incident } from '../slices/incidentsSlice'
 import Card from '../../../components/Common/Card'
 import AddIncidentDrawer from '../components/AddIncidentDrawer'
@@ -52,6 +53,19 @@ export default function IncidentsPage() {
   const [editingIncident, setEditingIncident] = useState<any | null>(null)
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [editingIncidentId, setEditingIncidentId] = useState<string | null>(null)
+  const [generatingReportId, setGeneratingReportId] = useState<string | null>(null)
+
+  const handleGenerateReport = async (id: string) => {
+    try {
+      setGeneratingReportId(id)
+      const result = await dispatch(generateIncidentReport({ id, documentType: 'PDF' }) as any).unwrap()
+      if (result?.url) window.open(result.url, '_blank', 'noopener,noreferrer')
+    } catch {
+      // error handled by slice state
+    } finally {
+      setGeneratingReportId(null)
+    }
+  }
 
   const handleCloseDrawer = () => {
     setDrawerOpen(false)
@@ -345,20 +359,36 @@ export default function IncidentsPage() {
                         {formatTime(incident.time)}
                       </TableCell>
                       <TableCell align="right">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          icon={<EditRoundedIcon sx={{ fontSize: 16 }} />}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleOpenEditDrawer(incident.id)
-                          }}
-                          loading={drawerLoading && editingIncidentId === incident.id}
-                          disabled={drawerLoading && editingIncidentId !== incident.id}
-                          aria-label={`${t('common.edit')} incident ${incident.id}`}
-                        >
-                          {drawerLoading && editingIncidentId === incident.id ? t('incidents.opening') : t('common.edit')}
-                        </Button>
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<EditRoundedIcon sx={{ fontSize: 16 }} />}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleOpenEditDrawer(incident.id)
+                            }}
+                            loading={drawerLoading && editingIncidentId === incident.id}
+                            disabled={drawerLoading && editingIncidentId !== incident.id}
+                            aria-label={`${t('common.edit')} incident ${incident.id}`}
+                          >
+                            {drawerLoading && editingIncidentId === incident.id ? t('incidents.opening') : t('common.edit')}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={<PictureAsPdfRoundedIcon sx={{ fontSize: 16 }} />}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleGenerateReport(incident.id)
+                            }}
+                            loading={generatingReportId === incident.id}
+                            disabled={generatingReportId !== null && generatingReportId !== incident.id}
+                            aria-label={`Generate PDF for incident ${incident.id}`}
+                          >
+                            {generatingReportId === incident.id ? t('incidents.generating_report') : t('incidents.generate_report')}
+                          </Button>
+                        </Stack>
                       </TableCell>
                       <TableCell align="right">
                         <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>

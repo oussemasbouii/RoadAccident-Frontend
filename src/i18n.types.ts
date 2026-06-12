@@ -259,6 +259,8 @@ export type TranslationMessages = {
     reports_in_view: string
     opening: string
     edit: string
+    generate_report: string
+    generating_report: string
     vehicles: string
     injuries: string
   }

@@ -258,6 +258,8 @@ const ar: TranslationMessages = {
     reports_in_view: 'تقرير/تقارير في العرض الحالي',
     opening: 'جارٍ الفتح...',
     edit: 'تعديل',
+    generate_report: 'إنشاء PDF',
+    generating_report: 'جارٍ الإنشاء...',
     vehicles: 'مركبات',
     injuries: 'إصابات',
   },
