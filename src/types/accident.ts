@@ -261,6 +261,77 @@ export type InfractionCode =
   | 'PHONE_USE'
   | 'OTHER'
 
+export type GenderCode = 'MALE' | 'FEMALE' | 'UNKNOWN'
+
+export type LicenseStatusCode =
+  | 'VALID'
+  | 'EXPIRED'
+  | 'SUSPENDED'
+  | 'DRIVING_SCHOOL'
+  | 'INVALID_CATEGORY'
+  | 'NO_LICENSE'
+  | 'ACCOMPANIED_DRIVING'
+
+export type SpeedInfractionCode =
+  | 'INAPPROPRIATE_SPEED'
+  | 'EXCEEDING_LIMIT'
+  | 'SLOW_OBSTRUCTING'
+  | 'NONE'
+  | 'UNKNOWN'
+
+export type AdminInfractionCode =
+  | 'NO_ADEQUATE_LICENSE'
+  | 'EXPIRED_LICENSE'
+  | 'EXCESS_LOAD'
+  | 'NO_TECHNICAL_INSPECTION'
+  | 'TACHOGRAPH_NOT_CHECKED'
+  | 'NONE'
+  | 'UNKNOWN'
+
+export type OtherInfractionCode =
+  | 'DISTRACTED_DRIVING'
+  | 'IMPROPER_LIGHTING'
+  | 'WRONG_WAY'
+  | 'PARTIAL_WRONG_WAY'
+  | 'IMPROPER_TURN'
+  | 'ILLEGAL_OVERTAKING'
+  | 'ZIGZAG_DRIVING'
+  | 'INSUFFICIENT_DISTANCE'
+  | 'UNJUSTIFIED_BRAKING'
+  | 'FAILURE_TO_YIELD'
+  | 'DISREGARD_TRAFFIC_LIGHTS'
+  | 'DISREGARD_STOP_SIGN'
+  | 'DISREGARD_YIELD_SIGN'
+  | 'DISREGARD_PEDESTRIAN_CROSSING'
+  | 'DISREGARD_OTHER_SIGNAL'
+  | 'IMPROPER_SIGNALING'
+  | 'UNSAFE_ENTRY'
+  | 'DANGEROUS_PARKING'
+  | 'UNSAFE_DOOR_OPENING'
+  | 'OTHER'
+  | 'NONE'
+
+export type PedestrianInfractionCode =
+  | 'DISREGARD_PEDESTRIAN_SIGNAL'
+  | 'NOT_USING_CROSSWALK'
+  | 'DISREGARD_AGENT_SIGNAL'
+  | 'ILLEGAL_CROSSING'
+  | 'IMPROPER_ON_ROADWAY'
+  | 'IMPROPER_ON_SHOULDER'
+  | 'IMPROPER_BOARDING'
+  | 'OTHER'
+  | 'NONE'
+
+export type ContinuousDrivingHoursCode =
+  | 'UNDER_20MIN'
+  | 'FROM_20MIN_TO_1H'
+  | 'FROM_1H_TO_3H'
+  | 'FROM_3H_TO_5H'
+  | 'OVER_5H'
+  | 'UNKNOWN'
+
+export type ReferenceCode = 'NATIONAL_GUARD' | 'POLICE'
+
 export type AccidentCauseCode =
   | 'INATTENTION'
   | 'INAPPROPRIATE_SPEED'
@@ -365,6 +436,9 @@ export interface RoadInfo {
   pavement: RoadPavementCode
   trafficRegime: TrafficRegimeCode
   trafficDirection: TrafficDirectionCode
+  locality?: string
+  roadNature?: string
+  pk?: string
 }
 
 export interface EnvironmentalConditions {
@@ -412,12 +486,23 @@ export interface ParticipantInfo {
   action: ActionCode
   travelReason: TravelReasonCode
   plannedTrip: PlannedTripCode
+  age?: number | null
+  gender?: GenderCode | null
+  driverNationality?: string
+  licenseStatus?: LicenseStatusCode | null
+  licenseIssueDate?: string | null
+  speedInfraction?: SpeedInfractionCode | null
+  adminInfraction?: AdminInfractionCode | null
+  otherInfraction?: OtherInfractionCode | null
+  pedestrianInfraction?: PedestrianInfractionCode | null
+  continuousDrivingHoursId?: ContinuousDrivingHoursCode | null
 }
 
 export interface AccidentDetails {
   type: AccidentTypeCode
   subType: AccidentSubTypeCode
   causes: AccidentCauseCode[]
+  accidentCauseId2?: AccidentCauseCode | null
   contributingFactors?: string[]
   description: string
   witnessInfo?: string
@@ -564,4 +649,14 @@ export interface CreateAccidentErrorResponse {
   success: boolean
   errors: AccidentValidationError[]
   message: string
+}
+
+export interface GenerateReportRequest {
+  documentType: 'PDF' | 'DOCX'
+}
+
+export interface GenerateReportResponse {
+  url: string
+  filename: string
+  expiresAt: string
 }
