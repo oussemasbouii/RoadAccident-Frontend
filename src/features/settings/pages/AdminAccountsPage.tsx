@@ -240,6 +240,7 @@ export default function AdminAccountsPage() {
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [centerFilter, setCenterFilter] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -254,7 +255,13 @@ export default function AdminAccountsPage() {
     try {
       setLoading(true)
       setError(null)
-      const resp = await apiService.users.list({ search: query.trim() || undefined, page: 1, limit: 50 })
+      const resp = await apiService.users.list({
+        search: query.trim() || undefined,
+        role: (roleFilter as 'officer' | 'supervisor' | 'admin') || undefined,
+        center: centerFilter.trim() || undefined,
+        page: 1,
+        limit: 50,
+      })
       
       // Debug: Log the full response to understand the data structure
       if (import.meta.env.DEV) {
@@ -320,16 +327,15 @@ export default function AdminAccountsPage() {
   // Client-side filtering
   const filteredOfficers = useMemo(() => {
     return officers.filter((o) => {
-      // Role filter
       if (roleFilter && o.role !== roleFilter) return false
-      
-      // Status filter
       if (statusFilter) {
         const status = deriveStatus(o)
         if (status !== statusFilter) return false
       }
-      
-      // Search query (client-side additional filtering)
+      if (centerFilter.trim()) {
+        const cl = centerFilter.toLowerCase().trim()
+        if (!o.center?.toLowerCase().includes(cl)) return false
+      }
       if (query.trim()) {
         const searchLower = query.toLowerCase().trim()
         const matchesName = (o.firstName?.toLowerCase().includes(searchLower) ||
@@ -340,10 +346,9 @@ export default function AdminAccountsPage() {
         const matchesOfficerId = o.officerId?.toLowerCase().includes(searchLower)
         if (!matchesName && !matchesEmail && !matchesOfficerId) return false
       }
-      
       return true
     })
-  }, [officers, roleFilter, statusFilter, query])
+  }, [officers, roleFilter, statusFilter, centerFilter, query])
 
   return (
     <Stack spacing={4} sx={{ pb: 4 }}>
@@ -395,6 +400,14 @@ export default function AdminAccountsPage() {
               <MenuItem value="blocked">{t('admin_accounts.blocked')}</MenuItem>
             </Select>
           </FormControl>
+          <TextField
+            label={t('settings.center')}
+            variant="outlined"
+            size="small"
+            value={centerFilter}
+            onChange={(e) => setCenterFilter(e.target.value)}
+            sx={{ bgcolor: 'background.paper' }}
+          />
         </Box>
       </Card>
 
