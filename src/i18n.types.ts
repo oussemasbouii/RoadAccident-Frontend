@@ -635,6 +635,9 @@ export type TranslationMessages = {
     zone: string
     urbanity: string
     road_name: string
+    locality: string
+    road_nature: string
+    pk: string
     sinuosity: string
     marking: string
     plan_layout: string

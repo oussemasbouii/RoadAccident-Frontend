@@ -1052,7 +1052,37 @@ export default function AddIncidentDrawer({
                       required
                       error={showErrors && !form.roadConditions.roadName.trim()}
                       helperText={showErrors && !form.roadConditions.roadName.trim() ? t('add_incident.field_required') : undefined}
-                                         />
+                    />
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                          size="small"
+                          label={t('add_incident.locality')}
+                          value={form.roadConditions.locality}
+                          onChange={(e) => setValue('roadConditions.locality', e.target.value)}
+                          fullWidth
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                          size="small"
+                          label={t('add_incident.road_nature')}
+                          value={form.roadConditions.roadNature}
+                          onChange={(e) => setValue('roadConditions.roadNature', e.target.value)}
+                          fullWidth
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <TextField
+                          size="small"
+                          label={t('add_incident.pk')}
+                          placeholder="e.g. 12+500"
+                          value={form.roadConditions.pk}
+                          onChange={(e) => setValue('roadConditions.pk', e.target.value)}
+                          fullWidth
+                        />
+                      </Grid>
+                    </Grid>
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6} md={4}>{renderEnum('roadConditions.roadTypeId', t('add_incident.road_type'), ROAD_TYPE_OPTIONS)}</Grid>
                       <Grid item xs={12} sm={6} md={4}>{renderEnum('roadConditions.networkCategoryId', t('add_incident.network_category'), NETWORK_CATEGORY_OPTIONS)}</Grid>
