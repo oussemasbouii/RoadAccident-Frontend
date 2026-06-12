@@ -92,6 +92,14 @@ const ALCOHOL_OPTIONS = ['NOT_DONE', 'NEGATIVE', 'POSITIVE', 'REFUSED']
 const DRUG_OPTIONS = ['NOT_DONE', 'NEGATIVE', 'POSITIVE', 'REFUSED']
 const INFRACTION_OPTIONS = ['NONE', 'SPEEDING', 'RED_LIGHT', 'STOP_SIGN', 'WRONG_WAY', 'NO_LICENSE', 'EXPIRED_LICENSE', 'NO_INSURANCE', 'DUI', 'PHONE_USE', 'OTHER']
 const ACCIDENT_CAUSE_OPTIONS = ['INATTENTION', 'INAPPROPRIATE_SPEED', 'INFRACTION', 'INEXPERIENCE', 'FATIGUE', 'ALCOHOL_DRUGS', 'ILLNESS', 'ROAD_CONDITION', 'SIGNAGE_CONDITION', 'VEHICLE_CONDITION', 'BREAKDOWN', 'OVERLOAD', 'ADVERSE_WEATHER', 'GLARE', 'ANIMAL', 'OTHER', 'NO_OPINION']
+const GENDER_OPTIONS = ['MALE', 'FEMALE', 'UNKNOWN']
+const LICENSE_STATUS_OPTIONS = ['VALID', 'EXPIRED', 'SUSPENDED', 'DRIVING_SCHOOL', 'INVALID_CATEGORY', 'NO_LICENSE', 'ACCOMPANIED_DRIVING']
+const SPEED_INFRACTION_OPTIONS = ['INAPPROPRIATE_SPEED', 'EXCEEDING_LIMIT', 'SLOW_OBSTRUCTING', 'NONE', 'UNKNOWN']
+const ADMIN_INFRACTION_OPTIONS = ['NO_ADEQUATE_LICENSE', 'EXPIRED_LICENSE', 'EXCESS_LOAD', 'NO_TECHNICAL_INSPECTION', 'TACHOGRAPH_NOT_CHECKED', 'NONE', 'UNKNOWN']
+const OTHER_INFRACTION_OPTIONS = ['DISTRACTED_DRIVING', 'IMPROPER_LIGHTING', 'WRONG_WAY', 'PARTIAL_WRONG_WAY', 'IMPROPER_TURN', 'ILLEGAL_OVERTAKING', 'ZIGZAG_DRIVING', 'INSUFFICIENT_DISTANCE', 'UNJUSTIFIED_BRAKING', 'FAILURE_TO_YIELD', 'DISREGARD_TRAFFIC_LIGHTS', 'DISREGARD_STOP_SIGN', 'DISREGARD_YIELD_SIGN', 'DISREGARD_PEDESTRIAN_CROSSING', 'DISREGARD_OTHER_SIGNAL', 'IMPROPER_SIGNALING', 'UNSAFE_ENTRY', 'DANGEROUS_PARKING', 'UNSAFE_DOOR_OPENING', 'OTHER', 'NONE']
+const PEDESTRIAN_INFRACTION_OPTIONS = ['DISREGARD_PEDESTRIAN_SIGNAL', 'NOT_USING_CROSSWALK', 'DISREGARD_AGENT_SIGNAL', 'ILLEGAL_CROSSING', 'IMPROPER_ON_ROADWAY', 'IMPROPER_ON_SHOULDER', 'IMPROPER_BOARDING', 'OTHER', 'NONE']
+const CONTINUOUS_DRIVING_OPTIONS = ['UNDER_20MIN', 'FROM_20MIN_TO_1H', 'FROM_1H_TO_3H', 'FROM_3H_TO_5H', 'OVER_5H', 'UNKNOWN']
+const REFERENCE_OPTIONS = ['NATIONAL_GUARD', 'POLICE']
 const ACCIDENT_TYPE_OPTIONS = ['COLLISION_MOVING', 'COLLISION_OBSTACLE', 'COLLISION_PEDESTRIAN_ANIMAL', 'ROLLOVER_ON_ROADWAY', 'RUNOFF_LEFT_COLLISION', 'RUNOFF_RIGHT_COLLISION', 'RUNOFF_LEFT_NO_COLLISION', 'RUNOFF_RIGHT_NO_COLLISION', 'OTHER']
 const ACCIDENT_SUBTYPE_OPTIONS = ['FRONT', 'REAR', 'SIDE', 'FRONT_SIDE', 'CHAIN', 'MULTIPLE', 'PARKED_VEHICLE', 'SAFETY_BARRIER', 'LEVEL_CROSSING_BARRIER', 'SIGNAL_SUPPORT', 'ISLAND_REFUGE', 'OTHER_OBJECT', 'PEDESTRIAN_GROUP', 'PEDESTRIAN_BICYCLE', 'PEDESTRIAN_REPAIR', 'ANIMAL_DRIVER', 'ANIMAL_HERD', 'DOMESTIC_ANIMAL', 'WILD_ANIMAL', 'ROLLOVER_ON_ROADWAY', 'LEFT_TREE', 'LEFT_POLE', 'LEFT_BUILDING', 'LEFT_STREET_FURNITURE', 'LEFT_CURB', 'LEFT_DITCH', 'LEFT_OTHER', 'RIGHT_TREE', 'RIGHT_POLE', 'RIGHT_BUILDING', 'RIGHT_STREET_FURNITURE', 'RIGHT_CURB', 'RIGHT_DITCH', 'RIGHT_OTHER', 'LEFT_FALL', 'LEFT_ROLLOVER', 'LEFT_FLAT', 'LEFT_OTHER_NO_COLLISION', 'RIGHT_FALL', 'RIGHT_ROLLOVER', 'RIGHT_FLAT', 'RIGHT_OTHER_NO_COLLISION', 'PASSENGER_FALL', 'VEHICLE_FIRE', 'COLLISION_TRAIN', 'COLLISION_METRO', 'OTHER']
 
@@ -126,6 +134,7 @@ function makeInitialForm() {
     schoolPoint: false,
     zoneId: 'ROAD',
     urbanityId: 'OUTSIDE_AGGLOMERATION',
+    reference: 'POLICE' as string,
   },
   roadConditions: {
     roadSinuosityId: 'UNIQUE',
@@ -137,6 +146,9 @@ function makeInitialForm() {
     andStreet: '',
     intersectionStreet: '',
     designation: '',
+    locality: '',
+    roadNature: '',
+    pk: '',
     roadTypeId: 'CONVENTIONAL_2X1',
     networkCategoryId: 'LOCAL',
     trafficRegimeId: 'BIDIRECTIONAL',
@@ -181,10 +193,21 @@ function makeInitialForm() {
     alcoholLevel: '',
     drugTest: 'NOT_DONE',
     infraction: 'NONE',
+    gender: '' as string,
+    age: '' as string,
+    driverNationality: '',
+    licenseStatus: '' as string,
+    licenseIssueDate: '',
+    speedInfraction: 'NONE',
+    adminInfraction: 'NONE',
+    otherInfraction: 'NONE',
+    pedestrianInfraction: 'NONE',
+    continuousDrivingHoursId: 'UNKNOWN',
   },
   damagesReport: {
     fatalAccident: false,
     accidentCauseId: 'INATTENTION',
+    accidentCauseId2: '' as string,
     deadCount: 0,
     hospitalizedInjuredCount: 0,
     lightlyInjuredCount: 0,
@@ -303,6 +326,7 @@ export default function AddIncidentDrawer({
         accidentSituationId: ensureEnumStr(info.accidentSituationId, ACCIDENT_SITUATION_OPTIONS, 'ON_ROAD'),
         zoneId: ensureEnumStr(info.zoneId, ZONE_OPTIONS, 'ROAD'),
         urbanityId: ensureEnumStr(info.urbanityId, URBANITY_OPTIONS, 'OUTSIDE_AGGLOMERATION'),
+        reference: ensureEnumStr(info.reference, REFERENCE_OPTIONS, 'POLICE'),
       },
       roadConditions: {
         ...fallback.roadConditions,
@@ -316,6 +340,9 @@ export default function AddIncidentDrawer({
         trafficDirectionId: ensureEnumStr(road.trafficDirectionId, TRAFFIC_DIRECTION_OPTIONS, 'BOTH'),
         roadWidthId: ensureEnumStr(road.roadWidthId, ROAD_WIDTH_OPTIONS, 'LESS_325'),
         laneWidthId: ensureEnumStr(road.laneWidthId, LANE_WIDTH_OPTIONS, 'LESS_6'),
+        locality: String(road.locality ?? ''),
+        roadNature: String(road.roadNature ?? ''),
+        pk: String(road.pk ?? ''),
       },
       environmentConditions: {
         ...fallback.environmentConditions,
@@ -342,11 +369,22 @@ export default function AddIncidentDrawer({
         alcoholTest: ensureEnumStr(participant.alcoholTest, ALCOHOL_OPTIONS, 'NOT_DONE'),
         drugTest: ensureEnumStr(participant.drugTest, DRUG_OPTIONS, 'NOT_DONE'),
         infraction: ensureEnumStr(participant.infraction, INFRACTION_OPTIONS, 'NONE'),
+        gender: ensureEnumStr(participant.gender, GENDER_OPTIONS, ''),
+        age: participant.age != null ? String(participant.age) : '',
+        driverNationality: String(participant.driverNationality ?? ''),
+        licenseStatus: ensureEnumStr(participant.licenseStatus, LICENSE_STATUS_OPTIONS, ''),
+        licenseIssueDate: String(participant.licenseIssueDate ?? ''),
+        speedInfraction: ensureEnumStr(participant.speedInfraction, SPEED_INFRACTION_OPTIONS, 'NONE'),
+        adminInfraction: ensureEnumStr(participant.adminInfraction, ADMIN_INFRACTION_OPTIONS, 'NONE'),
+        otherInfraction: ensureEnumStr(participant.otherInfraction, OTHER_INFRACTION_OPTIONS, 'NONE'),
+        pedestrianInfraction: ensureEnumStr(participant.pedestrianInfraction, PEDESTRIAN_INFRACTION_OPTIONS, 'NONE'),
+        continuousDrivingHoursId: ensureEnumStr(participant.continuousDrivingHoursId, CONTINUOUS_DRIVING_OPTIONS, 'UNKNOWN'),
       },
       damagesReport: {
         ...fallback.damagesReport,
         ...damages,
         accidentCauseId: ensureEnumStr(damages.accidentCauseId, ACCIDENT_CAUSE_OPTIONS, 'INATTENTION'),
+        accidentCauseId2: ensureEnumStr(damages.accidentCauseId2, ACCIDENT_CAUSE_OPTIONS, ''),
         accidentTypeId: ensureEnumStr(damages.accidentTypeId, ACCIDENT_TYPE_OPTIONS, 'OTHER'),
         accidentSubTypeId: ensureEnumStr(damages.accidentSubTypeId, ACCIDENT_SUBTYPE_OPTIONS, 'OTHER'),
       },
