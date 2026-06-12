@@ -1124,6 +1124,12 @@ export default function AddIncidentDrawer({
                     <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.cin')} value={form.participant.cin} onChange={(e) => setValue('participant.cin', e.target.value)} fullWidth /></Grid>
                     <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.registration_number')} value={form.participant.registrationNumber} onChange={(e) => setValue('participant.registrationNumber', e.target.value)} fullWidth /></Grid>
                     <Grid item xs={12} sm={6} md={3}>{renderEnum('participant.participantType', t('add_incident.participant_type'), PARTICIPANT_TYPE_OPTIONS)}</Grid>
+                    <Grid item xs={12} sm={6} md={3}>{renderEnum('participant.gender', t('add_incident.gender'), GENDER_OPTIONS)}</Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" type="number" label={t('add_incident.age')} value={form.participant.age} onChange={(e) => setValue('participant.age', e.target.value)} fullWidth inputProps={{ min: 0, max: 120 }} /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.driver_nationality')} value={form.participant.driverNationality} onChange={(e) => setValue('participant.driverNationality', e.target.value)} fullWidth /></Grid>
+                    <Grid item xs={12} sm={6} md={3}>{renderEnum('participant.licenseStatus', t('add_incident.license_status'), LICENSE_STATUS_OPTIONS)}</Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" type="date" label={t('add_incident.license_issue_date')} value={form.participant.licenseIssueDate} onChange={(e) => setValue('participant.licenseIssueDate', e.target.value)} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
+                    <Grid item xs={12} sm={6} md={3}>{renderEnum('participant.continuousDrivingHoursId', t('add_incident.continuous_driving'), CONTINUOUS_DRIVING_OPTIONS)}</Grid>
                   </Grid>
                 </Box>
 
@@ -1153,6 +1159,10 @@ export default function AddIncidentDrawer({
                     <Grid item xs={12} sm={6} md={4}>{renderEnum('participant.safetyEquipmentUse', t('add_incident.safety_equipment'), SAFETY_OPTIONS)}</Grid>
                     <Grid item xs={12} sm={6} md={4}>{renderEnum('participant.injurySeverity', t('add_incident.injury_severity'), INJURY_OPTIONS)}</Grid>
                     <Grid item xs={12} sm={6} md={4}>{renderEnum('participant.infraction', t('add_incident.infraction'), INFRACTION_OPTIONS)}</Grid>
+                    <Grid item xs={12} sm={6} md={4}>{renderEnum('participant.speedInfraction', t('add_incident.speed_infraction'), SPEED_INFRACTION_OPTIONS)}</Grid>
+                    <Grid item xs={12} sm={6} md={4}>{renderEnum('participant.adminInfraction', t('add_incident.admin_infraction'), ADMIN_INFRACTION_OPTIONS)}</Grid>
+                    <Grid item xs={12} sm={6} md={4}>{renderEnum('participant.otherInfraction', t('add_incident.other_infraction'), OTHER_INFRACTION_OPTIONS)}</Grid>
+                    <Grid item xs={12} sm={6} md={4}>{renderEnum('participant.pedestrianInfraction', t('add_incident.pedestrian_infraction'), PEDESTRIAN_INFRACTION_OPTIONS)}</Grid>
                     <Grid item xs={12} sm={6} md={3}>{renderEnum('participant.alcoholTest', t('add_incident.alcohol_test'), ALCOHOL_OPTIONS)}</Grid>
                     <Grid item xs={12} sm={6} md={3}>{renderEnum('participant.drugTest', t('add_incident.drug_test'), DRUG_OPTIONS)}</Grid>
                   </Grid>
@@ -1166,6 +1176,7 @@ export default function AddIncidentDrawer({
                   <Stack spacing={2}>
                     <Grid container spacing={2} alignItems="center">
                       <Grid item xs={12} sm={6} md={4}>{renderEnum('damagesReport.accidentCauseId', t('add_incident.accident_cause'), ACCIDENT_CAUSE_OPTIONS)}</Grid>
+                      <Grid item xs={12} sm={6} md={4}>{renderEnum('damagesReport.accidentCauseId2', t('add_incident.accident_cause_2'), ACCIDENT_CAUSE_OPTIONS)}</Grid>
                       <Grid item xs={12} sm={6} md={4}>{renderEnum('damagesReport.accidentTypeId', t('add_incident.accident_type'), ACCIDENT_TYPE_OPTIONS)}</Grid>
                       <Grid item xs={12} sm={6} md={4}>{renderEnum('damagesReport.accidentSubTypeId', t('add_incident.accident_subtype'), ACCIDENT_SUBTYPE_OPTIONS)}</Grid>
                     </Grid>

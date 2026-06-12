@@ -669,7 +669,18 @@ export type TranslationMessages = {
     alcohol_test: string
     drug_test: string
     infraction: string
+    gender: string
+    age: string
+    driver_nationality: string
+    license_status: string
+    license_issue_date: string
+    speed_infraction: string
+    admin_infraction: string
+    other_infraction: string
+    pedestrian_infraction: string
+    continuous_driving: string
     accident_cause: string
+    accident_cause_2: string
     accident_type: string
     accident_subtype: string
     fatal_accident: string
