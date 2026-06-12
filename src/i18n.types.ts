@@ -629,6 +629,7 @@ export type TranslationMessages = {
     municipality: string
     sector: string
     school_point: string
+    reference: string
     day_type: string
     situation: string
     zone: string

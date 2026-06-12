@@ -628,6 +628,7 @@ const fr: TranslationMessages = {
     municipality: 'Municipalité',
     sector: 'Secteur',
     school_point: "Proximité d'école",
+    reference: 'Source de signalement',
     day_type: 'Type de jour',
     situation: 'Situation',
     zone: 'Zone',

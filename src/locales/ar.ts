@@ -628,6 +628,7 @@ const ar: TranslationMessages = {
     municipality: 'البلدية',
     sector: 'القطاع',
     school_point: 'نقطة مدرسية',
+    reference: 'مصدر البلاغ',
     day_type: 'نوع اليوم',
     situation: 'الوضع',
     zone: 'المنطقة',

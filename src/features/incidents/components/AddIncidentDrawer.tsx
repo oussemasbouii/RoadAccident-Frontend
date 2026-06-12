@@ -1006,6 +1006,7 @@ export default function AddIncidentDrawer({
                     <Box>
                       <SectionHeader label={t('add_incident.section_context')} color="secondary" />
                       <Stack spacing={1.5}>
+                        {renderEnum('infoDetails.reference', t('add_incident.reference'), REFERENCE_OPTIONS)}
                         {renderEnum('infoDetails.dayTypeId', t('add_incident.day_type'), DAY_TYPE_OPTIONS)}
                         {renderEnum('infoDetails.accidentSituationId', t('add_incident.situation'), ACCIDENT_SITUATION_OPTIONS)}
                         <Grid container spacing={1.5}>
