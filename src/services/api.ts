@@ -182,9 +182,6 @@ export const apiService = {
     getById: (id: string) => api.get(`/accidents/${id}`),
     create: (data: Record<string, unknown>) => api.post<CreateAccidentResponse>('/accidents/', data),
     update: (id: string, data: Record<string, unknown>) => api.put(`/accidents/${id}`, data),
-    approve: (id: string, comment: string) => api.post(`/accidents/${id}/approve`, { comment }),
-    reject: (id: string, comment: string) => api.post(`/accidents/${id}/reject`, { comment }),
-    getAuditLog: (id: string) => api.get(`/accidents/${id}/audit-log`),
   },
 
   // Accidents

@@ -4,13 +4,16 @@ import {
   Avatar,
   Box,
   Button,
+  Checkbox,
   Chip,
+  Collapse,
   FormControl,
   InputLabel,
   Menu,
   MenuItem,
   Paper,
   Select,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -43,6 +46,7 @@ import PendingRoundedIcon from '@mui/icons-material/PendingRounded'
 import CancelRoundedIcon from '@mui/icons-material/CancelRounded'
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded'
 import ArrowDropDownRoundedIcon from '@mui/icons-material/ArrowDropDownRounded'
+import EditRoundedIcon from '@mui/icons-material/EditRounded'
 
 import Card from '../../../components/Common/Card'
 import Badge from '../../../components/Common/Badge'
@@ -240,6 +244,11 @@ export default function AdminAccountsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [officers, setOfficers] = useState<OfficerRecord[]>([])
+  const [roleSaving, setRoleSaving] = useState<Record<string, boolean>>({})
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; undoFn?: () => void }>({ open: false, message: '' })
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkActionLoading, setBulkActionLoading] = useState(false)
 
   const fetchOfficers = async () => {
     try {
@@ -360,14 +369,6 @@ export default function AdminAccountsPage() {
             onChange={(e) => setQuery(e.target.value)}
             sx={{ bgcolor: 'background.paper' }}
           />
-          <TextField
-            label={t('admin_accounts.officer_id')}
-            variant="outlined"
-            size="small"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            sx={{ bgcolor: 'background.paper' }}
-          />
           <FormControl size="small" sx={{ bgcolor: 'background.paper' }}>
             <InputLabel>{t('admin_accounts.role')}</InputLabel>
             <Select
@@ -418,9 +419,92 @@ export default function AdminAccountsPage() {
           </Stack>
         </Box>
         <Box sx={{ overflowX: 'auto' }}>
-          <Table>
+          <Collapse in={selectedIds.size > 0}>
+            <Box
+              sx={{
+                display: 'flex', alignItems: 'center', gap: 1.5,
+                px: 2, py: 1.25,
+                bgcolor: alpha(theme.palette.primary.main, 0.06),
+                borderRadius: 2,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                mx: 2,
+                mt: 1,
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 700, flex: 1 }}>
+                {selectedIds.size} selected
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                color="success"
+                disabled={bulkActionLoading}
+                onClick={async () => {
+                  setBulkActionLoading(true)
+                  try {
+                    await Promise.all(
+                      Array.from(selectedIds).map((id) =>
+                        apiService.users.updateStatus(id, { isValid: true })
+                      )
+                    )
+                    setSelectedIds(new Set())
+                    fetchOfficers()
+                  } finally {
+                    setBulkActionLoading(false)
+                  }
+                }}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Activate
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                disabled={bulkActionLoading}
+                onClick={async () => {
+                  setBulkActionLoading(true)
+                  try {
+                    await Promise.all(
+                      Array.from(selectedIds).map((id) =>
+                        apiService.users.updateStatus(id, { isValid: false })
+                      )
+                    )
+                    setSelectedIds(new Set())
+                    fetchOfficers()
+                  } finally {
+                    setBulkActionLoading(false)
+                  }
+                }}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Block
+              </Button>
+              <Button
+                size="small"
+                onClick={() => setSelectedIds(new Set())}
+                sx={{ textTransform: 'none' }}
+              >
+                Deselect all
+              </Button>
+            </Box>
+          </Collapse>
+          <Table stickyHeader size="small">
             <TableHead sx={{ bgcolor: alpha(theme.palette.action.active, 0.02) }}>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    indeterminate={selectedIds.size > 0 && selectedIds.size < officers.length}
+                    checked={officers.length > 0 && selectedIds.size === officers.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(new Set(officers.map((o) => String(o._id || o.id || ''))))
+                      } else {
+                        setSelectedIds(new Set())
+                      }
+                    }}
+                  />
+                </TableCell>
                 <TableCell sx={{ fontWeight: 700, py: 2, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.officer')}</TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.officer_id')}</TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('admin_accounts.role')}</TableCell>
@@ -434,7 +518,7 @@ export default function AdminAccountsPage() {
             <TableBody>
               {filteredOfficers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 12, color: 'text.secondary' }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 12, color: 'text.secondary' }}>
                     <Stack spacing={2} alignItems="center">
                       <PersonRoundedIcon sx={{ fontSize: 64, color: 'text.disabled', opacity: 0.5 }} />
                       <Typography variant="h6" color="text.secondary">
@@ -456,13 +540,28 @@ export default function AdminAccountsPage() {
                 const roleStyle = roleColors[o.role || 'officer'] || roleColors.officer
                 
                 return (
-                <TableRow 
+                <TableRow
                   key={safeId(o)}
-                  sx={{ 
-                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) },
+                  sx={{
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.03) },
                     transition: 'background-color 0.15s ease',
+                    '&:nth-of-type(even)': { bgcolor: alpha(theme.palette.action.hover, 0.02) },
                   }}
                 >
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedIds.has(String(o._id || o.id || ''))}
+                      onChange={(e) => {
+                        const id = String(o._id || o.id || '')
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.add(id)
+                          else next.delete(id)
+                          return next
+                        })
+                      }}
+                    />
+                  </TableCell>
                   <TableCell sx={{ py: 3 }}>
                     <Stack direction="row" spacing={2} alignItems="center">
                       <Avatar 
@@ -499,18 +598,67 @@ export default function AdminAccountsPage() {
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      icon={<AdminPanelSettingsRoundedIcon sx={{ fontSize: 16 }} />}
-                      label={o.role === 'admin' ? t('admin_accounts.role_admin') : o.role === 'dispatch' ? t('admin_accounts.role_dispatch') : t('admin_accounts.role_officer')}
-                      size="small"
-                      sx={{ 
-                        bgcolor: roleStyle.bg, 
-                        color: roleStyle.color,
-                        fontWeight: 700,
-                        fontSize: 11,
-                        '& .MuiChip-icon': { color: roleStyle.color },
-                      }} 
-                    />
+                    {editingRoleId === safeId(o) ? (
+                      <Select
+                        size="small"
+                        autoFocus
+                        value={o.role || 'officer'}
+                        disabled={roleSaving[safeId(o)]}
+                        onBlur={() => setEditingRoleId(null)}
+                        onChange={async (e) => {
+                          const id = safeId(o)
+                          const previousRole = o.role || 'officer'
+                          const newRole = e.target.value as string
+                          setEditingRoleId(null)
+                          setRoleSaving((prev) => ({ ...prev, [id]: true }))
+                          try {
+                            await apiService.users.update(id, { role: newRole })
+                            setOfficers((prev) =>
+                              prev.map((u) => safeId(u) === id ? { ...u, role: newRole } : u)
+                            )
+                            setSnackbar({
+                              open: true,
+                              message: `Role updated to ${newRole}`,
+                              undoFn: async () => {
+                                try {
+                                  await apiService.users.update(id, { role: previousRole })
+                                  setOfficers((prev) =>
+                                    prev.map((u) => safeId(u) === id ? { ...u, role: previousRole } : u)
+                                  )
+                                } catch { /* silent */ }
+                              },
+                            })
+                          } catch {
+                            setSnackbar({ open: true, message: 'Failed to update role' })
+                          } finally {
+                            setRoleSaving((prev) => ({ ...prev, [id]: false }))
+                          }
+                        }}
+                        sx={{ fontSize: 12, minWidth: 110, borderRadius: '8px' }}
+                      >
+                        <MenuItem value="officer">Officer</MenuItem>
+                        <MenuItem value="dispatch">Dispatch</MenuItem>
+                        <MenuItem value="admin">Admin</MenuItem>
+                      </Select>
+                    ) : (
+                      <Chip
+                        icon={<AdminPanelSettingsRoundedIcon sx={{ fontSize: 14 }} />}
+                        label={o.role === 'admin' ? t('admin_accounts.role_admin') : o.role === 'dispatch' ? t('admin_accounts.role_dispatch') : t('admin_accounts.role_officer')}
+                        size="small"
+                        deleteIcon={<EditRoundedIcon sx={{ fontSize: 13 }} />}
+                        onDelete={() => setEditingRoleId(safeId(o))}
+                        onClick={() => setEditingRoleId(safeId(o))}
+                        sx={{
+                          bgcolor: roleStyle.bg,
+                          color: roleStyle.color,
+                          fontWeight: 700,
+                          fontSize: 11,
+                          cursor: 'pointer',
+                          '& .MuiChip-icon': { color: roleStyle.color },
+                          '& .MuiChip-deleteIcon': { color: alpha(roleStyle.color, 0.6), '&:hover': { color: roleStyle.color } },
+                        }}
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1} alignItems="center">
@@ -628,6 +776,29 @@ export default function AdminAccountsPage() {
           </Table>
         </Box>
       </Card>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        message={snackbar.message}
+        action={
+          snackbar.undoFn ? (
+            <Button
+              color="secondary"
+              size="small"
+              onClick={() => {
+                snackbar.undoFn?.()
+                setSnackbar((p) => ({ ...p, open: false }))
+              }}
+              sx={{ textTransform: 'none', fontWeight: 700 }}
+            >
+              Undo
+            </Button>
+          ) : undefined
+        }
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Stack>
   )
 }

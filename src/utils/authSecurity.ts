@@ -26,3 +26,22 @@ export function isTokenExpired(token: string) {
   const nowSeconds = Math.floor(Date.now() / 1000)
   return nowSeconds >= Number(payload.exp)
 }
+
+const IDLE_EVENTS = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'] as const
+
+export function startIdleWatcher(timeoutMs: number, onTimeout: () => void): () => void {
+  let timer: ReturnType<typeof setTimeout>
+
+  const reset = () => {
+    clearTimeout(timer)
+    timer = setTimeout(onTimeout, timeoutMs)
+  }
+
+  IDLE_EVENTS.forEach((e) => window.addEventListener(e, reset, { passive: true }))
+  reset()
+
+  return () => {
+    clearTimeout(timer)
+    IDLE_EVENTS.forEach((e) => window.removeEventListener(e, reset))
+  }
+}

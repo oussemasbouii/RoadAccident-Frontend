@@ -682,19 +682,11 @@ export type TranslationMessages = {
     discard_body: string
     discard_cancel: string
     discard_confirm: string
-  }
-  approval: {
-    pending: string
-    approved: string
-    rejected: string
-    supervisor_review: string
-    audit_trail: string
-    no_audit_entries: string
-    review_button: string
-    confirm_approval: string
-    confirm_rejection: string
-    comment_placeholder: string
-    approve_action: string
-    reject_action: string
+    perimeter_warning: string
+    perimeter_title: string
+    perimeter_conflict_name: string
+    perimeter_hint: string
+    perimeter_footer_hint: string
+    perimeter_go_back: string
   }
 }

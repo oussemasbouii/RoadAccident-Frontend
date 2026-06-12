@@ -139,7 +139,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         zIndex: (theme) => theme.zIndex.drawer + 1,
       }}
     >
-      <Toolbar sx={{ minHeight: { xs: 64, md: 72 }, px: { xs: 2, md: 3 }, display: 'flex', justifyContent: 'space-between' }}>
+      <Toolbar sx={{ minHeight: { xs: 56, sm: 64, md: 72 }, px: { xs: 1.5, sm: 2, md: 3 }, display: 'flex', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
           <IconButton
             onClick={onMenuClick}
@@ -210,7 +210,6 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
               gap: 1.5,
               cursor: 'pointer',
               p: 0.5,
-              paddingInlineEnd: { xs: 4, md: 16 },
               borderRadius: 100,
               transition: 'all 0.2s',
               '&:hover': { bgcolor: alpha(theme.palette.action.active, 0.04) }

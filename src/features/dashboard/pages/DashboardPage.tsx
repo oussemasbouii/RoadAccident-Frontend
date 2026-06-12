@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
+  Alert,
   Box,
+  Collapse,
   Stack,
   Typography,
   alpha,
@@ -30,13 +32,15 @@ import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CircleIcon from "@mui/icons-material/Circle";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import RateReviewRoundedIcon from "@mui/icons-material/RateReviewRounded";
 
 // Redux & Components
 import { useAppDispatch, useAppSelector } from "../../../store/store";
 import { fetchIncidents } from "../../incidents/slices/incidentsSlice";
 import type { Incident } from "../../incidents/slices/incidentsSlice";
 import { fetchAlerts } from "../../alerts/slices/alertsSlice";
-import type { Alert } from "../../alerts/slices/alertsSlice";
+import type { Alert as AlertItem } from "../../alerts/slices/alertsSlice";
 import StatCard from "../../../components/Common/StatCard";
 import Card from "../../../components/Common/Card";
 import { useTranslation } from "../../../themeMode";
@@ -48,7 +52,8 @@ export default function DashboardPage() {
   const theme = useTheme();
   const { t } = useTranslation();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+  const [pendingAlertDismissed, setPendingAlertDismissed] = useState(false);
+
   const {
     list: incidents,
     loading: incidentsLoading,
@@ -71,6 +76,10 @@ export default function DashboardPage() {
   useEffect(() => {
     refreshData();
   }, [dispatch]);
+
+  const user = useAppSelector((state) => state.auth.user)
+  const isAdmin = user?.role === 'admin' || user?.role === 'supervisor'
+  const pendingCount = (incidents || []).filter((i: Incident) => (i as any).approvalStatus === 'pending').length
 
   const totalIncidents = incidents.length
   const openIncidents = incidents.filter((i: any) => i.status !== "resolved").length
@@ -183,6 +192,37 @@ export default function DashboardPage() {
           </Tooltip>
         </Stack>
       </Box>
+
+      <Collapse in={isAdmin && !pendingAlertDismissed && pendingCount > 0}>
+        <Alert
+          severity="warning"
+          icon={<RateReviewRoundedIcon fontSize="inherit" />}
+          action={
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <MuiButton
+                component={RouterLink}
+                to="/incidents"
+                color="warning"
+                size="small"
+                sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
+              >
+                Review Now
+              </MuiButton>
+              <IconButton
+                color="inherit"
+                size="small"
+                onClick={() => setPendingAlertDismissed(true)}
+                aria-label="dismiss"
+              >
+                <CloseRoundedIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+          }
+          sx={{ borderRadius: 2, mb: 2 }}
+        >
+          <strong>{pendingCount}</strong> incident{pendingCount !== 1 ? 's' : ''} pending your review
+        </Alert>
+      </Collapse>
 
       {/* Stats Grid — staggered entrance */}
       <MotionBox

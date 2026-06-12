@@ -1,10 +1,9 @@
-import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react'
+﻿import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import {
   Alert,
   alpha,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -29,25 +28,36 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded'
 import DirectionsCarRoundedIcon from '@mui/icons-material/DirectionsCarRounded'
 import PeopleRoundedIcon from '@mui/icons-material/PeopleRounded'
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
+import MyLocationRoundedIcon from '@mui/icons-material/MyLocationRounded'
 import { AnimatePresence, motion, animate, type Variants } from 'framer-motion'
 import AccidentLocationMap from '@/components/Common/AccidentLocationMap'
 import IncidentDocumentsPanel from './IncidentDocumentsPanel'
 import { moveStoredDocuments } from '../hooks/useIncidentDocuments'
 import { useTranslation, useThemeMode } from '../../../themeMode'
 import { getEnumLabel } from './incidentEnumLabels'
-import ApprovalActionBar from './ApprovalActionBar'
-import AuditTrailPanel from './AuditTrailPanel'
-import type { AuditEntry } from '../slices/incidentsSlice'
+import { useAppSelector } from '../../../store/store'
+import type { Incident } from '../slices/incidentsSlice'
+
+const PERIMETER_RADIUS_M = 200
+
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
 
 export interface AddIncidentDrawerProps {
   open: boolean
   onClose: () => void
   onSubmit?: (payload: any) => Promise<any> | any
   error?: string | null
-  mode?: 'create' | 'edit' | 'review'
+  mode?: 'create' | 'edit'
   initialData?: any | null
-  onApprove?: (comment: string) => void
-  onReject?: (comment: string) => void
 }
 
 const DAY_TYPE_OPTIONS = ['WORKING', 'BEFORE_HOLIDAY', 'HOLIDAY', 'AFTER_HOLIDAY']
@@ -96,19 +106,6 @@ const ensureEnumStr = (val: any, options: string[], fallback: string): string =>
     if (typeof name === 'string' && options.includes(name)) return name
   }
   return fallback
-}
-
-const SEVERITY_BG: Record<string, string> = {
-  critical: 'rgba(211,47,47,0.12)',
-  high: 'rgba(245,124,0,0.12)',
-  medium: 'rgba(2,136,209,0.12)',
-  low: 'rgba(46,125,50,0.12)',
-}
-const SEVERITY_COLOR: Record<string, string> = {
-  critical: 'error.main',
-  high: 'warning.main',
-  medium: 'info.main',
-  low: 'success.main',
 }
 
 function makeInitialForm() {
@@ -236,28 +233,6 @@ const fieldChild: Variants = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: _easeDecel } },
 }
 
-function ReviewInfoCard({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <Box
-      sx={{
-        p: 2,
-        borderRadius: 2,
-        border: '1px solid',
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-      }}
-    >
-      <Typography
-        variant="overline"
-        sx={{ fontWeight: 800, fontSize: '0.65rem', letterSpacing: 1.2, color: 'text.secondary', display: 'block', mb: 1 }}
-      >
-        {label}
-      </Typography>
-      {children}
-    </Box>
-  )
-}
-
 export default function AddIncidentDrawer({
   open,
   onClose,
@@ -265,8 +240,6 @@ export default function AddIncidentDrawer({
   error: externalError,
   mode = 'create',
   initialData = null,
-  onApprove,
-  onReject,
 }: AddIncidentDrawerProps) {
   const theme = useTheme()
   const { t } = useTranslation()
@@ -278,7 +251,8 @@ export default function AddIncidentDrawer({
   const [stepDirection, setStepDirection] = useState(1)
   const [form, setForm] = useState(() => makeInitialForm())
   const isEditMode = mode === 'edit'
-  const isReviewMode = mode === 'review'
+  const existingIncidents = useAppSelector((state) => state.incidents.list)
+  const [perimeterWarning, setPerimeterWarning] = useState<{ location: string; distanceM: number } | null>(null)
   const [draftDocumentKey, setDraftDocumentKey] = useState(`incident-draft-${crypto.randomUUID()}`)
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false)
   const [showErrors, setShowErrors] = useState(false)
@@ -385,22 +359,23 @@ export default function AddIncidentDrawer({
       setStep(0)
       setStepDirection(1)
       setShowErrors(false)
+      setPerimeterWarning(null)
       cleanFormRef.current = null
       return
     }
-    if (!isEditMode && !isReviewMode) {
+    if (!isEditMode) {
       setDraftDocumentKey(`incident-draft-${crypto.randomUUID()}`)
       const fresh = makeInitialForm()
       setForm(fresh)
       cleanFormRef.current = structuredClone(fresh)
     }
-    if (isEditMode || isReviewMode) {
+    if (isEditMode) {
       const mapped = mapAccidentToForm(initialData)
       setForm(mapped)
       cleanFormRef.current = structuredClone(mapped)
       setStep(0)
     }
-  }, [open, isEditMode, isReviewMode, initialData])
+  }, [open, isEditMode, initialData])
 
   const setValue = (path: string, value: any) => {
     setForm((prev: any) => {
@@ -435,6 +410,36 @@ export default function AddIncidentDrawer({
 
   // Reset errors on step change
   useEffect(() => { setShowErrors(false) }, [step])
+
+  const findNearbyIncident = useCallback((lat: number, lng: number) => {
+    const editingId = isEditMode ? String(initialData?.id || '') : null
+    let closestMatch: { incident: Incident; distanceM: number } | null = null
+    for (const incident of existingIncidents) {
+      if (editingId && incident.id === editingId) continue
+      if (!Number.isFinite(incident.latitude) || !Number.isFinite(incident.longitude)) continue
+      const d = haversineDistance(lat, lng, incident.latitude!, incident.longitude!)
+      if (d < PERIMETER_RADIUS_M) {
+        if (!closestMatch || d < closestMatch.distanceM) closestMatch = { incident, distanceM: d }
+      }
+    }
+    return closestMatch
+  }, [existingIncidents, isEditMode, initialData])
+
+  const checkPerimeter = useCallback((lat: number, lng: number) => {
+    const result = findNearbyIncident(lat, lng)
+    if (result) {
+      setPerimeterWarning({ location: result.incident.location, distanceM: result.distanceM })
+    } else {
+      setPerimeterWarning(null)
+    }
+  }, [findNearbyIncident])
+
+  // Re-run perimeter check whenever coordinates change (catches initial default location)
+  useEffect(() => {
+    if (open && !isEditMode) {
+      checkPerimeter(form.latitude, form.longitude)
+    }
+  }, [form.latitude, form.longitude, open, isEditMode, checkPerimeter])
 
   const documentScopeKey = isEditMode ? String(initialData?.id || '') : draftDocumentKey
   const documentsEnabled = isEditMode ? Boolean(initialData?.id) : canSubmit
@@ -478,6 +483,13 @@ export default function AddIncidentDrawer({
 
   const handleSubmit = async () => {
     if (!canSubmit) return
+    if (!isEditMode) {
+      const result = findNearbyIncident(form.latitude, form.longitude)
+      if (result) {
+        setPerimeterWarning({ location: result.incident.location, distanceM: result.distanceM })
+        return
+      }
+    }
     try {
       setSubmitting(true)
       const participantId = form.participant.id || `P-${Date.now()}`
@@ -522,7 +534,6 @@ export default function AddIncidentDrawer({
       value={path.split('.').reduce((a: any, key) => a[key], form as any)}
       onChange={(e) => setValue(path, e.target.value)}
       fullWidth
-      disabled={isReviewMode}
       SelectProps={{
         displayEmpty: true,
         renderValue: (selected) =>
@@ -539,7 +550,7 @@ export default function AddIncidentDrawer({
     </TextField>
   )
 
-  // ─── Section header component ────────────────────────────────────────────
+  // â”€â”€â”€ Section header component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const SectionHeader = ({ label, color = 'primary' }: { label: string; color?: string }) => (
     <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.75 }}>
       <Box sx={{ width: 3, height: 20, borderRadius: 2, bgcolor: `${color}.main`, flexShrink: 0 }} />
@@ -576,7 +587,7 @@ export default function AddIncidentDrawer({
         },
       }}
     >
-      {/* ── Sticky header: title + step tracker + progress ───────────────── */}
+      {/* â”€â”€ Sticky header: title + step tracker + progress â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <DialogTitle
         sx={{
           pt: 2.5,
@@ -593,7 +604,7 @@ export default function AddIncidentDrawer({
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.2 }}>
-              {isReviewMode ? t('add_incident.title_review') : isEditMode ? t('add_incident.title_update') : t('add_incident.title_new')}
+              {isEditMode ? t('add_incident.title_update') : t('add_incident.title_new')}
             </Typography>
             {isEditMode && initialData?.id && (
               <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
@@ -614,9 +625,8 @@ export default function AddIncidentDrawer({
           </IconButton>
         </Stack>
 
-        {!isReviewMode && (
-          <>
-            {/* Step indicator pills — clickable for completed steps */}
+        <>
+            {/* Step indicator pills â€” clickable for completed steps */}
             <Stack direction="row" spacing={0} alignItems="center" sx={{ mb: 2 }}>
               {steps.map((s, i) => {
                 const isActive = i === step
@@ -732,112 +742,15 @@ export default function AddIncidentDrawer({
               }}
             />
           </>
-        )}
       </DialogTitle>
 
-      {/* ── Scrollable content ───────────────────────────────────────────── */}
+      {/* â”€â”€ Scrollable content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <DialogContent sx={{ pt: 2.5, px: { xs: 2, md: 3 }, pb: 2, overflowX: 'hidden' }}>
         {externalError && (
           <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{externalError}</Alert>
         )}
 
-        {isReviewMode ? (
-          <Stack spacing={2}>
-            {/* Sticky approval strip */}
-            <Box
-              sx={{
-                position: 'sticky',
-                top: 0,
-                zIndex: 1,
-                bgcolor: 'background.paper',
-                pt: 0.5,
-                pb: 1.5,
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                mb: 1,
-              }}
-            >
-              <ApprovalActionBar
-                approvalStatus={initialData?.approvalStatus}
-                onApprove={onApprove ?? (() => {})}
-                onReject={onReject ?? (() => {})}
-              />
-            </Box>
-
-            {/* Location */}
-            <ReviewInfoCard label="Location">
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {[
-                  initialData?.infoDetails?.governorate,
-                  initialData?.infoDetails?.delegation,
-                  initialData?.infoDetails?.municipality,
-                ].filter(Boolean).join(', ') || initialData?.location || '—'}
-              </Typography>
-              {(initialData?.latitude != null && initialData?.longitude != null) && (
-                <Typography variant="caption" color="text.secondary">
-                  {Number(initialData.latitude).toFixed(4)}, {Number(initialData.longitude).toFixed(4)}
-                </Typography>
-              )}
-            </ReviewInfoCard>
-
-            {/* Incident details */}
-            <ReviewInfoCard label="Incident Details">
-              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
-                <Chip
-                  size="small"
-                  label={(initialData?.severity || 'unknown').toUpperCase()}
-                  sx={{
-                    fontWeight: 700, fontSize: 10,
-                    bgcolor: SEVERITY_BG[initialData?.severity as string] ?? 'action.selected',
-                    color: SEVERITY_COLOR[initialData?.severity as string] ?? 'text.secondary',
-                  }}
-                />
-                <Typography variant="caption" color="text.secondary">
-                  {initialData?.accidentDate || initialData?.time || ''}
-                  {initialData?.infoDetails?.accidentTime ? ` · ${initialData.infoDetails.accidentTime}` : ''}
-                </Typography>
-              </Stack>
-              {initialData?.infoDetails?.dayTypeId && (
-                <Typography variant="body2" color="text.secondary">
-                  {`${t('add_incident.day_type_label')}: `}{initialData.infoDetails.dayTypeId.replace(/_/g, ' ').toLowerCase()}
-                </Typography>
-              )}
-            </ReviewInfoCard>
-
-            {/* Summary / description */}
-            <ReviewInfoCard label="Summary">
-              <Typography variant="body2">
-                {initialData?.infoDetails?.summary || initialData?.description || '—'}
-              </Typography>
-            </ReviewInfoCard>
-
-            {/* Outcome */}
-            <ReviewInfoCard label="Outcome">
-              <Stack direction="row" spacing={3}>
-                {[
-                  { label: 'Fatal', value: initialData?.damagesReport?.deadCount ?? initialData?.fatalities ?? 0 },
-                  { label: 'Hospitalized', value: initialData?.damagesReport?.hospitalizedInjuredCount ?? 0 },
-                  { label: 'Light injuries', value: initialData?.damagesReport?.lightlyInjuredCount ?? 0 },
-                  { label: 'Unharmed', value: initialData?.damagesReport?.unharmedCount ?? 0 },
-                ].map((item) => (
-                  <Box key={item.label} sx={{ textAlign: 'center' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1 }}>{item.value}</Typography>
-                    <Typography variant="caption" color="text.secondary">{item.label}</Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </ReviewInfoCard>
-
-            {/* Audit trail */}
-            <Box>
-              <Typography variant="overline" sx={{ fontWeight: 800, fontSize: '0.65rem', letterSpacing: 1.2, color: 'text.secondary' }}>
-                {t('approval.audit_trail')}
-              </Typography>
-              <AuditTrailPanel entries={(initialData?.auditLog ?? []) as AuditEntry[]} />
-            </Box>
-          </Stack>
-        ) : (
-          <>
+        <>
           <AnimatePresence custom={stepDirection} mode="wait">
           <motion.div
             key={step}
@@ -848,10 +761,10 @@ export default function AddIncidentDrawer({
             exit="exit"
             style={{ willChange: 'transform, opacity' }}
           >
-            {/* ── Step 0: Location & Time ─────────────────────────────── */}
+            {/* â”€â”€ Step 0: Location & Time â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {step === 0 && (
               <Grid container spacing={3}>
-                {/* Map — dominant, left side */}
+                {/* Map â€” dominant, left side */}
                 <Grid item xs={12} md={7} lg={8}>
                   <Box
                     sx={{
@@ -866,6 +779,7 @@ export default function AddIncidentDrawer({
                       onLocationChange={(loc) => {
                         setValue('latitude', loc.latitude)
                         setValue('longitude', loc.longitude)
+                        if (!isEditMode) checkPerimeter(loc.latitude, loc.longitude)
                         if (loc.description?.trim()) {
                           setValue('roadConditions.roadName', loc.description.trim())
                         }
@@ -879,7 +793,6 @@ export default function AddIncidentDrawer({
                       }}
                       height={isSmall ? 300 : 460}
                       showSearch
-                      readOnly={isReviewMode}
                       showInstructions={false}
                     />
                   </Box>
@@ -890,9 +803,96 @@ export default function AddIncidentDrawer({
                   >
                     {t('add_incident.map_hint')}
                   </Typography>
+
+                  {/* Perimeter conflict card */}
+                  <AnimatePresence>
+                    {perimeterWarning && !isEditMode && (
+                      <motion.div
+                        key="perimeter-warning"
+                        initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: [0, 0, 0.2, 1] } }}
+                        exit={{ opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.14 } }}
+                      >
+                        <Box
+                          sx={{
+                            mt: 1.5,
+                            p: 0,
+                            borderRadius: 3,
+                            overflow: 'hidden',
+                            border: `1.5px solid ${alpha(theme.palette.warning.main, 0.4)}`,
+                            bgcolor: alpha(theme.palette.warning.main, 0.05),
+                          }}
+                        >
+                          {/* Accent stripe */}
+                          <Box sx={{ height: 3, bgcolor: 'warning.main' }} />
+
+                          <Stack direction="row" spacing={1.5} sx={{ px: 2, py: 1.5, alignItems: 'flex-start' }}>
+                            {/* Icon badge */}
+                            <Box
+                              sx={{
+                                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                                bgcolor: alpha(theme.palette.warning.main, 0.15),
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}
+                            >
+                              <WarningAmberRoundedIcon sx={{ fontSize: 18, color: 'warning.main' }} />
+                            </Box>
+
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'warning.dark', lineHeight: 1.3 }}>
+                                {t('add_incident.perimeter_title')}
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mt: 0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                title={perimeterWarning.location}
+                              >
+                                {t('add_incident.perimeter_conflict_name')}{' '}
+                                <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                                  "{perimeterWarning.location}"
+                                </Box>
+                              </Typography>
+                            </Box>
+
+                            {/* Distance chip */}
+                            <Box
+                              sx={{
+                                flexShrink: 0,
+                                px: 1.2, py: 0.4,
+                                borderRadius: '100px',
+                                bgcolor: alpha(theme.palette.warning.main, 0.18),
+                                border: `1px solid ${alpha(theme.palette.warning.main, 0.35)}`,
+                                display: 'flex', alignItems: 'center', gap: 0.5,
+                              }}
+                            >
+                              <MyLocationRoundedIcon sx={{ fontSize: 11, color: 'warning.dark' }} />
+                              <Typography sx={{ fontSize: 11, fontWeight: 800, color: 'warning.dark', lineHeight: 1 }}>
+                                {Math.round(perimeterWarning.distanceM)}m
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          {/* Footer hint */}
+                          <Box
+                            sx={{
+                              px: 2, py: 1,
+                              borderTop: `1px dashed ${alpha(theme.palette.warning.main, 0.3)}`,
+                              display: 'flex', alignItems: 'center', gap: 0.75,
+                            }}
+                          >
+                            <PlaceRoundedIcon sx={{ fontSize: 13, color: 'warning.main', flexShrink: 0 }} />
+                            <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1.4 }}>
+                              {t('add_incident.perimeter_hint')}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </Grid>
 
-                {/* Fields — right side */}
+                {/* Fields â€” right side */}
                 <Grid item xs={12} md={5} lg={4}>
                   <motion.div variants={fieldParent} initial="initial" animate="animate">
                   <Stack spacing={2}>
@@ -912,8 +912,7 @@ export default function AddIncidentDrawer({
                               InputLabelProps={{ shrink: true }}
                               required
                               fullWidth
-                              disabled={isReviewMode}
-                            />
+                                                         />
                           </Grid>
                           <Grid item xs={6}>
                             <TextField
@@ -925,8 +924,7 @@ export default function AddIncidentDrawer({
                               InputLabelProps={{ shrink: true }}
                               required
                               fullWidth
-                              disabled={isReviewMode}
-                            />
+                                                         />
                           </Grid>
                         </Grid>
 
@@ -943,21 +941,20 @@ export default function AddIncidentDrawer({
                           maxRows={4}
                           error={showErrors && !form.infoDetails.summary.trim()}
                           helperText={showErrors && !form.infoDetails.summary.trim() ? t('add_incident.field_required') : undefined}
-                          disabled={isReviewMode}
-                        />
+                                                 />
 
                         <Grid container spacing={1.5}>
                           <Grid item xs={6}>
-                            <TextField size="small" label={t('add_incident.governorate')} value={form.infoDetails.governorate} onChange={(e) => setValue('infoDetails.governorate', e.target.value)} fullWidth disabled={isReviewMode} />
+                            <TextField size="small" label={t('add_incident.governorate')} value={form.infoDetails.governorate} onChange={(e) => setValue('infoDetails.governorate', e.target.value)} fullWidth />
                           </Grid>
                           <Grid item xs={6}>
-                            <TextField size="small" label={t('add_incident.delegation')} value={form.infoDetails.delegation} onChange={(e) => setValue('infoDetails.delegation', e.target.value)} fullWidth disabled={isReviewMode} />
+                            <TextField size="small" label={t('add_incident.delegation')} value={form.infoDetails.delegation} onChange={(e) => setValue('infoDetails.delegation', e.target.value)} fullWidth />
                           </Grid>
                           <Grid item xs={6}>
-                            <TextField size="small" label={t('add_incident.municipality')} value={form.infoDetails.municipality} onChange={(e) => setValue('infoDetails.municipality', e.target.value)} fullWidth disabled={isReviewMode} />
+                            <TextField size="small" label={t('add_incident.municipality')} value={form.infoDetails.municipality} onChange={(e) => setValue('infoDetails.municipality', e.target.value)} fullWidth />
                           </Grid>
                           <Grid item xs={6}>
-                            <TextField size="small" label={t('add_incident.sector')} value={form.infoDetails.sector} onChange={(e) => setValue('infoDetails.sector', e.target.value)} fullWidth disabled={isReviewMode} />
+                            <TextField size="small" label={t('add_incident.sector')} value={form.infoDetails.sector} onChange={(e) => setValue('infoDetails.sector', e.target.value)} fullWidth />
                           </Grid>
                         </Grid>
                       </Stack>
@@ -983,8 +980,7 @@ export default function AddIncidentDrawer({
                               size="small"
                               checked={form.infoDetails.schoolPoint}
                               onChange={(e) => setValue('infoDetails.schoolPoint', e.target.checked)}
-                              disabled={isReviewMode}
-                            />
+                                                         />
                           }
                           label={
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -1001,7 +997,7 @@ export default function AddIncidentDrawer({
               </Grid>
             )}
 
-            {/* ── Step 1: Road & Environment ──────────────────────────── */}
+            {/* â”€â”€ Step 1: Road & Environment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {step === 1 && (
               <Stack spacing={3}>
                 {/* Road Conditions */}
@@ -1017,8 +1013,7 @@ export default function AddIncidentDrawer({
                       required
                       error={showErrors && !form.roadConditions.roadName.trim()}
                       helperText={showErrors && !form.roadConditions.roadName.trim() ? t('add_incident.field_required') : undefined}
-                      disabled={isReviewMode}
-                    />
+                                         />
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6} md={4}>{renderEnum('roadConditions.roadTypeId', t('add_incident.road_type'), ROAD_TYPE_OPTIONS)}</Grid>
                       <Grid item xs={12} sm={6} md={4}>{renderEnum('roadConditions.networkCategoryId', t('add_incident.network_category'), NETWORK_CATEGORY_OPTIONS)}</Grid>
@@ -1048,17 +1043,17 @@ export default function AddIncidentDrawer({
               </Stack>
             )}
 
-            {/* ── Step 2: Participant & Outcome ───────────────────────── */}
+            {/* â”€â”€ Step 2: Participant & Outcome â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {step === 2 && (
               <Stack spacing={3}>
                 {/* Identity */}
                 <Box>
                   <SectionHeader label={t('add_incident.section_participant')} />
                   <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.first_name')} value={form.participant.firstName} onChange={(e) => setValue('participant.firstName', e.target.value)} fullWidth disabled={isReviewMode} /></Grid>
-                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.last_name')} value={form.participant.lastName} onChange={(e) => setValue('participant.lastName', e.target.value)} fullWidth disabled={isReviewMode} /></Grid>
-                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.cin')} value={form.participant.cin} onChange={(e) => setValue('participant.cin', e.target.value)} fullWidth disabled={isReviewMode} /></Grid>
-                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.registration_number')} value={form.participant.registrationNumber} onChange={(e) => setValue('participant.registrationNumber', e.target.value)} fullWidth disabled={isReviewMode} /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.first_name')} value={form.participant.firstName} onChange={(e) => setValue('participant.firstName', e.target.value)} fullWidth /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.last_name')} value={form.participant.lastName} onChange={(e) => setValue('participant.lastName', e.target.value)} fullWidth /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.cin')} value={form.participant.cin} onChange={(e) => setValue('participant.cin', e.target.value)} fullWidth /></Grid>
+                    <Grid item xs={12} sm={6} md={3}><TextField size="small" label={t('add_incident.registration_number')} value={form.participant.registrationNumber} onChange={(e) => setValue('participant.registrationNumber', e.target.value)} fullWidth /></Grid>
                     <Grid item xs={12} sm={6} md={3}>{renderEnum('participant.participantType', t('add_incident.participant_type'), PARTICIPANT_TYPE_OPTIONS)}</Grid>
                   </Grid>
                 </Box>
@@ -1123,8 +1118,7 @@ export default function AddIncidentDrawer({
                           checked={form.damagesReport.fatalAccident}
                           onChange={(e) => setValue('damagesReport.fatalAccident', e.target.checked)}
                           color="error"
-                          disabled={isReviewMode}
-                        />
+                                                 />
                       </Stack>
                       <Grid container spacing={1.5}>
                         <Grid item xs={6} sm={3}>
@@ -1137,8 +1131,7 @@ export default function AddIncidentDrawer({
                             fullWidth
                             inputProps={{ min: 0 }}
                             sx={{ '& .MuiOutlinedInput-root': { borderColor: alpha(theme.palette.error.main, 0.3) } }}
-                            disabled={isReviewMode}
-                          />
+                                                     />
                         </Grid>
                         <Grid item xs={6} sm={3}>
                           <TextField
@@ -1149,8 +1142,7 @@ export default function AddIncidentDrawer({
                             onChange={(e) => setValue('damagesReport.hospitalizedInjuredCount', Number(e.target.value) || 0)}
                             fullWidth
                             inputProps={{ min: 0 }}
-                            disabled={isReviewMode}
-                          />
+                                                     />
                         </Grid>
                         <Grid item xs={6} sm={3}>
                           <TextField
@@ -1161,8 +1153,7 @@ export default function AddIncidentDrawer({
                             onChange={(e) => setValue('damagesReport.lightlyInjuredCount', Number(e.target.value) || 0)}
                             fullWidth
                             inputProps={{ min: 0 }}
-                            disabled={isReviewMode}
-                          />
+                                                     />
                         </Grid>
                         <Grid item xs={6} sm={3}>
                           <TextField
@@ -1173,8 +1164,7 @@ export default function AddIncidentDrawer({
                             onChange={(e) => setValue('damagesReport.unharmedCount', Number(e.target.value) || 0)}
                             fullWidth
                             inputProps={{ min: 0 }}
-                            disabled={isReviewMode}
-                          />
+                                                     />
                         </Grid>
                       </Grid>
                     </Box>
@@ -1189,7 +1179,6 @@ export default function AddIncidentDrawer({
                       multiline
                       minRows={2}
                       maxRows={4}
-                      disabled={isReviewMode}
                     />
                   </Stack>
                 </Box>
@@ -1198,22 +1187,21 @@ export default function AddIncidentDrawer({
           </motion.div>
           </AnimatePresence>
 
-          {/* Documents panel — always at bottom of step 2 */}
+          {/* Documents panel â€” always at bottom of step 2 */}
           {step === 2 && (
             <Box sx={{ mt: 3 }}>
               <Divider sx={{ mb: 3 }} />
               <IncidentDocumentsPanel
-                accidentId={(isEditMode || isReviewMode) ? String(initialData?.id || '') || null : null}
+                accidentId={isEditMode ? String(initialData?.id || '') || null : null}
                 scopeKey={documentScopeKey}
                 enabled={documentsEnabled}
               />
             </Box>
           )}
           </>
-        )}
       </DialogContent>
 
-      {/* ── Sticky footer ───────────────────────────────────────────────── */}
+      {/* â”€â”€ Sticky footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Box
         sx={{
           px: { xs: 2, md: 3 },
@@ -1226,8 +1214,43 @@ export default function AddIncidentDrawer({
           zIndex: theme.zIndex.modal + 6,
         }}
       >
-        {!isReviewMode ? (
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
+        {/* Perimeter conflict reminder in footer (visible on step 1 and 2) */}
+        <AnimatePresence>
+          {perimeterWarning && !isEditMode && step > 0 && (
+            <motion.div
+              key="footer-perimeter"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto', transition: { duration: 0.2 } }}
+              exit={{ opacity: 0, height: 0, transition: { duration: 0.15 } }}
+            >
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1}
+                sx={{
+                  mb: 1.5, px: 1.5, py: 1,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.warning.main, 0.08),
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+                }}
+              >
+                <WarningAmberRoundedIcon sx={{ fontSize: 15, color: 'warning.main', flexShrink: 0 }} />
+                <Typography variant="caption" sx={{ color: 'warning.dark', fontWeight: 600, flex: 1 }}>
+                  {t('add_incident.perimeter_title')} — {t('add_incident.perimeter_footer_hint')}
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={() => { setStepDirection(-1); setStep(0) }}
+                  sx={{ fontSize: 11, fontWeight: 700, textTransform: 'none', color: 'warning.dark', py: 0.25, minWidth: 0 }}
+                >
+                  {t('add_incident.perimeter_go_back')}
+                </Button>
+              </Stack>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
             {/* Back */}
             <motion.span
               whileTap={step === 0 ? undefined : { scale: 0.96 }}
@@ -1303,7 +1326,7 @@ export default function AddIncidentDrawer({
                       variant="contained"
                       color="success"
                       onClick={handleSubmit}
-                      disabled={!canSubmit || submitting}
+                      disabled={!canSubmit || submitting || (!isEditMode && !!perimeterWarning)}
                       startIcon={submitting ? undefined : <CheckCircleRoundedIcon />}
                       sx={{
                         borderRadius: 100,
@@ -1337,16 +1360,6 @@ export default function AddIncidentDrawer({
               </AnimatePresence>
             </Stack>
           </Stack>
-        ) : (
-          <Stack direction="row" justifyContent="flex-end">
-            <Button
-              onClick={handleClose}
-              sx={{ borderRadius: 100, fontWeight: 600, textTransform: 'none', color: 'text.secondary' }}
-            >
-              {t('add_incident.close')}
-            </Button>
-          </Stack>
-        )}
       </Box>
     </Dialog>
 
@@ -1386,3 +1399,4 @@ export default function AddIncidentDrawer({
     </>
   )
 }
+

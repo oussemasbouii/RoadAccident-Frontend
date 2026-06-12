@@ -23,7 +23,7 @@ import ChatDockManager from './components/ChatDockManager'
 import CommandBar from './components/CommandBar'
 import SocketConnectionManager from './components/SocketConnectionManager'
 import CallManager from './components/CallManager'
-import { clearAuthStorage, isTokenExpired } from './utils/authSecurity'
+import { clearAuthStorage, isTokenExpired, startIdleWatcher } from './utils/authSecurity'
 import { getAccessToken, setAccessToken, setRefreshToken } from './utils/tokenStore'
 import { apiService } from './services/api'
 import { setUser } from './features/auth/slices/authSlice'
@@ -123,6 +123,19 @@ function App() {
     const user = useSelector((state: RootState) => state.auth.user)
     const token = useSelector((state: RootState) => state.auth.token)
     const isAuthed = Boolean(user || token)
+    const dispatch = useDispatch()
+
+    useEffect(() => {
+      if (!isAuthed) return
+      const THIRTY_MINUTES = 30 * 60 * 1000
+      const stop = startIdleWatcher(THIRTY_MINUTES, () => {
+        clearAuthStorage()
+        dispatch(setUser(null))
+        window.location.replace('/login')
+      })
+      return stop
+    }, [isAuthed, dispatch])
+
     if (!isAuthed) return null
     return (
       <>

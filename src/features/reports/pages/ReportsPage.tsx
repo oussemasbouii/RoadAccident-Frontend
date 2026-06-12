@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { format, subDays } from 'date-fns'
 import {
-  Box, Chip, Divider, List, ListItem, Paper,
-  Stack, Tab, Tabs, Typography, alpha, useTheme,
+  Box, Button as MuiButton, Card, Chip, Divider, FormControl,
+  InputLabel, List, ListItem, MenuItem, Paper,
+  Select, Stack, Tab, Tabs, TextField, ToggleButton, ToggleButtonGroup,
+  Typography, alpha, useTheme,
 } from '@mui/material'
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
@@ -30,6 +33,7 @@ import { useTranslation, useThemeMode } from '../../../themeMode'
 import IncidentHeatmapPanel from '../../dashboard/components/EnhancedKpiDashboard/IncidentHeatmapPanel'
 import CauseRanking from '../../dashboard/components/EnhancedKpiDashboard/CauseRanking'
 import { listParent } from '../../../utils/motion'
+import TrendChart from '../components/TrendChart'
 
 const MotionBox = motion(Box)
 
@@ -81,7 +85,13 @@ export default function ReportsPage() {
     active: t('reports.active'), responded: t('reports.responded'), resolved: t('reports.resolved'),
   }
 
-  const [timeRange, setTimeRange] = useState('month')
+  const [filters, setFilters] = useState({
+    dateFrom: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+    dateTo: format(new Date(), 'yyyy-MM-dd'),
+    wilaya: 'all' as string,
+    period: 'month' as 'day' | 'week' | 'month',
+    viewMode: 'pins' as 'pins' | 'heatmap',
+  })
   const [activeTab, setActiveTab] = useState(0)
 
   const { list: incidents, loading: incidentsLoading, error: incidentsError } = useAppSelector((s) => s.incidents)
@@ -92,20 +102,48 @@ export default function ReportsPage() {
     dispatch(fetchAlerts({ page: 1, limit: 50 }) as any)
   }, [dispatch])
 
-  const cutoffDate = useMemo(() => {
-    const now = new Date()
-    now.setDate(now.getDate() - (dayRangeMap[timeRange] ?? 30))
-    return now
-  }, [timeRange])
+  const availableWilayas = useMemo(() => {
+    const s = new Set<string>()
+    for (const inc of incidents) {
+      if (inc.governorate) s.add(inc.governorate)
+    }
+    return Array.from(s).sort()
+  }, [incidents])
 
-  const filteredIncidents = useMemo(
-    () => incidents.filter((i: any) => { const d = parseDate(i.timestamp || i.time); return d ? d >= cutoffDate : true }),
-    [incidents, cutoffDate]
-  )
-  const filteredAlerts = useMemo(
-    () => alerts.filter((a: any) => { const d = parseDate((a as any).timestamp || a.time); return d ? d >= cutoffDate : true }),
-    [alerts, cutoffDate]
-  )
+  const filteredIncidents = useMemo(() => {
+    return incidents.filter((inc: any) => {
+      const d = parseDate(inc.timestamp || inc.time)
+      if (d) {
+        if (filters.dateFrom) {
+          const from = new Date(filters.dateFrom)
+          if (d < from) return false
+        }
+        if (filters.dateTo) {
+          const to = new Date(filters.dateTo)
+          to.setHours(23, 59, 59, 999)
+          if (d > to) return false
+        }
+      }
+      if (filters.wilaya !== 'all') {
+        if ((inc.governorate || '') !== filters.wilaya) return false
+      }
+      return true
+    })
+  }, [incidents, filters])
+
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((a: any) => {
+      const d = parseDate((a as any).timestamp || a.time)
+      if (d) {
+        if (filters.dateFrom && d < new Date(filters.dateFrom)) return false
+        if (filters.dateTo) {
+          const to = new Date(filters.dateTo); to.setHours(23, 59, 59, 999)
+          if (d > to) return false
+        }
+      }
+      return true
+    })
+  }, [alerts, filters])
 
   // ── Derived metrics ──────────────────────────────────────────────────────────
   const totalIncidents    = filteredIncidents.length
@@ -199,7 +237,7 @@ export default function ReportsPage() {
   }, [incidentSeverityRows, theme.palette.divider])
 
   const dailyTimeline = useMemo(() => {
-    const days = timeRange === 'day' ? 1 : 7
+    const days = filters.period === 'day' ? 1 : 7
     return Array.from({ length: days }, (_, i) => {
       const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - (days - 1 - i))
       const dayKey = date.toISOString().slice(0, 10)
@@ -209,10 +247,12 @@ export default function ReportsPage() {
         alerts:    filteredAlerts.filter((x: any) => parseDate((x as any).timestamp || x.time)?.toISOString().slice(0, 10) === dayKey).length,
       }
     })
-  }, [filteredAlerts, filteredIncidents, timeRange, locale])
+  }, [filteredAlerts, filteredIncidents, filters.period, locale])
+
+  const trendPeriod = filters.period
 
   const reportExportData = [{
-    generatedAt: new Date().toISOString(), timeRange,
+    generatedAt: new Date().toISOString(), timeRange: filters.period,
     summary: { totalIncidents, resolutionRate, openIncidents: openIncidents.length, criticalOpen, unreadAlerts: unreadCount, alertPressure },
     incidentsBySeverity: severityCounts, alertsBySeverity: alertSeverityCounts,
     incidentsByStatus: statusCounts, alertsByType: alertTypeCounts,
@@ -224,13 +264,6 @@ export default function ReportsPage() {
 
   const loading    = incidentsLoading || alertsLoading
   const fetchError = incidentsError || alertsError
-
-  const TIME_PRESETS = [
-    { value: 'day',   label: t('common.today') },
-    { value: 'week',  label: t('common.week') },
-    { value: 'month', label: t('common.month') },
-    { value: 'year',  label: t('common.year') },
-  ]
 
   const TAB_DEFS = [
     { label: 'Overview',    icon: <InsightsRoundedIcon fontSize="small" /> },
@@ -255,29 +288,13 @@ export default function ReportsPage() {
           </Typography>
           <Typography color="text.secondary">{t('reports.subtitle')}</Typography>
         </Box>
-        <Stack direction={rowDir} spacing={1.25} alignItems="center" flexWrap="wrap">
-          <Stack direction="row" spacing={0.5}>
-            {TIME_PRESETS.map((p) => (
-              <Chip
-                key={p.value}
-                size="small"
-                label={p.label}
-                onClick={() => setTimeRange(p.value)}
-                variant={timeRange === p.value ? 'filled' : 'outlined'}
-                color={timeRange === p.value ? 'primary' : 'default'}
-                icon={<FilterListRoundedIcon sx={{ fontSize: '14px !important' }} />}
-                sx={{ fontWeight: 600, '& .MuiChip-icon': { ml: 0.75 } }}
-              />
-            ))}
-          </Stack>
-          <ExportButton
-            data={reportExportData}
-            filename={`officer-briefing-${timeRange}`}
-            label={t('common.view_all')}
-            title={t('reports.officer_briefing')}
-            variant="report"
-          />
-        </Stack>
+        <ExportButton
+          data={reportExportData}
+          filename={`officer-briefing-${filters.period}`}
+          label={t('common.view_all')}
+          title={t('reports.officer_briefing')}
+          variant="report"
+        />
       </Box>
 
       {/* ── Error banner ──────────────────────────────────────────── */}
@@ -288,6 +305,98 @@ export default function ReportsPage() {
           </Typography>
         </Paper>
       )}
+
+      {/* ── Global filter bar ─────────────────────────────────────── */}
+      <Paper
+        variant="outlined"
+        sx={{ p: 2, mb: 2, borderRadius: 3, borderColor: alpha(theme.palette.divider, 0.6) }}
+      >
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' },
+            gap: 1.5,
+            alignItems: 'end',
+          }}
+        >
+          <TextField
+            label="From"
+            type="date"
+            size="small"
+            value={filters.dateFrom}
+            onChange={(e) => setFilters((p) => ({ ...p, dateFrom: e.target.value }))}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+          <TextField
+            label="To"
+            type="date"
+            size="small"
+            value={filters.dateTo}
+            onChange={(e) => setFilters((p) => ({ ...p, dateTo: e.target.value }))}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+          <FormControl size="small">
+            <InputLabel>Wilaya</InputLabel>
+            <Select
+              value={filters.wilaya}
+              label="Wilaya"
+              onChange={(e) => setFilters((p) => ({ ...p, wilaya: e.target.value }))}
+            >
+              <MenuItem value="all">All Wilayas</MenuItem>
+              {availableWilayas.map((w) => (
+                <MenuItem key={w} value={w}>{w}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600 }}>
+              Period
+            </Typography>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={filters.period}
+              onChange={(_, v) => v && setFilters((p) => ({ ...p, period: v }))}
+            >
+              <ToggleButton value="day" sx={{ textTransform: 'none', fontWeight: 600, px: 1.5 }}>Day</ToggleButton>
+              <ToggleButton value="week" sx={{ textTransform: 'none', fontWeight: 600, px: 1.5 }}>Week</ToggleButton>
+              <ToggleButton value="month" sx={{ textTransform: 'none', fontWeight: 600, px: 1.5 }}>Month</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+          <Stack direction="row" spacing={1} alignItems="flex-end">
+            {activeTab === 2 && (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600 }}>
+                  View
+                </Typography>
+                <ToggleButtonGroup
+                  size="small"
+                  exclusive
+                  value={filters.viewMode}
+                  onChange={(_, v) => v && setFilters((p) => ({ ...p, viewMode: v }))}
+                >
+                  <ToggleButton value="pins" sx={{ textTransform: 'none', fontWeight: 600, px: 1.5 }}>Pins</ToggleButton>
+                  <ToggleButton value="heatmap" sx={{ textTransform: 'none', fontWeight: 600, px: 1.5 }}>Heatmap</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+            )}
+            <MuiButton
+              size="small"
+              variant="outlined"
+              onClick={() => setFilters({
+                dateFrom: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+                dateTo: format(new Date(), 'yyyy-MM-dd'),
+                wilaya: 'all',
+                period: 'month',
+                viewMode: 'pins',
+              })}
+              sx={{ textTransform: 'none', borderRadius: 2 }}
+            >
+              Reset
+            </MuiButton>
+          </Stack>
+        </Box>
+      </Paper>
 
       {/* ── Tab bar ───────────────────────────────────────────────── */}
       <Paper
@@ -354,6 +463,19 @@ export default function ReportsPage() {
                 <StatCard icon={<NotificationsActiveRoundedIcon />} label={t('reports.alert_pressure')}      value={`${alertPressure}%`}  trend={alertPressure >= 50 ? 'up' : 'neutral'} trendValue={`${highPriorityAlerts} ${t('reports.high_critical_alerts')}`}   intent="warning" />
                 <StatCard icon={<MapRoundedIcon />}                 label={t('reports.primary_hotspot')}     value={dominantHotspot?.location || '—'} trend="neutral" trendValue={dominantHotspot ? `${dominantHotspot.count} ${t('reports.accidents')}` : t('reports.no_location_data')} intent="danger" />
               </MotionBox>
+
+              {/* Trend Chart */}
+              <Card sx={{ p: 3, mt: 2.5 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Incident Trend</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {filters.dateFrom} – {filters.dateTo}
+                    </Typography>
+                  </Box>
+                </Stack>
+                <TrendChart incidents={filteredIncidents} period={trendPeriod} />
+              </Card>
 
               {/* Analytics triptych */}
               <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: '1.3fr 1fr 1fr' } }}>
@@ -624,7 +746,11 @@ export default function ReportsPage() {
           {/* ════════════ TAB 2 — GEOGRAPHIC ════════════ */}
           {activeTab === 2 && (
             <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', xl: '1fr 400px' }, alignItems: 'start' }}>
-              <IncidentHeatmapPanel incidents={filteredIncidents as Incident[]} />
+              <IncidentHeatmapPanel
+                incidents={filteredIncidents as Incident[]}
+                viewMode={filters.viewMode}
+                onViewModeChange={(v) => setFilters((p) => ({ ...p, viewMode: v }))}
+              />
               <CauseRanking incidents={filteredIncidents as Incident[]} />
             </Box>
           )}

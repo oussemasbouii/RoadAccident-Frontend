@@ -77,7 +77,6 @@ export default function AccidentLocationMap({
       const geolocate = new maplibregl.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },
         trackUserLocation: false,
-        showUserHeading: false,
         showAccuracyCircle: true,
       })
       geolocate.on('error', (evt: { code?: number }) => {

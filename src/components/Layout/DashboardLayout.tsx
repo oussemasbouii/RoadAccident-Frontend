@@ -140,10 +140,10 @@ export default function DashboardLayout() {
         <Box component="main" sx={{ flex: 1, overflow: 'auto' }}>
           <Box
             sx={{
-              p: { xs: 2, md: 3 },
+              p: { xs: 1.5, sm: 2, md: 3 },
               maxWidth: 1440,
               width: '100%',
-              marginInlineEnd: 'auto',
+              mx: 'auto',
             }}
           >
             <AnimatePresence mode="wait" initial={false}>

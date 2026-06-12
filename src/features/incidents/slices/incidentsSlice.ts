@@ -8,21 +8,13 @@ export interface Incident {
   longitude?: number
   severity: 'critical' | 'high' | 'medium' | 'low'
   status: 'active' | 'responded' | 'resolved'
-  approvalStatus?: 'pending' | 'approved' | 'rejected'
-  auditLog?: AuditEntry[]
   time: string
   timestamp?: string
   vehicles: number
   injuries: number
   description?: string
   cause?: string
-}
-
-export interface AuditEntry {
-  action: 'created' | 'approved' | 'rejected' | 'updated'
-  comment: string
-  actor: string
-  timestamp: string
+  governorate?: string
 }
 
 interface IncidentStats {
@@ -104,13 +96,6 @@ function toUiIncident(raw: any): Incident {
   const summary = String(raw?.infoDetails?.summary ?? '').trim()
   const areaLabel = [sector, municipality, delegation, governorate].filter(Boolean).join(', ')
 
-  const approvalStatus: Incident['approvalStatus'] =
-    (['pending', 'approved', 'rejected'].includes(raw?.approvalStatus)
-      ? raw.approvalStatus
-      : 'pending') as Incident['approvalStatus']
-
-  const auditLog: AuditEntry[] = Array.isArray(raw?.auditLog) ? raw.auditLog : []
-
   return {
     id: String(raw?.id || raw?._id || raw?.incidentId || raw?.accidentId || crypto.randomUUID()),
     location:
@@ -135,8 +120,7 @@ function toUiIncident(raw: any): Incident {
     injuries: Number(raw?.injuries ?? raw?.injuryCount ?? totalInjuries),
     description: raw?.description || raw?.comment || raw?.damagesReport?.damageDescription,
     cause: raw?.damagesReport?.accidentCauseId ?? undefined,
-    approvalStatus,
-    auditLog,
+    governorate: governorate || undefined,
   }
 }
 
@@ -356,7 +340,7 @@ export const updateIncident = createAsyncThunk(
   'incidents/updateIncident',
   async ({ id, payload }: { id: string; payload: Record<string, unknown> }, { rejectWithValue }) => {
     try {
-      const response = await apiService.incidents.update(id, payload)
+      const response = await apiService.incidents.update(id, toAccidentCreatePayload(payload) as any)
       return response.data
     } catch (error: any) {
       return rejectWithValue(
@@ -364,30 +348,6 @@ export const updateIncident = createAsyncThunk(
           || error.response?.data?.error
           || (typeof error.response?.data === 'string' ? error.response.data : 'Failed to update incident')
       )
-    }
-  }
-)
-
-export const approveIncident = createAsyncThunk(
-  'incidents/approveIncident',
-  async ({ id, comment }: { id: string; comment: string }, { rejectWithValue }) => {
-    try {
-      const response = await apiService.incidents.approve(id, comment)
-      return response.data
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to approve incident')
-    }
-  }
-)
-
-export const rejectIncident = createAsyncThunk(
-  'incidents/rejectIncident',
-  async ({ id, comment }: { id: string; comment: string }, { rejectWithValue }) => {
-    try {
-      const response = await apiService.incidents.reject(id, comment)
-      return response.data
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to reject incident')
     }
   }
 )
@@ -489,43 +449,6 @@ const incidentsSlice = createSlice({
       state.error = action.payload as string
     })
 
-    // Approve incident
-    builder.addCase(approveIncident.pending, (state) => {
-      state.loading = true
-      state.error = null
-    })
-    builder.addCase(approveIncident.fulfilled, (state, action) => {
-      state.loading = false
-      const updated = unwrapResponseData(action.payload)
-      if (!updated) return
-      const incoming = toUiIncident(updated)
-      const idx = state.list.findIndex((i) => i.id === incoming.id)
-      if (idx >= 0) state.list[idx] = incoming
-      state.currentIncident = updated
-    })
-    builder.addCase(approveIncident.rejected, (state, action) => {
-      state.loading = false
-      state.error = action.payload as string
-    })
-
-    // Reject incident
-    builder.addCase(rejectIncident.pending, (state) => {
-      state.loading = true
-      state.error = null
-    })
-    builder.addCase(rejectIncident.fulfilled, (state, action) => {
-      state.loading = false
-      const updated = unwrapResponseData(action.payload)
-      if (!updated) return
-      const incoming = toUiIncident(updated)
-      const idx = state.list.findIndex((i) => i.id === incoming.id)
-      if (idx >= 0) state.list[idx] = incoming
-      state.currentIncident = updated
-    })
-    builder.addCase(rejectIncident.rejected, (state, action) => {
-      state.loading = false
-      state.error = action.payload as string
-    })
   },
 })
 
