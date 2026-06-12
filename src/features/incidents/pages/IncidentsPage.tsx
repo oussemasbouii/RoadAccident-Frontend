@@ -33,7 +33,8 @@ import EditRoundedIcon from '@mui/icons-material/EditRounded'
 import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded'
 
 import { useAppDispatch, useAppSelector } from '../../../store/store'
-import { fetchIncidents, fetchIncidentById, createIncident, updateIncident, clearError, generateIncidentReport } from '../slices/incidentsSlice'
+import { fetchIncidents, fetchIncidentById, createIncident, updateIncident, clearError } from '../slices/incidentsSlice'
+import { apiService } from '../../../services/api'
 import type { Incident } from '../slices/incidentsSlice'
 import Card from '../../../components/Common/Card'
 import AddIncidentDrawer from '../components/AddIncidentDrawer'
@@ -61,18 +62,25 @@ export default function IncidentsPage() {
   const handleGenerateReport = async (id: string) => {
     try {
       setGeneratingReportId(id)
-      const result = await dispatch(generateIncidentReport({ id, documentType: 'PDF' }) as any).unwrap()
-      // Handle both flat { url } and envelope { data: { url } } responses
-      const url = result?.url || result?.data?.url
+      const response = await apiService.incidents.generateReport(id, { documentType: 'PDF' })
+      const result = response.data
+      const url = result?.url || (result as any)?.data?.url
       if (url) {
         window.open(url, '_blank', 'noopener,noreferrer')
-        setReportSnackbar({ open: true, message: t('incidents.generate_report') + ' OK', severity: 'success' })
+        setReportSnackbar({ open: true, message: 'PDF report ready — opening now.', severity: 'success' })
       } else {
-        setReportSnackbar({ open: true, message: 'Report generated but no download URL returned.', severity: 'error' })
+        setReportSnackbar({ open: true, message: 'Report generated but server returned no download URL.', severity: 'error' })
       }
     } catch (err: any) {
-      const msg = err?.message || err?.response?.data?.message || 'Failed to generate report.'
-      setReportSnackbar({ open: true, message: msg, severity: 'error' })
+      const status: number | undefined = err?.response?.status
+      const serverMsg: string | undefined = err?.response?.data?.message || err?.response?.data?.error
+      if (status === 404 || status === 501) {
+        setReportSnackbar({ open: true, message: 'PDF generation is not yet available on this server.', severity: 'error' })
+      } else if (serverMsg) {
+        setReportSnackbar({ open: true, message: serverMsg, severity: 'error' })
+      } else {
+        setReportSnackbar({ open: true, message: `Failed to generate report (${status ?? 'network error'}).`, severity: 'error' })
+      }
     } finally {
       setGeneratingReportId(null)
     }
