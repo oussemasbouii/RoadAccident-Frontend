@@ -1,12 +1,14 @@
 import axios from 'axios'
-import { 
-  AccidentReport, 
-  CreateAccidentResponse, 
+import {
+  AccidentReport,
+  CreateAccidentResponse,
   CreateAccidentErrorResponse,
   AttachmentFileTypeCode,
   IncidentDocumentUploadConfirmRequest,
   IncidentDocumentUploadRequest,
   IncidentDocumentUpdateRequest,
+  GenerateReportRequest,
+  GenerateReportResponse,
 } from '@/types/accident'
 import { clearAuthStorage } from '@/utils/authSecurity'
 import { getAccessToken, getDeviceId, getRefreshToken, setAccessToken, setRefreshToken } from '@/utils/tokenStore'
@@ -182,6 +184,8 @@ export const apiService = {
     getById: (id: string) => api.get(`/accidents/${id}`),
     create: (data: Record<string, unknown>) => api.post<CreateAccidentResponse>('/accidents/', data),
     update: (id: string, data: Record<string, unknown>) => api.put(`/accidents/${id}`, data),
+    generateReport: (id: string, data: GenerateReportRequest) =>
+      api.post<GenerateReportResponse>(`/accidents/${id}/generate-report`, data),
   },
 
   // Accidents
@@ -220,8 +224,15 @@ export const apiService = {
   users: {
     getMe: () => api.get('/users/me'),
     updateMe: (data: Record<string, unknown>) => api.patch('/users/me', data),
-    list: (params?: { search?: string; page?: number; limit?: number }) =>
-      api.get('/users/', { params: { search: params?.search, page: params?.page, limit: params?.limit } }),
+    list: (params?: {
+      search?: string
+      center?: string
+      role?: 'officer' | 'supervisor' | 'admin'
+      isValid?: boolean
+      isFrozen?: boolean
+      page?: number
+      limit?: number
+    }) => api.get('/users/', { params }),
     getById: (id: string) => api.get(`/users/${id}`),
     update: (id: string, data: Record<string, unknown>) => api.patch(`/users/${id}`, data),
     updateStatus: (
