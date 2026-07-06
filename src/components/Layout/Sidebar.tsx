@@ -4,7 +4,9 @@ import { useDispatch, useSelector } from 'react-redux'
 import {
   alpha,
   Avatar,
+  Badge,
   Box,
+  Chip,
   Divider,
   IconButton,
   List,
@@ -23,6 +25,7 @@ import NotificationsActiveRoundedIcon from '@mui/icons-material/NotificationsAct
 import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded'
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded'
 import LocationSearchingRoundedIcon from '@mui/icons-material/LocationSearchingRounded'
+import InventoryRoundedIcon from '@mui/icons-material/InventoryRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
@@ -41,6 +44,10 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const user = useSelector((state: RootState) => state.auth.user)
+  const totalUnreadMessages = useSelector((state: RootState) =>
+    state.chat.contactIds.reduce((sum: number, id: string) => sum + (state.chat.unreadByPeer[id] || 0), 0)
+  )
+  const pendingAccountsCount = useSelector((state: RootState) => state.notifications.pendingAccountsCount)
   const { t } = useTranslation()
   const { direction } = useThemeMode()
   const theme = useTheme()
@@ -52,9 +59,10 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
     { path: '/incidents', label: t('nav.accidents'), icon: <ReportProblemRoundedIcon /> },
     { path: '/alerts', label: t('nav.alerts'), icon: <NotificationsActiveRoundedIcon /> },
     { path: '/reports', label: t('nav.reports'), icon: <BarChartRoundedIcon /> },
-    { path: '/communications', label: t('nav.communications'), icon: <ForumRoundedIcon /> },
-    { path: '/admin/accounts', label: t('nav.user_accounts'), icon: <AdminPanelSettingsRoundedIcon />, role: 'admin' },
+    { path: '/communications', label: t('nav.communications'), icon: <ForumRoundedIcon />, badge: totalUnreadMessages, badgeColor: 'primary' as const },
+    { path: '/admin/accounts', label: t('nav.user_accounts'), icon: <AdminPanelSettingsRoundedIcon />, role: 'admin', badge: pendingAccountsCount, badgeColor: 'warning' as const },
     { path: '/admin/officer-tracking', label: t('nav.officer_tracking'), icon: <LocationSearchingRoundedIcon />, role: 'admin' },
+    { path: '/admin/archived-incidents', label: t('nav.archived_incidents'), icon: <InventoryRoundedIcon />, role: 'admin' },
     { path: '/settings', label: t('nav.settings'), icon: <SettingsRoundedIcon /> },
   ]
 
@@ -213,7 +221,24 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                     transition={spring.snappy}
                     style={{ display: 'flex' }}
                   >
-                    {item.icon}
+                    <Badge
+                      badgeContent={item.badge || 0}
+                      color={item.badgeColor || 'primary'}
+                      max={99}
+                      invisible={!item.badge}
+                      sx={{
+                        '& .MuiBadge-badge': {
+                          fontSize: 10,
+                          fontWeight: 700,
+                          minWidth: 16,
+                          height: 16,
+                          padding: '0 4px',
+                          boxShadow: `0 0 0 2px ${theme.palette.background.default}`,
+                        },
+                      }}
+                    >
+                      {item.icon}
+                    </Badge>
                   </motion.div>
                 </ListItemIcon>
 
@@ -234,6 +259,25 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                     }
                   }}
                 />
+
+                {!collapsed && item.badge ? (
+                  <Chip
+                    size="small"
+                    label={item.badge > 99 ? '99+' : item.badge}
+                    color={item.badgeColor || 'primary'}
+                    sx={{
+                      position: 'relative',
+                      zIndex: 1,
+                      height: 20,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      minWidth: 24,
+                      ml: 'auto',
+                      borderRadius: 10,
+                      '& .MuiChip-label': { px: 0.8 },
+                    }}
+                  />
+                ) : null}
               </ListItemButton>
             )
 

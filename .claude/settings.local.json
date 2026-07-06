@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(Get-Content \"C:\\\\Users\\\\osboui\\\\RoadAccident-Frontend\\\\src\\\\locales\\\\en.ts\")",
+      "Bash(Measure-Object -Line)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\osboui\\\\RoadAccident-Frontend\\\\src\\\\components\\\\Common\" -File)",
+      "Bash(Select-Object Name)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npx vitest *)",
+      "Bash(npm install *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(node -e \"let d=''; process.stdin.on\\('data',c=>d+=c\\); process.stdin.on\\('end',\\(\\)=>{try{const j=JSON.parse\\(d\\);console.log\\('JSON VALID'\\);console.log\\('Keys:',Object.keys\\(j\\).join\\(','\\)\\);console.log\\('Glyphs:',j.glyphs\\);console.log\\('Sprite:',j.sprite\\);console.log\\('Sources:',Object.keys\\(j.sources||{}\\).join\\(','\\)\\);}catch\\(e\\){console.log\\('JSON INVALID:',e.message\\);}}\\)\")",
+      "Bash(node -e \"let d=''; process.stdin.on\\('data',c=>d+=c\\); process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\); const src=j.sources['versatiles-shortbread']; console.log\\('Source type:',src.type\\); console.log\\('Source tiles:',JSON.stringify\\(src.tiles\\)\\); console.log\\('Source url:',src.url\\);}\\)\")",
+      "Bash(node -e \"let d=''; process.stdin.on\\('data',c=>d+=c\\); process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\); const matches=[...d.matchAll\\(/__[A-Z_]+__/g\\)].map\\(m=>m[0]\\); const unique=[...new Set\\(matches\\)]; console.log\\('All placeholders found:',unique.join\\(', '\\)\\); console.log\\('Total placeholder occurrences:',matches.length\\);}\\)\")",
+      "Bash(node -e \"let d=''; process.stdin.on\\('data',c=>d+=c\\); process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\); console.log\\('version:',j.version\\); console.log\\('name:',j.name\\); console.log\\('Layer count:',j.layers.length\\); const src=j.sources['versatiles-shortbread']; console.log\\('Source scheme:',src.scheme\\); console.log\\('Source minzoom:',src.minzoom\\); console.log\\('Source maxzoom:',src.maxzoom\\);}\\)\")",
+      "Bash(node -e \"const m=require\\('C:/Users/osboui/RoadAccident-Frontend/node_modules/maplibre-gl/dist/maplibre-gl.js'\\); console.log\\('FullscreenControl:', typeof m.FullscreenControl\\); console.log\\('GeolocateControl:', typeof m.GeolocateControl\\); console.log\\('NavigationControl:', typeof m.NavigationControl\\);\")",
+      "Bash(node -e ' *)",
+      "Bash(git commit *)",
+      "WebFetch(domain:api.micladevops.com)",
+      "Bash(npm run *)"
+    ]
+  }
+}

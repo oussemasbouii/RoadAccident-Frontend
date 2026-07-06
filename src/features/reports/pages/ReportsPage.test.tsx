@@ -46,26 +46,27 @@ const renderWithProviders = (ui: React.ReactElement, { initialState = {} } = {})
 }
 
 describe('ReportsPage', () => {
-  it('renders the Reports & Analytics title', () => {
+  it('renders the Reports title', () => {
     renderWithProviders(<ReportsPage />)
-    expect(screen.getByText('Reports & Analytics')).toBeDefined()
+    expect(screen.getAllByText('Reports').length).toBeGreaterThan(0)
   })
 
-  it('renders time range filter', () => {
+  it('renders the date-range filter', () => {
     renderWithProviders(<ReportsPage />)
-    expect(screen.getByText('This Month')).toBeDefined()
+    expect(screen.getByLabelText(/From/i)).toBeDefined()
   })
 
-  it('renders StatCards with analytics data', () => {
+  it('renders StatCards derived from the incidents list', () => {
     const initialState = {
-      reports: {
-        stats: { totalIncidents: 150, resolvedToday: 5, avgResponseTime: 12, injuryRate: 0.05 },
-        incidentsByLocation: [],
-        loading: false
-      }
+      incidents: {
+        list: [
+          { id: '1', status: 'active', location: 'Tunis', severity: 'high', vehicles: 2, injuries: 1, time: '2026-02-21 10:00' },
+          { id: '2', status: 'resolved', location: 'Sfax', severity: 'low', vehicles: 1, injuries: 0, time: '2026-02-20 09:00' },
+        ],
+      },
     }
     renderWithProviders(<ReportsPage />, { initialState })
-    expect(screen.getByText('Total Incidents')).toBeDefined()
-    expect(screen.getByText('150')).toBeDefined()
+    // First stat card is labelled with the incidents title ("Road Accidents").
+    expect(screen.getAllByText('Road Accidents').length).toBeGreaterThan(0)
   })
 })

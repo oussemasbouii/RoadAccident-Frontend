@@ -27,6 +27,10 @@ import EmergencyRoundedIcon from '@mui/icons-material/EmergencyRounded'
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded'
 import BlockRoundedIcon from '@mui/icons-material/BlockRounded'
 import HourglassEmptyRoundedIcon from '@mui/icons-material/HourglassEmptyRounded'
+import WifiOffRoundedIcon from '@mui/icons-material/WifiOffRounded'
+import CloudOffRoundedIcon from '@mui/icons-material/CloudOffRounded'
+import TimerRoundedIcon from '@mui/icons-material/TimerRounded'
+import KeyRoundedIcon from '@mui/icons-material/KeyRounded'
 import { apiService } from '@/services/api'
 import { AuthUser } from '../slices/authSlice'
 import { setUser, setToken } from '../slices/authSlice'
@@ -36,116 +40,103 @@ import { clearAuthStorage } from '@/utils/authSecurity'
 import { getDeviceId, setAccessToken, setDeviceId, setRefreshToken } from '@/utils/tokenStore'
 import { Button, Card } from '@/components/Common'
 
-function mapLoginError(err: any, locale: LocaleCode): { message: string; isBlocked?: boolean; isRestricted?: boolean } {
+type LoginErrorKind = 'credentials' | 'server' | 'network' | 'rate_limit'
+
+function mapLoginError(err: any, locale: LocaleCode): {
+  message: string
+  kind: LoginErrorKind
+  isBlocked?: boolean
+  isRestricted?: boolean
+} {
   const status = err?.response?.status
   const payload = err?.response?.data || {}
   const errorType = String(payload?.type || '').toUpperCase()
-  const msg = String(payload?.message || err?.message || 'Login failed').toLowerCase()
-  
-  // Debug: Log the full error response to understand the structure
+  const msg = String(payload?.message || err?.message || '').toLowerCase()
+
   if (import.meta.env.DEV) {
-    console.log('🔴 Login Error - Full Response:', err?.response)
-    console.log('🔴 Login Error - Payload:', payload)
-    console.log('🔴 Login Error - Error Type:', errorType)
-    console.log('🔴 Login Error - Message:', msg)
+    console.log('🔴 Login Error:', { status, errorType, msg, payload })
   }
-  
-  // Check for blocked/restricted status in error response - check multiple locations
+
   const userData = payload?.data?.user || payload?.data?.officer || payload?.user || payload?.officer || {}
   const isValid = userData?.isValid
   const isFrozen = userData?.isFrozen
   const accountStatus = payload?.accountStatus || userData?.status || payload?.data?.accountStatus || payload?.status
-  
-  // Debug: Log extracted status fields
-  if (import.meta.env.DEV) {
-    console.log('🔴 Login Error - User Data:', userData)
-    console.log('🔴 Login Error - isValid:', isValid)
-    console.log('🔴 Login Error - isFrozen:', isFrozen)
-    console.log('🔴 Login Error - accountStatus:', accountStatus)
-  }
 
-  // Blocked account detection - check all possible indicators
+  // Blocked account
   if (
     isValid === false ||
-    accountStatus === 'blocked' ||
-    accountStatus === 'BLOCKED' ||
-    payload?.isValid === false ||
-    payload?.data?.isValid === false ||
-    msg.includes('account is blocked') ||
-    msg.includes('account blocked') ||
-    msg.includes('blocked') ||
-    errorType === 'ACCOUNT_BLOCKED' ||
-    errorType === 'BLOCKED'
+    accountStatus === 'blocked' || accountStatus === 'BLOCKED' ||
+    payload?.isValid === false || payload?.data?.isValid === false ||
+    msg.includes('account is blocked') || msg.includes('account blocked') ||
+    errorType === 'ACCOUNT_BLOCKED' || errorType === 'BLOCKED'
   ) {
-    return { 
-      message: translate(locale, 'auth.blocked'),
-      isBlocked: true
-    }
+    return { message: translate(locale, 'auth.blocked'), kind: 'credentials', isBlocked: true }
   }
 
-  // Restricted account detection - check all possible indicators
+  // Restricted account
   if (
     isFrozen === true ||
-    accountStatus === 'restricted' ||
-    accountStatus === 'frozen' ||
-    accountStatus === 'RESTRICTED' ||
-    accountStatus === 'FROZEN' ||
-    payload?.isFrozen === true ||
-    payload?.data?.isFrozen === true ||
-    msg.includes('account is restricted') ||
-    msg.includes('account restricted') ||
-    msg.includes('temporarily restricted') ||
-    msg.includes('restricted') ||
+    accountStatus === 'restricted' || accountStatus === 'frozen' ||
+    accountStatus === 'RESTRICTED' || accountStatus === 'FROZEN' ||
+    payload?.isFrozen === true || payload?.data?.isFrozen === true ||
+    msg.includes('account is restricted') || msg.includes('temporarily restricted') ||
     msg.includes('frozen') ||
-    errorType === 'ACCOUNT_RESTRICTED' ||
-    errorType === 'RESTRICTED' ||
-    errorType === 'FROZEN'
+    errorType === 'ACCOUNT_RESTRICTED' || errorType === 'RESTRICTED' || errorType === 'FROZEN'
   ) {
-    return { 
-      message: translate(locale, 'auth.restricted'),
-      isRestricted: true
-    }
+    return { message: translate(locale, 'auth.restricted'), kind: 'credentials', isRestricted: true }
   }
 
-  // Check for "user not valid" in the message - indicates blocked/restricted/unvalidated account
-  // Note: Backend returns same message for both blocked and restricted accounts
+  // "user not valid" — unvalidated / access limited
   if (errorType === 'INVALID_CREDENTIALS' && msg.includes('user not valid')) {
-    return { 
-      message: translate(locale, 'auth.not_validated'),
-      isBlocked: true
-    }
+    return { message: translate(locale, 'auth.not_validated'), kind: 'credentials', isBlocked: true }
   }
 
+  // Explicit invalid credentials
   if (errorType === 'INVALID_CREDENTIALS') {
-    return { message: translate(locale, 'auth.invalid_credentials') }
+    return { message: translate(locale, 'auth.invalid_credentials'), kind: 'credentials' }
   }
 
-  if (errorType === 'UNKNOWN_ERROR' && msg.includes('verifying user password')) {
-    return { message: 'Server error during password verification. Please try again later.' }
+  // UNKNOWN_ERROR during password verification = wrong password (backend bug, treat as credentials)
+  if (errorType === 'UNKNOWN_ERROR' && (msg.includes('verifying user password') || msg.includes('password'))) {
+    return { message: translate(locale, 'auth.invalid_credentials'), kind: 'credentials' }
   }
 
+  // Rate limiting
+  if (status === 429) {
+    return { message: translate(locale, 'auth.too_many_attempts'), kind: 'rate_limit' }
+  }
+
+  // Locked / suspended
+  if (status === 423 || msg.includes('suspended')) {
+    return { message: translate(locale, 'auth.restricted'), kind: 'credentials', isRestricted: true }
+  }
+
+  // 401 / 403 — always wrong credentials, not server fault
+  if (status === 401 || status === 403 || msg.includes('unauthorized')) {
+    return { message: translate(locale, 'auth.invalid_credentials'), kind: 'credentials' }
+  }
+
+  // Server errors
   if (status && status >= 500) {
-    return { message: 'Server error while signing in. Please try again in a few minutes.' }
+    return { message: translate(locale, 'auth.server_error'), kind: 'server' }
   }
 
-  if (
-    status === 423 ||
-    msg.includes('blocked') ||
-    msg.includes('suspended') ||
-    msg.includes('restricted')
-  ) {
-    return { message: translate(locale, 'auth.restricted') }
+  // No internet
+  if (!status && !navigator.onLine) {
+    return { message: translate(locale, 'auth.no_connection'), kind: 'network' }
   }
 
-  if (status === 401 || status === 403 || msg.includes('invalid') || msg.includes('unauthorized')) {
-    return { message: translate(locale, 'auth.invalid_credentials') }
+  // Network / fetch failure
+  if (!status && (msg.includes('network') || msg.includes('failed to fetch') || msg.includes('load failed'))) {
+    return { message: translate(locale, 'auth.network_error'), kind: 'network' }
   }
 
-  if (!status && (msg.includes('network') || msg.includes('failed to fetch'))) {
-    return { message: 'Network error. Check your connection and try again.' }
+  // Fallback — try to surface the server message, default to credentials error
+  const serverMsg = payload?.message
+  if (serverMsg && typeof serverMsg === 'string' && serverMsg.length < 120) {
+    return { message: serverMsg, kind: 'credentials' }
   }
-
-  return { message: payload?.message || err?.message || translate(locale, 'auth.invalid_credentials') }
+  return { message: translate(locale, 'auth.invalid_credentials'), kind: 'credentials' }
 }
 
 function getDeviceInfo() {
@@ -172,6 +163,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorKind, setErrorKind] = useState<LoginErrorKind | null>(null)
   const [statusWarning, setStatusWarning] = useState<{ type: 'blocked' | 'restricted' | 'notValidated' | null; message: string }>({ type: null, message: '' })
   
   const theme = useTheme()
@@ -186,6 +178,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setErrorKind(null)
     setStatusWarning({ type: null, message: '' })
     clearAuthStorage()
     
@@ -291,11 +284,24 @@ export default function LoginPage() {
         // Account is restricted - show warning on login page but allow login
         dispatch(setToken(accessToken))
         dispatch(setUser(user))
+        try {
+          const meResp = await apiService.users.getMe()
+          const profile = meResp.data?.data || meResp.data || {}
+          dispatch(setUser({
+            ...user,
+            id: String(profile.id || profile._id || user.id),
+            officerId: profile.officerId || user.officerId,
+            firstName: profile.firstName || user.firstName,
+            lastName: profile.lastName || user.lastName,
+            displayName: profile.displayName || profile.name || user.displayName,
+            center: profile.center || user.center,
+            phoneNumber: profile.phoneNumber || user.phoneNumber,
+          }))
+        } catch { /* use JWT data */ }
         setStatusWarning({
           type: 'restricted',
           message: 'Your account is temporarily restricted. Some features may be limited. You will be redirected shortly...'
         })
-        // Navigate after showing warning briefly
         setTimeout(() => {
           navigate('/', { state: { accountWarning: 'restricted' } })
         }, 2000)
@@ -304,38 +310,38 @@ export default function LoginPage() {
       
       dispatch(setToken(accessToken))
       dispatch(setUser(user))
+
+      // Enrich profile from /users/me since login response may omit user fields
+      try {
+        const meResp = await apiService.users.getMe()
+        const profile = meResp.data?.data || meResp.data || {}
+        dispatch(setUser({
+          ...user,
+          id: String(profile.id || profile._id || user.id),
+          officerId: profile.officerId || user.officerId,
+          firstName: profile.firstName || user.firstName,
+          lastName: profile.lastName || user.lastName,
+          displayName: profile.displayName || profile.name || profile.fullName || user.displayName,
+          center: profile.center || user.center,
+          phoneNumber: profile.phoneNumber || user.phoneNumber,
+          isValid: profile.isValid !== undefined ? profile.isValid : user.isValid,
+          isFrozen: profile.isFrozen !== undefined ? profile.isFrozen : user.isFrozen,
+          validated: profile.validated !== undefined ? profile.validated : user.validated,
+        }))
+      } catch {
+        // Profile fetch failed — JWT data is still stored above
+      }
+
       navigate('/')
     } catch (err: any) {
       const loginError = mapLoginError(err, locale)
-      
-      // If "user not valid" error, show a user-friendly message
-      if (loginError.isBlocked && err?.response?.data?.message?.includes('user not valid')) {
-        try {
-          // Since the backend returns the same message for all cases, we'll show a more helpful generic message
-          // that guides the user to contact support for their specific issue
-          setStatusWarning({
-            type: 'blocked',
-            message: 'Your account access is currently limited. This could be due to account validation, restrictions, or blocking. Please contact your administrator for assistance with your specific account status.'
-          })
-        } catch (statusErr: any) {
-          // If anything fails, show the same helpful message
-          setStatusWarning({
-            type: 'blocked',
-            message: 'Your account access is currently limited. This could be due to account validation, restrictions, or blocking. Please contact your administrator for assistance with your specific account status.'
-          })
-        }
-      } else if (loginError.isBlocked) {
-        setStatusWarning({
-          type: 'blocked',
-          message: loginError.message
-        })
+      if (loginError.isBlocked) {
+        setStatusWarning({ type: 'blocked', message: loginError.message })
       } else if (loginError.isRestricted) {
-        setStatusWarning({
-          type: 'restricted',
-          message: loginError.message
-        })
+        setStatusWarning({ type: 'restricted', message: loginError.message })
       } else {
         setError(loginError.message)
+        setErrorKind(loginError.kind)
       }
     } finally {
       setLoading(false)
@@ -481,7 +487,7 @@ export default function LoginPage() {
                 
                 <Box sx={{ mt: 'auto', pt: 6, opacity: 0.7 }}>
                   <Typography variant="caption">
-                    © 2026 Emergency Services Administration. All rights reserved.
+                    © 2026 Micla Engineering & Design Tunis. All rights reserved.
                   </Typography>
                 </Box>
               </Box>
@@ -568,9 +574,44 @@ export default function LoginPage() {
                   </Stack>
 
                   {error && (
-                    <Alert severity="error" variant="filled" sx={{ borderRadius: 2 }}>
-                      {error}
-                    </Alert>
+                    <Fade in>
+                      <Alert
+                        severity={errorKind === 'network' || errorKind === 'server' ? 'warning' : 'error'}
+                        variant="outlined"
+                        icon={
+                          errorKind === 'network' ? <WifiOffRoundedIcon fontSize="small" /> :
+                          errorKind === 'server' ? <CloudOffRoundedIcon fontSize="small" /> :
+                          errorKind === 'rate_limit' ? <TimerRoundedIcon fontSize="small" /> :
+                          <KeyRoundedIcon fontSize="small" />
+                        }
+                        sx={{
+                          borderRadius: 2,
+                          alignItems: 'flex-start',
+                          '& .MuiAlert-icon': { mt: 0.25 },
+                        }}
+                        action={
+                          (errorKind === 'server' || errorKind === 'network') ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => { setError(null); setErrorKind(null) }}
+                            >
+                              {t('auth.retry')}
+                            </Button>
+                          ) : undefined
+                        }
+                      >
+                        <Typography variant="body2" fontWeight={700} sx={{ lineHeight: 1.4 }}>
+                          {errorKind === 'credentials' && t('auth.invalid_credentials').split('.')[0]}
+                          {errorKind === 'server' && 'Service unavailable'}
+                          {errorKind === 'network' && 'No connection'}
+                          {errorKind === 'rate_limit' && 'Too many attempts'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ display: 'block', mt: 0.25, opacity: 0.9 }}>
+                          {error}
+                        </Typography>
+                      </Alert>
+                    </Fade>
                   )}
 
                   {/* Blocked Account Warning */}
@@ -658,13 +699,13 @@ export default function LoginPage() {
 
                     <Box sx={{ textAlign: 'center', pt: 2 }}>
                       <Typography variant="body2" color="text.secondary">
-                        {t('auth.no_account')}{' '}
-                        <Link 
-                          component={RouterLink} 
-                          to="/auth/admin-signup" 
+                        New officer?{' '}
+                        <Link
+                          component={RouterLink}
+                          to="/register"
                           sx={{ fontWeight: 700, textDecoration: 'none' }}
                         >
-                          {t('auth.create_admin_account')}
+                          Request an account
                         </Link>
                       </Typography>
                     </Box>

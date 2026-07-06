@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { Box, Typography, alpha, useTheme } from '@mui/material'
+import { Box, Stack, Typography, alpha, useTheme } from '@mui/material'
+import MapRoundedIcon from '@mui/icons-material/MapRounded'
 import { getMapStyle } from '@/utils/mapStyle'
 import { getMapControlSx } from '@/utils/mapControlSx'
 import { useTranslation } from '@/themeMode'
@@ -192,13 +193,39 @@ export default function OfficerTrackingMap({
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
 
-    mapRef.current = new maplibregl.Map({
-      container: mapContainer.current,
-      style: getMapStyle(),
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-      attributionControl: false,
-    })
+    // Check WebGL availability before attempting to create the map
+    const webGLAvailable = (() => {
+      try {
+        const canvas = document.createElement('canvas')
+        return !!(
+          window.WebGLRenderingContext &&
+          (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+        )
+      } catch {
+        return false
+      }
+    })()
+
+    if (!webGLAvailable) {
+      setError('WebGL is not available in this browser or environment. The map cannot be displayed.')
+      return
+    }
+
+    let map: maplibregl.Map
+    try {
+      map = new maplibregl.Map({
+        container: mapContainer.current,
+        style: getMapStyle(),
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+        attributionControl: false,
+      })
+    } catch {
+      setError('The map could not be initialized. WebGL may be unavailable or blocked in this environment.')
+      return
+    }
+    mapRef.current = map
+
     mapRef.current.addControl(new maplibregl.NavigationControl(), 'top-right')
     mapRef.current.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
     mapRef.current.on('error', () => setError(tRef.current('maps.failed_to_load_map_tiles')))
@@ -446,11 +473,52 @@ export default function OfficerTrackingMap({
       {error && (
         <Box sx={{
           position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          bgcolor: alpha(theme.palette.background.paper, 0.92),
-          zIndex: 4, p: 2, textAlign: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          bgcolor: theme.palette.background.paper,
+          zIndex: 4, p: 3, textAlign: 'center', gap: 1.5,
+          overflowY: 'auto',
         }}>
-          <Typography color="error.main">{error}</Typography>
+          <MapRoundedIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>Map unavailable</Typography>
+          <Typography color="text.secondary" variant="body2" sx={{ maxWidth: 380 }}>
+            {error}
+          </Typography>
+
+          {officers.length > 0 && (
+            <Box sx={{ width: '100%', maxWidth: 460, mt: 1, textAlign: 'left' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                Officer locations — {officers.length} active
+              </Typography>
+              <Stack spacing={0} sx={{ mt: 1, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, overflow: 'hidden' }}>
+                {officers.map((o, i) => (
+                  <Box
+                    key={o.id}
+                    sx={{
+                      display: 'flex', alignItems: 'center', gap: 2,
+                      px: 2, py: 1.25,
+                      borderTop: i > 0 ? `1px solid ${theme.palette.divider}` : 'none',
+                      bgcolor: i % 2 === 0 ? 'transparent' : alpha(theme.palette.action.hover, 0.03),
+                    }}
+                  >
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, bgcolor: statusColor(o.status) }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {o.name || o.officerId}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', flexShrink: 0 }}>
+                      {o.latitude.toFixed(4)}, {o.longitude.toFixed(4)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: statusColor(o.status), fontWeight: 600, flexShrink: 0 }}>
+                      {o.status || 'unknown'}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {officers.length === 0 && (
+            <Typography variant="body2" color="text.disabled">No officers currently tracked.</Typography>
+          )}
         </Box>
       )}
     </Box>

@@ -161,18 +161,21 @@ export default function CommsHubPage() {
   }, [me?.id])
   const isChatRoute = location.pathname.includes('/communications')
 
-  const contacts = useMemo<ChatContact[]>(() => {
-    const contactsState = chatState.contactIds
+  const allContacts = useMemo<ChatContact[]>(() => {
+    return chatState.contactIds
       .map((id: string) => chatState.contacts[id] as ChatContact | undefined)
       .filter((contact: ChatContact | undefined): contact is ChatContact => Boolean(contact))
-    if (!query.trim()) return contactsState
+  }, [chatState.contactIds, chatState.contacts])
+
+  const contacts = useMemo<ChatContact[]>(() => {
+    if (!query.trim()) return allContacts
     const needle = query.toLowerCase()
-    return contactsState.filter((c: ChatContact) =>
+    return allContacts.filter((c: ChatContact) =>
       [c.name, c.officerId, c.role].some((value) => value.toLowerCase().includes(needle))
     )
-  }, [chatState.contactIds, chatState.contacts, query])
+  }, [allContacts, query])
 
-  const selectedContact = contacts.find((c: ChatContact) => c.id === selectedId) || null
+  const selectedContact = allContacts.find((c: ChatContact) => c.id === selectedId) || null
   const selectedMessages = chatState.messagesByPeer[selectedContact?.id || ''] || []
   const selectedCallHistory = useMemo(() => {
     if (!selectedContact) return []
@@ -369,7 +372,9 @@ export default function CommsHubPage() {
                   {t('comms.contacts')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                {contacts.length} contacts
+                  {query.trim()
+                    ? `${contacts.length} / ${allContacts.length} ${t('comms.contacts').toLowerCase()}`
+                    : `${contacts.length} ${t('comms.contacts').toLowerCase()}`}
                 </Typography>
               </Box>
             </Stack>
@@ -380,7 +385,7 @@ export default function CommsHubPage() {
 
           <TextField
             size="small"
-            placeholder="Search officers..."
+            placeholder={t('comms.search_contacts')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             InputProps={{
@@ -392,7 +397,7 @@ export default function CommsHubPage() {
             }}
           />
 
-          <Stack spacing={1} sx={{ overflowY: 'auto' }}>
+          <Stack spacing={1} sx={{ overflowY: 'auto', flex: 1, minHeight: 0, maxHeight: 520, pr: 0.5 }}>
             {contacts.length === 0 && (
               <Typography variant="body2" color="text.secondary">
                 {t('comms.no_contacts')}
@@ -495,7 +500,7 @@ export default function CommsHubPage() {
                     <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: theme.palette.divider }} />
                     <Typography variant="caption" color="text.secondary">
                       {selectedContact.status === 'online'
-                        ? t('common.all')
+                        ? t('comms.online')
                         : t('comms.last_seen', { time: formatRelativeTime(selectedContact.lastSeen, locale, t('comms.unknown_time')) })}
                     </Typography>
                   </Stack>
@@ -669,7 +674,7 @@ export default function CommsHubPage() {
 
           <Divider />
 
-          <Stack ref={scrollRef} onScroll={handleScroll} spacing={2} sx={{ flex: 1, overflowY: 'auto', paddingInlineEnd: 4, maxHeight: 400 }}>
+          <Stack ref={scrollRef} onScroll={handleScroll} spacing={2} sx={{ flex: 1, overflowY: 'auto', paddingInlineEnd: 4, minHeight: 0, maxHeight: 520 }}>
             {!selectedContact && (
               <Box
                 sx={{
@@ -791,7 +796,7 @@ export default function CommsHubPage() {
                                 fontWeight: 600,
                               }}
                             >
-                              Loading attachment...
+                              {t('comms.loading_attachment')}
                             </Box>
                           )}
                           {message.text && (

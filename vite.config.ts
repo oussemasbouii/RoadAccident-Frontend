@@ -10,6 +10,20 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 3000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          // MapLibre has no React deps — safe to split
+          if (id.includes('maplibre-gl')) return 'vendor-map'
+          // Everything else stays in one vendor chunk — avoids circular load-order crashes
+          return 'vendor-libs'
+        },
+      },
+    },
+  },
   test: {
     globals: true,
     environment: "happy-dom",
@@ -22,8 +36,8 @@ export default defineConfig({
     hmr: false,
     proxy: {
       "/api": {
-        // Proxy API calls to the mobile backend (production/dev endpoint)
-        target: "https://micladevops.com",
+        // Proxy API calls to the API server
+        target: "https://api.micladevops.com",
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path.replace(/^\/api/, "/api/v2"),

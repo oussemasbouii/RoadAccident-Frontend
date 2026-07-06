@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ErrorInfo, ReactNode } from 'react'
 import maplibregl from 'maplibre-gl'
 import {
   Box,
@@ -48,6 +49,30 @@ function formatRelativeTime(lastSeen?: number, labels = { unknown: 'Unknown', se
   if (minutes < 60) return labels.minutesAgo(minutes)
   const hours = Math.floor(minutes / 60)
   return labels.hoursAgo(hours)
+}
+
+class MapErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean; message: string }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { crashed: false, message: '' }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { crashed: true, message: error?.message || 'Map failed to load.' }
+  }
+  componentDidCatch(_error: Error, _info: ErrorInfo) { /* already captured in state */ }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 1.5, p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>Map unavailable</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 360 }}>
+            The map could not be rendered in this environment. WebGL may be disabled or unavailable.
+          </Typography>
+        </Box>
+      )
+    }
+    return this.props.children
+  }
 }
 
 export default function OfficerTrackingPage() {
@@ -378,12 +403,14 @@ export default function OfficerTrackingPage() {
             <Chip size="small" label={`${officers.length} ${t('dashboard.tracking')}`} />
           </Box>
           <Box sx={{ height: { xs: 520, lg: 640 } }}>
-            <OfficerTrackingMap
-              officers={officers}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onReady={handleMapReady}
-            />
+            <MapErrorBoundary>
+              <OfficerTrackingMap
+                officers={officers}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onReady={handleMapReady}
+              />
+            </MapErrorBoundary>
           </Box>
         </Card>
 

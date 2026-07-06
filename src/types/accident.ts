@@ -652,7 +652,24 @@ export interface CreateAccidentErrorResponse {
 }
 
 export interface GenerateReportRequest {
-  documentType: 'PDF' | 'DOCX'
+  documentType: string
+}
+
+export interface ArchivedAccident {
+  id: string
+  location: string
+  latitude?: number
+  longitude?: number
+  severity: string
+  status: string
+  deletedAt: string
+  deletedBy?: string
+  deletedReason?: string
+  time?: string
+  timestamp?: string
+  vehicles?: number
+  injuries?: number
+  description?: string
 }
 
 export interface GenerateReportResponse {

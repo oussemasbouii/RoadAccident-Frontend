@@ -48,7 +48,8 @@ const renderWithProviders = (ui: React.ReactElement, { initialState = {} } = {})
 describe('IncidentsPage', () => {
   it('renders the Road Accidents title', () => {
     renderWithProviders(<IncidentsPage />)
-    expect(screen.getByText('Road Accidents')).toBeDefined()
+    // Title appears in the page header and the table card header.
+    expect(screen.getAllByText('Road Accidents').length).toBeGreaterThan(0)
   })
 
   it('renders the incident management data table', () => {
@@ -63,7 +64,8 @@ describe('IncidentsPage', () => {
     }
     renderWithProviders(<IncidentsPage />, { initialState })
     
-    expect(screen.getByText('#1')).toBeDefined()
+    // Desktop table truncates the id (e.g. "#1…"), so match loosely.
+    expect(screen.getByText(/#1/)).toBeDefined()
     expect(screen.getByText('Tunis')).toBeDefined()
   })
 })

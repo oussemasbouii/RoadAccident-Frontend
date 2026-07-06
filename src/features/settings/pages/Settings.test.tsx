@@ -67,15 +67,14 @@ describe('Settings & Admin Pages', () => {
   })
 
   describe('AdminAccountsPage', () => {
-    it('renders the Administration title', () => {
+    it('renders the page title', () => {
       renderWithProviders(<AdminAccountsPage />)
-      expect(screen.getByText('Officer Accounts')).toBeDefined()
+      expect(screen.getByText('User Accounts')).toBeDefined()
     })
 
-    it('renders search and filter fields', () => {
+    it('renders the search field', () => {
       renderWithProviders(<AdminAccountsPage />)
-      expect(screen.getByLabelText(/Search Identification/i)).toBeDefined()
-      expect(screen.getByLabelText(/Audit Documentation/i)).toBeDefined()
+      expect(screen.getByLabelText(/Search users/i)).toBeDefined()
     })
   })
 })

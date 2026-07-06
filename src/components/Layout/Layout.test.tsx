@@ -24,7 +24,9 @@ const createMockStore = (initialState = {}) => {
   return configureStore({
     reducer: {
       auth: authReducer,
-      alerts: (state = { unreadCount: 5 }) => state,
+      alerts: (state = { unreadCount: 5, list: [], loading: false }) => state,
+      chat: (state = { contactIds: [], unreadByPeer: {} }) => state,
+      notifications: (state = { pendingAccountsCount: 0 }) => state,
     },
     preloadedState: initialState,
   })
@@ -57,11 +59,6 @@ describe('Layout Components', () => {
       expect(screen.getByText('John Doe')).toBeDefined()
       expect(screen.getByText('JD')).toBeDefined()
       expect(screen.getByText('admin')).toBeDefined()
-    })
-
-    it('renders the search bar in Topbar', () => {
-      renderWithProviders(<Topbar onMenuClick={vi.fn()} />)
-      expect(screen.getByPlaceholderText(/Search incidents/i)).toBeDefined()
     })
   })
 

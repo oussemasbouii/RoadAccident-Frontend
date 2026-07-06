@@ -20,6 +20,12 @@ const api = axios.create({
   withCredentials: true,
 })
 
+// Same base URL as `api` (goes through the Vite proxy), but no auth interceptor attached
+const publicApi = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+})
+
 let isRefreshing = false
 let failedQueue: Array<any> = []
 
@@ -154,15 +160,23 @@ export const apiService = {
       phoneNumber: string
     }) => api.post('/auth/signup', data),
     adminSignup: (data: {
-      officerId?: string
-      email?: string
+      officerId: string
       password: string
       firstName: string
       lastName: string
       phoneNumber?: string
       center?: string
-      role?: 'admin'
-    }) => api.post('/auth/admin/signup', data),
+      role?: 'admin' | 'officer' | 'supervisor'
+    }) => api.post('/auth/signup', data),
+    register: (data: {
+      officerId: string
+      password: string
+      firstName: string
+      lastName: string
+      phoneNumber?: string
+      center?: string
+      role?: string
+    }) => publicApi.post('/auth/register', data),
     requestPasswordReset: (data: { email?: string; officerId?: string }) =>
       api.post('/auth/password/forgot', data),
     verifyPasswordResetToken: (data: { token: string; email?: string; officerId?: string }) =>
@@ -186,6 +200,11 @@ export const apiService = {
     update: (id: string, data: Record<string, unknown>) => api.put(`/accidents/${id}`, data),
     generateReport: (id: string, data: GenerateReportRequest) =>
       api.post<GenerateReportResponse>(`/accidents/${id}/generate-report`, data),
+    getArchived: (page = 1, limit = 20) => api.get('/accidents/archived', { params: { page, limit } }),
+    restore: (id: string, data?: { reason?: string }) =>
+      api.post(`/accidents/${id}/restore`, data ?? {}),
+    softDelete: (id: string, data?: { reason?: string }) =>
+      api.delete(`/accidents/${id}`, { data: data ?? {} }),
   },
 
   // Accidents
@@ -241,6 +260,12 @@ export const apiService = {
     ) => api.patch(`/users/${id}/status`, data),
     updatePassword: (id: string, data: { newPassword: string }) => api.patch(`/users/${id}/password`, data),
     revokeSessions: (id: string) => api.post(`/users/${id}/sessions/revoke`),
+    // Soft-delete (deactivate): disables the account, revokes sessions, records to audit.
+    // Reversible via restore. Returns the public user profile.
+    softDelete: (id: string, data?: { reason?: string }) =>
+      api.delete(`/users/${id}`, { data: data ?? {} }),
+    restore: (id: string, data?: { reason?: string }) =>
+      api.post(`/users/${id}/restore`, data ?? {}),
     // Check user status by officerId (for login assistance)
     checkStatus: (officerId: string) => api.get(`/users/status/${officerId}`),
   },

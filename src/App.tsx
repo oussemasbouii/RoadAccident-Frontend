@@ -5,11 +5,13 @@ import { Toaster } from 'react-hot-toast'
 import store, { RootState } from './store/store'
 import LoginPage from './features/auth/pages/LoginPage'
 import AdminSignupPage from './features/auth/pages/AdminSignupPage'
+import RegisterPage from './features/auth/pages/RegisterPage'
 import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage'
 import ResetPasswordPage from './features/auth/pages/ResetPasswordPage'
 import DashboardLayout from './components/Layout/DashboardLayout'
 import DashboardPage from './features/dashboard/pages/DashboardPage'
 import IncidentsPage from './features/incidents/pages/IncidentsPage'
+import ArchivedIncidentsPage from './features/incidents/pages/ArchivedIncidentsPage'
 import AlertsPage from './features/alerts/pages/AlertsPage'
 import ReportsPage from './features/reports/pages/ReportsPage'
 import SettingsPage from './features/settings/pages/SettingsPage'
@@ -156,7 +158,7 @@ function App() {
         <AuthenticatedServices />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/auth/admin-signup" element={<AdminSignupPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route
@@ -174,7 +176,9 @@ function App() {
             <Route path="communications" element={<CommsHubPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="admin/accounts" element={<AdminRoute><AdminAccountsPage /></AdminRoute>} />
+            <Route path="admin/new-account" element={<AdminRoute><AdminSignupPage /></AdminRoute>} />
             <Route path="admin/officer-tracking" element={<AdminRoute><OfficerTrackingPage /></AdminRoute>} />
+            <Route path="admin/archived-incidents" element={<AdminRoute><ArchivedIncidentsPage /></AdminRoute>} />
             <Route index element={<Navigate to="/dashboard" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />

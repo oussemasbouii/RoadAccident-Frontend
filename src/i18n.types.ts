@@ -47,6 +47,7 @@ export type TranslationMessages = {
     communications: string
     user_accounts: string
     officer_tracking: string
+    archived_incidents: string
     settings: string
   }
   auth: {
@@ -68,6 +69,11 @@ export type TranslationMessages = {
     blocked: string
     restricted: string
     not_validated: string
+    server_error: string
+    too_many_attempts: string
+    no_connection: string
+    network_error: string
+    retry: string
   }
   topbar: {
     notifications: string
@@ -264,6 +270,22 @@ export type TranslationMessages = {
     vehicles: string
     injuries: string
   }
+  archived_incidents: {
+    title: string
+    subtitle: string
+    empty: string
+    loading: string
+    restore: string
+    restoring: string
+    restore_success: string
+    restore_error: string
+    deleted_at: string
+    deleted_by: string
+    deleted_reason: string
+    reason_placeholder: string
+    confirm_restore_title: string
+    confirm_restore_body: string
+  }
   settings: {
     title: string
     subtitle: string
@@ -425,7 +447,49 @@ export type TranslationMessages = {
     failed_to_load_users: string
     role_admin: string
     role_dispatch: string
+    role_supervisor: string
     role_officer: string
+    pending_approval: string
+    pending_approvals_title: string
+    create_account: string
+    showing_pending: string
+    x_selected: string
+    activate: string
+    block_selected: string
+    deselect_all: string
+    approve: string
+    approving: string
+    reject: string
+    rejecting: string
+    awaiting_approval: string
+    account_approved: string
+    registration_rejected: string
+    role_updated: string
+    role_update_failed: string
+    reset_password_title: string
+    reset_password_for: string
+    new_password: string
+    confirm_new_password: string
+    passwords_must_match: string
+    password_min_12: string
+    revoke_sessions_title: string
+    revoke_sessions_body: string
+    deactivate: string
+    deactivated: string
+    restore: string
+    deactivating: string
+    restoring: string
+    deactivate_title: string
+    deactivate_warning: string
+    reason_optional: string
+    reason_placeholder: string
+    confirm_deactivate: string
+    user_deactivated: string
+    user_restored: string
+    deactivate_failed: string
+    restore_failed: string
+    restorable_until: string
+    show_deactivated: string
   }
   documents: {
     attachments: string
@@ -558,6 +622,7 @@ export type TranslationMessages = {
     minimize: string
     close: string
     type_message: string
+    search_contacts: string
   }
   calls: {
     incoming_call: string
@@ -609,8 +674,13 @@ export type TranslationMessages = {
     submit: string
     update: string
     submitting: string
+    step_info: string
     step_location: string
     step_road: string
+    step_environment: string
+    step_participant: string
+    step_vehicle: string
+    step_damages: string
     step_people: string
     section_location: string
     section_road: string
@@ -705,5 +775,91 @@ export type TranslationMessages = {
     perimeter_hint: string
     perimeter_footer_hint: string
     perimeter_go_back: string
+    duplicate_dialog_title: string
+    duplicate_high_risk_title: string
+    duplicate_alert_high_risk: string
+    duplicate_alert_location: string
+    duplicate_existing_label: string
+    duplicate_away: string
+    duplicate_confirm_question: string
+    duplicate_proceed: string
+    section_date_time: string
+    section_accident_details: string
+    section_road_geometry: string
+    section_road_identification: string
+    section_road_classification: string
+    section_traffic: string
+    section_road_dimensions: string
+    section_env_conditions: string
+    section_env_additional: string
+    address_number: string
+    between_street: string
+    and_street: string
+    intersection_with: string
+    designation: string
+    number_of_lanes: string
+    speed_limit: string
+    central_reservation: string
+    road_characteristics: string
+    road_surface_condition: string
+    road_condition_text: string
+    obstacles: string
+    circumstances_1: string
+    circumstances_2: string
+    involved_parties: string
+    add_participant: string
+    no_participants_yet: string
+    personal_information: string
+    save_participant: string
+    vehicle_details: string
+    no_vehicles_yet: string
+    behavior_tests: string
+    section_accident_outcome: string
+    tax_id: string
+    passport_number: string
+    e_houwiya: string
+    brand: string
+    commercial_type: string
+    usage_type: string
+    vehicle_nationality: string
+    registration_card_number: string
+    chassis_number: string
+    engine_number: string
+    section_vehicle_technical: string
+    section_insurance: string
+    insurance_contract_number: string
+    insurance_contract_date: string
+    orange_card_number: string
+    validity_start_date: string
+    validity_end_date: string
+    territorial_validity: string
+    card_date: string
+    insurer_company_name: string
+    insurer_address: string
+    insurer_phone: string
+    insurer_fax: string
+    insurer_email: string
+    insured_person_name: string
+    insured_person_address: string
+    insured_phone: string
+    section_identity_docs: string
+    alcohol_level: string
+    vehicle_damage_markers: string
+    vehicle_damage_markers_placeholder: string
+    vehicle_damage_markers_hint: string
+    submit_error_generic: string
+    required_fields_missing: string
+    no_participants_reminder: string
+    location_clear: string
+    nearby_count: string
+    duplicate_time_elapsed: string
+    duplicate_view: string
+    duplicate_and_more: string
+    checking_duplicates: string
+    duplicate_live_alert: string
+    duplicate_step_guard_title: string
+    duplicate_step_guard_body: string
+    duplicate_step_guard_continue: string
+    duplicate_step_guard_review: string
   }
 }

@@ -34,6 +34,12 @@ interface IncidentsState {
   stats: IncidentStats
   reportGenerating: boolean
   reportError: string | null
+  archivedList: any[]
+  archivedTotal: number
+  archivedLoading: boolean
+  archivedError: string | null
+  restoringId: string | null
+  deletingId: string | null
 }
 
 const initialState: IncidentsState = {
@@ -46,6 +52,12 @@ const initialState: IncidentsState = {
   stats: { open: 0, resolved: 0, fatalities: 0, avgResponseTime: 0 },
   reportGenerating: false,
   reportError: null,
+  archivedList: [],
+  archivedTotal: 0,
+  archivedLoading: false,
+  archivedError: null,
+  restoringId: null,
+  deletingId: null,
 }
 
 const unwrapResponseData = (payload: any) => payload?.data ?? payload
@@ -369,13 +381,55 @@ export const updateIncident = createAsyncThunk(
 
 export const generateIncidentReport = createAsyncThunk(
   'incidents/generateReport',
-  async ({ id, documentType }: { id: string; documentType: 'PDF' | 'DOCX' }, { rejectWithValue }) => {
+  async ({ id, documentType }: { id: string; documentType: string }, { rejectWithValue }) => {
     try {
       const response = await apiService.incidents.generateReport(id, { documentType })
       return response.data
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.message || 'Failed to generate report'
+      )
+    }
+  }
+)
+
+export const fetchArchivedIncidents = createAsyncThunk(
+  'incidents/fetchArchived',
+  async ({ page = 1, limit = 20 }: { page?: number; limit?: number } = {}, { rejectWithValue }) => {
+    try {
+      const response = await apiService.incidents.getArchived(page, limit)
+      return unwrapResponseData(response.data)
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || error.response?.data?.error || 'Failed to fetch archived incidents'
+      )
+    }
+  }
+)
+
+export const restoreIncident = createAsyncThunk(
+  'incidents/restore',
+  async ({ id, reason }: { id: string; reason?: string }, { rejectWithValue }) => {
+    try {
+      await apiService.incidents.restore(id, reason ? { reason } : undefined)
+      return { id }
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || error.response?.data?.error || 'Failed to restore incident'
+      )
+    }
+  }
+)
+
+export const softDeleteIncident = createAsyncThunk(
+  'incidents/softDelete',
+  async ({ id, reason }: { id: string; reason?: string }, { rejectWithValue }) => {
+    try {
+      await apiService.incidents.softDelete(id, reason ? { reason } : undefined)
+      return { id }
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || error.response?.data?.error || 'Failed to archive incident'
       )
     }
   }
@@ -488,6 +542,48 @@ const incidentsSlice = createSlice({
     builder.addCase(generateIncidentReport.rejected, (state, action) => {
       state.reportGenerating = false
       state.reportError = action.payload as string
+    })
+
+    // Fetch archived incidents
+    builder.addCase(fetchArchivedIncidents.pending, (state) => {
+      state.archivedLoading = true
+      state.archivedError = null
+    })
+    builder.addCase(fetchArchivedIncidents.fulfilled, (state, action) => {
+      state.archivedLoading = false
+      const payload = action.payload
+      state.archivedList = Array.isArray(payload) ? payload : (payload?.accidents ?? payload?.data ?? [])
+      state.archivedTotal = payload?.total ?? state.archivedList.length
+    })
+    builder.addCase(fetchArchivedIncidents.rejected, (state, action) => {
+      state.archivedLoading = false
+      state.archivedError = action.payload as string
+    })
+
+    // Restore incident
+    builder.addCase(restoreIncident.pending, (state, action) => {
+      state.restoringId = action.meta.arg.id
+    })
+    builder.addCase(restoreIncident.fulfilled, (state, action) => {
+      state.restoringId = null
+      state.archivedList = state.archivedList.filter((a) => a.id !== action.payload.id)
+      state.archivedTotal = Math.max(0, state.archivedTotal - 1)
+    })
+    builder.addCase(restoreIncident.rejected, (state) => {
+      state.restoringId = null
+    })
+
+    // Soft-delete incident
+    builder.addCase(softDeleteIncident.pending, (state, action) => {
+      state.deletingId = action.meta.arg.id
+    })
+    builder.addCase(softDeleteIncident.fulfilled, (state, action) => {
+      state.deletingId = null
+      state.list = state.list.filter((i) => i.id !== action.payload.id)
+      state.total = Math.max(0, state.total - 1)
+    })
+    builder.addCase(softDeleteIncident.rejected, (state) => {
+      state.deletingId = null
     })
   },
 })

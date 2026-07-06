@@ -1,0 +1,71 @@
+<h2>How should the date range filter work?</h2>
+<p class="subtitle">This controls the time window for all KPI calculations, the time-of-day grid, cause ranking, and period comparison.</p>
+
+<div class="options">
+
+  <div class="option" data-choice="presets" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Preset chips only</h3>
+      <p>Fast one-click switching between fixed windows. No date picker needed — simpler UI, works well for operational monitoring.</p>
+      <div style="margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;font-family:monospace;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:10px;color:#64748b;margin-right:2px;">Period:</span>
+          <span style="background:#1d4ed8;color:#fff;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;">Today</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:3px 10px;border-radius:20px;font-size:10px;">7 days</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:3px 10px;border-radius:20px;font-size:10px;">30 days</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:3px 10px;border-radius:20px;font-size:10px;">90 days</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:3px 10px;border-radius:20px;font-size:10px;">1 year</span>
+          <span style="margin-left:auto;background:#0f766e;color:#99f6e4;padding:3px 10px;border-radius:20px;font-size:10px;">↓ Export</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <span style="font-size:10px;color:#64748b;margin-right:2px;">Severity:</span>
+          <span style="background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:20px;font-size:10px;">● Critical</span>
+          <span style="background:#431407;color:#fdba74;padding:2px 8px;border-radius:20px;font-size:10px;">● High</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:20px;font-size:10px;">● Medium</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:20px;font-size:10px;">● Low</span>
+          <span style="font-size:10px;color:#64748b;margin-left:8px;">Status:</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:20px;font-size:10px;">Active</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:20px;font-size:10px;">Resolved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="custom" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Presets + custom date range picker</h3>
+      <p>Same preset chips, but also a "Custom" option that opens a start/end date picker. Useful for investigations of a specific incident window (e.g., "Ramadan period" or a specific month).</p>
+      <div style="margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;font-family:monospace;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:10px;color:#64748b;">Period:</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:3px 10px;border-radius:20px;font-size:10px;">Today</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:3px 10px;border-radius:20px;font-size:10px;">7d</span>
+          <span style="background:#1d4ed8;color:#fff;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;">30d</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:3px 10px;border-radius:20px;font-size:10px;">90d</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:3px 10px;border-radius:20px;font-size:10px;">1y</span>
+          <span style="background:#334155;color:#7dd3fc;padding:3px 10px;border-radius:20px;font-size:10px;border:1px solid #0284c7;">📅 Custom…</span>
+          <span style="margin-left:auto;background:#0f766e;color:#99f6e4;padding:3px 10px;border-radius:20px;font-size:10px;">↓ Export</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 8px;background:#1e293b;border-radius:6px;border:1px solid #0284c7;">
+          <span style="font-size:10px;color:#7dd3fc;">📅 From:</span>
+          <span style="background:#0f172a;color:#e2e8f0;padding:2px 8px;border-radius:4px;font-size:10px;border:1px solid #334155;">2026-04-01</span>
+          <span style="font-size:10px;color:#7dd3fc;">To:</span>
+          <span style="background:#0f172a;color:#e2e8f0;padding:2px 8px;border-radius:4px;font-size:10px;border:1px solid #334155;">2026-04-30</span>
+          <span style="background:#1d4ed8;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;">Apply</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <span style="font-size:10px;color:#64748b;">Severity:</span>
+          <span style="background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:20px;font-size:10px;">● Critical</span>
+          <span style="background:#431407;color:#fdba74;padding:2px 8px;border-radius:20px;font-size:10px;">● High</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:20px;font-size:10px;">● Medium</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:20px;font-size:10px;">● Low</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Either way, severity and status are multi-select chips. The date range is the main decision here.</p>

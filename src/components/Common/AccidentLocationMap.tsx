@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { alpha, Box, TextField, Typography, Paper, IconButton, CircularProgress, useTheme } from '@mui/material'
@@ -21,6 +21,13 @@ interface Location {
   }
 }
 
+interface NearbyIncidentPin {
+  latitude: number
+  longitude: number
+  location: string
+  isHighRisk: boolean
+}
+
 interface AccidentLocationMapProps {
   initialLocation?: Location
   onLocationChange?: (location: Location) => void
@@ -29,6 +36,21 @@ interface AccidentLocationMapProps {
   readOnly?: boolean
   showInstructions?: boolean
   markerVariant?: 'accident' | 'alert'
+  nearbyIncidents?: NearbyIncidentPin[]
+  showDetectionRadius?: boolean
+}
+
+// Generate a circle polygon approximation (N points) around a lat/lng center at radiusM meters
+function circlePolygon(lat: number, lng: number, radiusM: number, points = 64): [number, number][] {
+  const coords: [number, number][] = []
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * 2 * Math.PI
+    const dLat = (radiusM * Math.cos(angle)) / 111320
+    const dLng = (radiusM * Math.sin(angle)) / (111320 * Math.cos((lat * Math.PI) / 180))
+    coords.push([lng + dLng, lat + dLat])
+  }
+  coords.push(coords[0]) // close the ring
+  return coords
 }
 
 export default function AccidentLocationMap({
@@ -39,6 +61,8 @@ export default function AccidentLocationMap({
   readOnly = false,
   showInstructions = true,
   markerVariant = 'accident',
+  nearbyIncidents,
+  showDetectionRadius = false,
 }: AccidentLocationMapProps) {
   const theme = useTheme()
   const { t } = useTranslation()
@@ -46,6 +70,8 @@ export default function AccidentLocationMap({
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const marker = useRef<maplibregl.Marker | null>(null)
+  const nearbyMarkersRef = useRef<maplibregl.Marker[]>([])
+  const currentCenterRef = useRef<{ lat: number; lng: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
   const [address, setAddress] = useState('')
@@ -93,6 +119,7 @@ export default function AccidentLocationMap({
 
     if (initialLocation.latitude && initialLocation.longitude) {
       addMarker(initialLocation.latitude, initialLocation.longitude)
+      currentCenterRef.current = { lat: initialLocation.latitude, lng: initialLocation.longitude }
     }
 
     map.current.on('load', () => setLoading(false))
@@ -108,6 +135,8 @@ export default function AccidentLocationMap({
       ro.disconnect()
       marker.current?.remove()
       marker.current = null
+      nearbyMarkersRef.current.forEach(mk => mk.remove())
+      nearbyMarkersRef.current = []
       map.current?.remove()
       map.current = null
     }
@@ -150,8 +179,88 @@ export default function AccidentLocationMap({
     )
   }
 
+  const updateDetectionRadius = useCallback((lat: number, lng: number) => {
+    const m = map.current
+    if (!m || !m.isStyleLoaded()) return
+    const geojson: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'Polygon', coordinates: [circlePolygon(lat, lng, 200)] },
+      }],
+    }
+    const src = m.getSource('detection-radius') as maplibregl.GeoJSONSource | undefined
+    if (src) {
+      src.setData(geojson)
+    } else {
+      m.addSource('detection-radius', { type: 'geojson', data: geojson })
+      m.addLayer({
+        id: 'detection-radius-fill',
+        type: 'fill',
+        source: 'detection-radius',
+        paint: { 'fill-color': '#ef4444', 'fill-opacity': 0.08 },
+      })
+      m.addLayer({
+        id: 'detection-radius-line',
+        type: 'line',
+        source: 'detection-radius',
+        paint: { 'line-color': '#ef4444', 'line-width': 1.5, 'line-dasharray': [4, 3], 'line-opacity': 0.7 },
+      })
+    }
+  }, [])
+
+  const removeDetectionRadius = useCallback(() => {
+    const m = map.current
+    if (!m || !m.isStyleLoaded()) return
+    if (m.getLayer('detection-radius-fill')) m.removeLayer('detection-radius-fill')
+    if (m.getLayer('detection-radius-line')) m.removeLayer('detection-radius-line')
+    if (m.getSource('detection-radius')) m.removeSource('detection-radius')
+  }, [])
+
+  const updateNearbyMarkers = useCallback((pins: NearbyIncidentPin[], dark: boolean) => {
+    const m = map.current
+    if (!m) return
+    nearbyMarkersRef.current.forEach(mk => mk.remove())
+    nearbyMarkersRef.current = []
+    pins.forEach(pin => {
+      const el = document.createElement('div')
+      const color = pin.isHighRisk ? '#ef4444' : '#f97316'
+      el.style.cssText = `width:28px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3))`
+      el.innerHTML = `<svg viewBox="0 0 28 34" width="28" height="34"><path d="M14 1C7.4 1 2 6.4 2 13c0 8 10.2 18 11.4 19.1.3.3.9.3 1.2 0C15.8 31 26 21 26 13 26 6.4 20.6 1 14 1z" fill="${color}" stroke="#fff" stroke-width="1.5"/><circle cx="14" cy="13" r="5" fill="#fff" opacity="0.9"/></svg>`
+      const popup = new maplibregl.Popup({ offset: 18, anchor: 'bottom', closeButton: false })
+        .setHTML(`<div style="font-family:ui-sans-serif,system-ui;padding:8px 10px;font-size:12px;font-weight:600;color:${dark ? '#f1f5f9' : '#0f172a'};background:${dark ? '#1e293b' : '#fff'};border-radius:8px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pin.location}</div>`)
+      const mk = new maplibregl.Marker({ element: el }).setLngLat([pin.longitude, pin.latitude]).setPopup(popup).addTo(m)
+      nearbyMarkersRef.current.push(mk)
+    })
+  }, [])
+
+  // Keep radius + nearby markers in sync with props
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    const onLoad = () => {
+      if (showDetectionRadius && currentCenterRef.current) {
+        updateDetectionRadius(currentCenterRef.current.lat, currentCenterRef.current.lng)
+      } else {
+        removeDetectionRadius()
+      }
+      updateNearbyMarkers(nearbyIncidents || [], isDark)
+    }
+    if (m.isStyleLoaded()) {
+      onLoad()
+    } else {
+      m.once('load', onLoad)
+    }
+    return () => { m.off('load', onLoad) }
+  }, [showDetectionRadius, nearbyIncidents, isDark, updateDetectionRadius, removeDetectionRadius, updateNearbyMarkers])
+
   const updateLocation = (lat: number, lng: number, description?: string) => {
     addMarker(lat, lng)
+    currentCenterRef.current = { lat, lng }
+    if (showDetectionRadius && map.current?.isStyleLoaded()) {
+      updateDetectionRadius(lat, lng)
+    }
     map.current?.flyTo({ center: [lng, lat], zoom: 15, essential: true })
     onLocationChange?.({ latitude: lat, longitude: lng, description })
 
