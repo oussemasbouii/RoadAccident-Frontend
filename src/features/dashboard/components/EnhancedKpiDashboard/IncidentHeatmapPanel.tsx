@@ -12,6 +12,7 @@ import LayersRoundedIcon from '@mui/icons-material/LayersRounded'
 import FiberManualRecordRoundedIcon from '@mui/icons-material/FiberManualRecord'
 import type { Incident } from '../../../incidents/slices/incidentsSlice'
 import { getMapStyle } from '@/utils/mapStyle'
+import { geocodeAddress } from '@/utils/mapService'
 import { getMapControlSx } from '@/utils/mapControlSx'
 import { useTranslation } from '../../../../themeMode'
 
@@ -99,9 +100,10 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
   // Refs to avoid stale closures inside map callbacks
   const incidentsRef     = useRef(incidents)
   const resolvedRef      = useRef<Record<string, Coords>>({})
+  const fittedRef        = useRef(false)
 
   const [mapError, setMapError]               = useState<string | null>(null)
-  const [resolvedCoords]                      = useState<Record<string, Coords>>({})
+  const [resolvedCoords, setResolvedCoords]   = useState<Record<string, Coords>>({})
   const [pointCount, setPointCount]           = useState(0)
   const [internalViewMode, setInternalViewMode] = useState<'pins' | 'heatmap'>('pins')
   const viewMode = propViewMode ?? internalViewMode
@@ -115,6 +117,45 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
   incidentsRef.current = incidents
   resolvedRef.current  = resolvedCoords
   isDarkRef.current    = isDark
+
+  // ── Geocode place-name locations so every incident is mapped by default ──────
+  // Incidents that already carry lat/lng or a "lat,lng" string are handled by
+  // resolveCoords(); the rest (named places) are geocoded here — once per unique
+  // location — and cached in resolvedCoords, which repaints the map layers.
+  useEffect(() => {
+    let active = true
+    const run = async () => {
+      const pending = new Map<string, string>() // lowercased key -> original query
+      for (const inc of incidents) {
+        if (inc.latitude != null && inc.longitude != null) continue
+        const raw = inc.location?.trim() ?? ''
+        if (!raw || parseCoords(raw)) continue
+        const key = raw.toLowerCase()
+        if (resolvedRef.current[key]) continue
+        if (!pending.has(key)) pending.set(key, raw)
+      }
+      if (pending.size === 0) return
+
+      const results = await Promise.all(
+        Array.from(pending.entries()).map(async ([key, query]) => {
+          try {
+            const c = await geocodeAddress(query)
+            return c ? ([key, { lat: c.lat, lng: c.lng }] as const) : null
+          } catch {
+            return null
+          }
+        })
+      )
+      if (!active) return
+      const additions: Record<string, Coords> = {}
+      for (const r of results) if (r) additions[r[0]] = r[1]
+      if (Object.keys(additions).length > 0) {
+        setResolvedCoords((prev) => ({ ...prev, ...additions }))
+      }
+    }
+    run()
+    return () => { active = false }
+  }, [incidents])
 
   // ── Fit bounds helper ───────────────────────────────────────
   const handleFitBounds = () => {
@@ -180,10 +221,11 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
           id: 'incidents-circles',
           type: 'circle',
           source: 'incidents-heat',
-          minzoom: 8,
           layout: { visibility: 'visible' },
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 5, 14, 14] as any,
+            // Visible at every zoom (was hidden below zoom 8, which left the map
+            // looking empty at the default country-level view).
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 3.5, 8, 6, 14, 13] as any,
             'circle-color': [
               'match', ['get', 'severity'],
               'critical', SEV_COLORS.critical,
@@ -194,7 +236,7 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
             ] as any,
             'circle-stroke-width': 1.5,
             'circle-stroke-color': '#ffffff',
-            'circle-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0, 10, 0.9] as any,
+            'circle-opacity': 0.88,
           },
         })
 
@@ -252,6 +294,12 @@ export default function IncidentHeatmapPanel({ incidents, viewMode: propViewMode
     const geo = buildGeoJson(incidents, resolvedCoords)
     setPointCount(geo.features.length)
     ;(mapRef.current.getSource('incidents-heat') as maplibregl.GeoJSONSource | undefined)?.setData(geo)
+    // Frame the incidents the first time any are mapped, so they're clearly visible
+    // without the user having to zoom or click a black-spot.
+    if (!fittedRef.current && geo.features.length > 0) {
+      fittedRef.current = true
+      handleFitBounds()
+    }
   }, [incidents, resolvedCoords])
 
   // ── Toggle layer visibility when viewMode changes ───────────

@@ -94,6 +94,25 @@ export const chatSlice = createSlice({
         }
       }
     },
+    // Merge a batch of fetched history into a peer's thread: dedupe by id, keep the
+    // existing (live) copy of any overlapping message so its status isn't downgraded,
+    // and keep the thread sorted oldest-first. Safe to call repeatedly (pagination).
+    mergeMessages(state, action: PayloadAction<{ peerId: string; messages: ChatMessage[] }>) {
+      const { peerId, messages } = action.payload
+      if (!messages.length) return
+      const existing = state.messagesByPeer[peerId] || []
+      const byId = new Map<string, ChatMessage>()
+      existing.forEach((m) => byId.set(m.id, m))
+      messages.forEach((m) => {
+        const prev = byId.get(m.id)
+        // prev (live) fields win over history for overlapping keys (no status downgrade),
+        // history fills in anything missing; brand-new history messages are added as-is.
+        byId.set(m.id, prev ? { ...m, ...prev } : m)
+      })
+      state.messagesByPeer[peerId] = Array.from(byId.values()).sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )
+    },
     openThread(state, action: PayloadAction<{ peerId: string }>) {
       const { peerId } = action.payload
       const next = [peerId, ...state.openThreads.filter((id) => id !== peerId)]
@@ -277,6 +296,7 @@ export const {
   setContacts,
   updateContact,
   addMessage,
+  mergeMessages,
   openThread,
   closeThread,
   minimizeThread,

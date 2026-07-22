@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format, subDays } from 'date-fns'
 import {
-  Box, Button as MuiButton, Card, Chip, Divider, FormControl,
+  Alert, Box, Button as MuiButton, Card, Chip, Divider, FormControl,
   InputLabel, List, ListItem, MenuItem, Paper,
   Select, Stack, Tab, Tabs, TextField, ToggleButton, ToggleButtonGroup,
   Typography, alpha, useTheme,
@@ -93,6 +93,12 @@ export default function ReportsPage() {
     viewMode: 'pins' as 'pins' | 'heatmap',
   })
   const [activeTab, setActiveTab] = useState(0)
+
+  // Invalid range: From after To. ISO yyyy-MM-dd strings compare correctly as strings.
+  const invalidDateRange = Boolean(
+    filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo
+  )
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
 
   const { list: incidents, loading: incidentsLoading, error: incidentsError } = useAppSelector((s) => s.incidents)
   const { list: alerts, unreadCount, loading: alertsLoading, error: alertsError } = useAppSelector((s) => s.alerts)
@@ -324,16 +330,18 @@ export default function ReportsPage() {
             type="date"
             size="small"
             value={filters.dateFrom}
+            error={invalidDateRange}
             onChange={(e) => setFilters((p) => ({ ...p, dateFrom: e.target.value }))}
-            slotProps={{ inputLabel: { shrink: true } }}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: filters.dateTo || todayStr } }}
           />
           <TextField
             label="To"
             type="date"
             size="small"
             value={filters.dateTo}
+            error={invalidDateRange}
             onChange={(e) => setFilters((p) => ({ ...p, dateTo: e.target.value }))}
-            slotProps={{ inputLabel: { shrink: true } }}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: filters.dateFrom || undefined, max: todayStr } }}
           />
           <FormControl size="small">
             <InputLabel>Wilaya</InputLabel>
@@ -397,6 +405,12 @@ export default function ReportsPage() {
           </Stack>
         </Box>
       </Paper>
+
+      {invalidDateRange && (
+        <Alert severity="error" sx={{ mb: 2.5, borderRadius: 3 }}>
+          Invalid date range: the &quot;From&quot; date must be on or before the &quot;To&quot; date. Adjust the dates to see results.
+        </Alert>
+      )}
 
       {/* ── Tab bar ───────────────────────────────────────────────── */}
       <Paper
@@ -474,7 +488,7 @@ export default function ReportsPage() {
                     </Typography>
                   </Box>
                 </Stack>
-                <TrendChart incidents={filteredIncidents} period={trendPeriod} />
+                <TrendChart incidents={filteredIncidents} period={trendPeriod} from={filters.dateFrom} to={filters.dateTo} />
               </Card>
 
               {/* Analytics triptych */}

@@ -270,11 +270,7 @@ export default function ChatWindow({
       } else {
         const message = item.data as ChatMessage
         const isMe = message.senderId === currentUserId
-        const reactionEntries = message.reactions
-          ? Object.entries(message.reactions)
-              .map(([emoji, users]) => ({ emoji, count: users.length }))
-              .filter((entry) => entry.count > 0)
-          : []
+        const reactionEntries: { emoji: string; count: number }[] = []
         const statusIcon =
           message.status === 'seen'
             ? <DoneAllRoundedIcon sx={{ fontSize: 14, color: theme.palette.primary.main }} />
@@ -288,13 +284,6 @@ export default function ChatWindow({
           <Box
             key={message.id}
             sx={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%', mb: 1 }}
-            onMouseEnter={() => setHoveredMessageId(message.id)}
-            onMouseLeave={() => setHoveredMessageId((prev) => (prev === message.id ? null : prev))}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              setOpenReactionFor(message.id)
-              setReactionAnchor(e.currentTarget as HTMLElement)
-            }}
           >
             <Box
               sx={{
@@ -519,13 +508,7 @@ export default function ChatWindow({
       const showTimestamp = true // Always show timestamp for every message
 
       // Get reaction data
-      const reactionEntries = message.reactions
-        ? Object.entries(message.reactions).map(([emoji, userIds]) => ({
-            emoji,
-            count: userIds.length,
-            hasCurrentUser: currentUserId ? userIds.includes(currentUserId) : false,
-          }))
-        : []
+      const reactionEntries: { emoji: string; count: number; hasCurrentUser: boolean }[] = []
 
       return {
         message,

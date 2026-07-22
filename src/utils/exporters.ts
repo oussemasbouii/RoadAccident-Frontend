@@ -2069,30 +2069,51 @@ export async function exportIncidentsODT(data: any[], filename = 'incidents.odt'
   <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
 </manifest:manifest>`)
 
+  // Styled table (borders, padding, full width, shaded bold header) so the ODT reads
+  // like the Word export rather than an unstyled borderless grid.
   const buildTableXml = (headers: string[], rows: (string | number)[][]) => {
     const headerCellsXml = headers
-      .map((header) => `<table:table-cell office:value-type="string"><text:p>${escapeXml(header)}</text:p></table:table-cell>`)
+      .map((header) => `<table:table-cell table:style-name="RACellH" office:value-type="string"><text:p text:style-name="RAHeadP">${escapeXml(header)}</text:p></table:table-cell>`)
       .join('')
     const rowCellsXml = rows
       .map(
         (row) =>
           `<table:table-row>${row
-            .map((cell) => `<table:table-cell office:value-type="string"><text:p>${escapeXml(String(cell ?? '-'))}</text:p></table:table-cell>`)
+            .map((cell) => `<table:table-cell table:style-name="RACell" office:value-type="string"><text:p>${escapeXml(String(cell ?? '-'))}</text:p></table:table-cell>`)
             .join('')}</table:table-row>`
       )
       .join('')
-    return `<table:table table:name="Table">
+    return `<table:table table:name="Table" table:style-name="RATbl">
+      <table:table-column table:style-name="RACol" table:number-columns-repeated="${headers.length}"/>
       <table:table-row>${headerCellsXml}</table:table-row>
       ${rowCellsXml}
     </table:table>`
   }
+
+  const incidentRows = briefing.incidents.map((incident: any) => ([
+    incident.id,
+    incident.location,
+    titleize(incident.severity || 'medium'),
+    titleize(incident.status || 'active'),
+    incident.time || '',
+    safeNumber(incident.vehicles),
+    safeNumber(incident.injuries),
+  ]))
 
   const contentXml = `<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content
   xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
   xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
   xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
-  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0">
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">
+  <office:automatic-styles>
+    <style:style style:name="RATbl" style:family="table"><style:table-properties style:rel-width="100%" table:align="margins"/></style:style>
+    <style:style style:name="RACol" style:family="table-column"><style:table-column-properties style:rel-column-width="1*"/></style:style>
+    <style:style style:name="RACellH" style:family="table-cell"><style:table-cell-properties fo:border="0.5pt solid #334155" fo:padding="0.12cm" fo:background-color="#dbe4f0"/></style:style>
+    <style:style style:name="RACell" style:family="table-cell"><style:table-cell-properties fo:border="0.5pt solid #cbd5e1" fo:padding="0.1cm"/></style:style>
+    <style:style style:name="RAHeadP" style:family="paragraph"><style:text-properties fo:font-weight="bold"/></style:style>
+  </office:automatic-styles>
   <office:body>
     <office:text>
       <text:h text:outline-level="1">${escapeXml(title)}</text:h>
@@ -2117,6 +2138,9 @@ export async function exportIncidentsODT(data: any[], filename = 'incidents.odt'
 
       <text:h text:outline-level="2">Hotspots</text:h>
       ${buildTableXml(['Location', 'Count'], briefing.hotspots.map((row) => ([row.location, row.count])))}
+
+      <text:h text:outline-level="2">Incidents</text:h>
+      ${buildTableXml(['ID', 'Location', 'Severity', 'Status', 'Time', 'Vehicles', 'Injuries'], incidentRows)}
     </office:text>
   </office:body>
 </office:document-content>`
@@ -2137,37 +2161,48 @@ export async function exportODTFromRows(rows: any[], filename = 'export.odt') {
 </manifest:manifest>`)
 
   const headerCellsXml = headerLabels
-    .map((header) => `<table:table-cell office:value-type="string"><text:p>${escapeXml(header)}</text:p></table:table-cell>`)
+    .map((header) => `<table:table-cell table:style-name="RACellH" office:value-type="string"><text:p text:style-name="RAHeadP">${escapeXml(header)}</text:p></table:table-cell>`)
     .join('')
 
   const rowCellsXml = values
     .map(
       (row) =>
         `<table:table-row>${row
-          .map((cell) => `<table:table-cell office:value-type="string"><text:p>${escapeXml(String(cell ?? '-'))}</text:p></table:table-cell>`)
+          .map((cell) => `<table:table-cell table:style-name="RACell" office:value-type="string"><text:p>${escapeXml(String(cell ?? '-'))}</text:p></table:table-cell>`)
           .join('')}</table:table-row>`
     )
     .join('')
 
-  const noDataRow = '<text:p>No data available for export.</text:p>'
+  const tableXml = headerLabels.length === 0
+    ? '<text:p>No data available for export.</text:p>'
+    : `<table:table table:name="ExportTable" table:style-name="RATbl">
+        <table:table-column table:style-name="RACol" table:number-columns-repeated="${headerLabels.length}"/>
+        <table:table-row>${headerCellsXml}</table:table-row>
+        ${rowCellsXml}
+      </table:table>`
 
+  // Styled table (borders, padding, full width, shaded bold header) so the ODT is
+  // presented like the Word export instead of an unstyled borderless grid.
   zip.file('content.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content
   xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
   xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
   xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
-  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0">
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">
+  <office:automatic-styles>
+    <style:style style:name="RATbl" style:family="table"><style:table-properties style:rel-width="100%" table:align="margins"/></style:style>
+    <style:style style:name="RACol" style:family="table-column"><style:table-column-properties style:rel-column-width="1*"/></style:style>
+    <style:style style:name="RACellH" style:family="table-cell"><style:table-cell-properties fo:border="0.5pt solid #334155" fo:padding="0.12cm" fo:background-color="#dbe4f0"/></style:style>
+    <style:style style:name="RACell" style:family="table-cell"><style:table-cell-properties fo:border="0.5pt solid #cbd5e1" fo:padding="0.1cm"/></style:style>
+    <style:style style:name="RAHeadP" style:family="paragraph"><style:text-properties fo:font-weight="bold"/></style:style>
+  </office:automatic-styles>
   <office:body>
     <office:text>
       <text:h text:outline-level="1">Export Report</text:h>
       <text:p>Generated: ${escapeXml(new Date().toLocaleString())}</text:p>
       <text:p></text:p>
-      ${headerLabels.length === 0
-        ? noDataRow
-        : `<table:table table:name="ExportTable">
-            <table:table-row>${headerCellsXml}</table:table-row>
-            ${rowCellsXml}
-          </table:table>`}
+      ${tableXml}
     </office:text>
   </office:body>
 </office:document-content>`)

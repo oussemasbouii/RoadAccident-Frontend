@@ -36,7 +36,8 @@ import { Card, Button } from '@/components/Common'
 import { useAppDispatch, useAppSelector } from '@/store/store'
 import { getAccessToken, getRefreshToken } from '@/utils/tokenStore'
 import { connectSharedSocket } from '@/services/socketClient'
-import { clearMute, markRead, setActivePeer, setMute, toggleReaction } from '@/features/chat/slices/chatSlice'
+import { apiService } from '@/services/api'
+import { clearMute, markRead, mergeMessages, setActivePeer, setMute } from '@/features/chat/slices/chatSlice'
 import DoneRoundedIcon from '@mui/icons-material/DoneRounded'
 import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded'
 import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded'
@@ -47,8 +48,6 @@ import AttachmentLightbox from '@/components/AttachmentLightbox'
 import { useChatComposer } from '@/features/communications/hooks/useChatComposer'
 import { decodeJwtSub } from '@/utils/callUtils'
 import { useTranslation } from '@/themeMode'
-
-const REACTION_OPTIONS = ['✅', '⚠️', '👀', '👍', '❗', '❓', '🙏']
 
 function formatRelativeTime(value?: string, locale = 'en', unknownLabel = 'Unknown') {
   if (!value) return unknownLabel
@@ -126,18 +125,16 @@ export default function CommsHubPage() {
   const chatState = useAppSelector((state) => state.chat)
   const activePeerId = useAppSelector((state) => state.chat.activePeerId)
   const [query, setQuery] = useState('')
+  const historyFetchedRef = useRef<Set<string>>(new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const typingByPeer = useAppSelector((state) => state.chat.typingByPeer)
   const muteByPeer = useAppSelector((state) => state.chat.muteByPeer)
-  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
-  const [openReactionFor, setOpenReactionFor] = useState<string | null>(null)
-  const [reactionAnchor, setReactionAnchor] = useState<null | HTMLElement>(null)
-  const reactionCloseTimer = useRef<number | null>(null)
   const callHistory = useAppSelector((state) => state.call.callHistory)
   const activeCall = useAppSelector((state) => state.call.activeCall)
   const [showCallHistory, setShowCallHistory] = useState(false)
   const [muteAnchorEl, setMuteAnchorEl] = useState<null | HTMLElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const atBottomRef = useRef(true)
   const [showNewPill, setShowNewPill] = useState(false)
   const [newCount, setNewCount] = useState(0)
   const quickReplies = useMemo(
@@ -221,6 +218,7 @@ export default function CommsHubPage() {
     const el = scrollRef.current
     if (!el) return
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+    atBottomRef.current = atBottom
     if (atBottom) {
       setShowNewPill(false)
       setNewCount(0)
@@ -235,19 +233,36 @@ export default function CommsHubPage() {
     setNewCount(0)
   }, [])
 
+  // Jump to the latest message when switching conversations. Declared before the
+  // new-message effect so atBottomRef is reset before that effect reads it.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !selectedId) return
+    el.scrollTop = el.scrollHeight
+    atBottomRef.current = true
+    setShowNewPill(false)
+    setNewCount(0)
+  }, [selectedId])
+
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24
-    if (atBottom) {
+    // Use the scroll position captured BEFORE this item grew the list (measuring here
+    // would be wrong — scrollHeight already includes the new message). Always follow
+    // your own outgoing message to the bottom.
+    const lastItem = combinedItems[combinedItems.length - 1]
+    const lastIsMine =
+      lastItem?.type === 'message' && (lastItem.data as ChatMessage).senderId === currentUserId
+    if (atBottomRef.current || lastIsMine) {
       el.scrollTop = el.scrollHeight
+      atBottomRef.current = true
       setShowNewPill(false)
       setNewCount(0)
     } else {
       setNewCount((prev) => prev + 1)
       setShowNewPill(true)
     }
-  }, [combinedItems.length])
+  }, [combinedItems.length, currentUserId])
   const totalUnread = useMemo(
     () => chatState.contactIds.reduce((sum: number, id: string) => sum + (chatState.unreadByPeer[id] || 0), 0),
     [chatState.contactIds, chatState.unreadByPeer]
@@ -336,6 +351,62 @@ export default function CommsHubPage() {
       )
     }
   }, [selectedId, currentUserId, chatState.messagesByPeer, dispatch, isChatRoute])
+
+  // Clear the active peer when leaving the chat page, so new messages from the
+  // last-open conversation resume counting toward the unread badge.
+  useEffect(() => {
+    return () => {
+      dispatch(setActivePeer({ peerId: null }))
+    }
+  }, [dispatch])
+
+  // Load 1:1 conversation history once per peer (per session) when a thread is opened.
+  // Merges beneath any live messages (dedup by id, chronological) so nothing is lost.
+  useEffect(() => {
+    if (!selectedId || !currentUserId) return
+    if (historyFetchedRef.current.has(selectedId)) return
+    historyFetchedRef.current.add(selectedId)
+    const peerId = selectedId
+    const meId = String(currentUserId)
+    apiService.chat
+      .messages(peerId, { limit: 30 })
+      .then((resp) => {
+        const raw = resp.data?.messages ?? resp.data?.data?.messages ?? []
+        if (!Array.isArray(raw) || raw.length === 0) return
+        const mapped: ChatMessage[] = raw.map((m: any) => {
+          const senderId = String(m.senderId)
+          const isFromMe = senderId === meId
+          const status: ChatMessage['status'] = m.read ? 'seen' : m.delivered ? 'delivered' : 'sent'
+          // Guard against a malformed timestamp — new Date('bad').toISOString() throws,
+          // which would abort the whole history load.
+          const parsedTs = m.timestamp ? new Date(m.timestamp) : new Date()
+          const timestamp = Number.isNaN(parsedTs.getTime()) ? new Date().toISOString() : parsedTs.toISOString()
+          return {
+            id: String(m.id),
+            senderId,
+            receivers: [isFromMe ? peerId : meId],
+            text: m.content ?? '',
+            timestamp,
+            type: m.messageType === 'media' ? 'info' : undefined,
+            status,
+            attachment: m.attachment
+              ? {
+                  id: m.attachment.id,
+                  type: m.attachment.type,
+                  filename: m.attachment.filename,
+                  mimeType: m.attachment.mimeType,
+                  size: m.attachment.size,
+                }
+              : undefined,
+          }
+        })
+        dispatch(mergeMessages({ peerId, messages: mapped }))
+      })
+      .catch(() => {
+        // Allow a retry the next time this thread is opened if the fetch failed.
+        historyFetchedRef.current.delete(peerId)
+      })
+  }, [selectedId, currentUserId, dispatch])
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -716,10 +787,6 @@ export default function CommsHubPage() {
               if (item.type === 'message') {
                 const message = item.data as ChatMessage
                 const isMe = message.senderId === currentUserId
-                const reactions = message.reactions || {}
-                const reactionEntries = Object.entries(reactions)
-                  .map(([emoji, users]) => ({ emoji, count: users.length }))
-                  .filter((entry) => entry.count > 0)
                 const statusIcon =
                   message.status === 'seen'
                     ? <DoneAllRoundedIcon sx={{ fontSize: 14, color: theme.palette.primary.main }} />
@@ -732,16 +799,6 @@ export default function CommsHubPage() {
                   <Box
                     key={message.id}
                     sx={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '75%' }}
-                    onMouseEnter={(event) => {
-                      if (reactionCloseTimer.current) window.clearTimeout(reactionCloseTimer.current)
-                      setHoveredMessageId(message.id)
-                    }}
-                    onMouseLeave={() => {
-                      if (reactionCloseTimer.current) window.clearTimeout(reactionCloseTimer.current)
-                      reactionCloseTimer.current = window.setTimeout(() => {
-                        setHoveredMessageId(null)
-                      }, 300)
-                    }}
                   >
                     <Box
                       sx={{
@@ -807,57 +864,6 @@ export default function CommsHubPage() {
                         </Stack>
                       ) : (
                         <Typography variant="body2">{message.text}</Typography>
-                      )}
-                      {reactionEntries.length > 0 && (
-                        <Stack direction="row" spacing={0.6} sx={{ mt: 0.35, flexWrap: 'wrap', alignItems: 'center' }}>
-                          {reactionEntries.map((entry) => (
-                            <Box
-                              key={entry.emoji}
-                              sx={{
-                                px: 0.6,
-                                py: 0.1,
-                                borderRadius: 999,
-                                border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                                bgcolor: alpha(theme.palette.background.paper, 0.9),
-                                fontSize: 11,
-                                fontWeight: 700,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 0.4,
-                              }}
-                            >
-                              <span>{entry.emoji}</span>
-                              <span>{entry.count}</span>
-                            </Box>
-                          ))}
-                        </Stack>
-                      )}
-                      {hoveredMessageId === message.id && (
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            top: -10,
-                            right: isMe ? 'auto' : '100%',
-                            left: isMe ? '100%' : 'auto',
-                            transform: isMe ? 'translateX(10px)' : 'translateX(-10px)',
-                            zIndex: 10,
-                          }}
-                        >
-                          <IconButton
-                            size="small"
-                            onClick={(event) => {
-                              setOpenReactionFor(message.id)
-                              setReactionAnchor(event.currentTarget)
-                            }}
-                            sx={{
-                              bgcolor: alpha(theme.palette.background.paper, 0.9),
-                              border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
-                            }}
-                          >
-                            <ForumRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
                       )}
                     </Box>
                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
@@ -1084,62 +1090,6 @@ export default function CommsHubPage() {
         </MenuItem>
       </Menu>
       <AttachmentLightbox lightbox={lightbox} onClose={() => setLightbox(null)} onDownload={handleDownloadImage} />
-
-      <Popover
-        open={Boolean(openReactionFor)}
-        anchorEl={reactionAnchor}
-        onClose={() => {
-          setOpenReactionFor(null)
-          setReactionAnchor(null)
-        }}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        disablePortal
-        PaperProps={{
-          onMouseEnter: () => {
-            if (reactionCloseTimer.current) window.clearTimeout(reactionCloseTimer.current)
-          },
-          onMouseLeave: () => {
-            if (reactionCloseTimer.current) window.clearTimeout(reactionCloseTimer.current)
-            reactionCloseTimer.current = window.setTimeout(() => {
-              setOpenReactionFor(null)
-              setReactionAnchor(null)
-            }, 450)
-          },
-          sx: {
-            borderRadius: 999,
-            px: 0.6,
-            py: 0.4,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
-            zIndex: 2601,
-          },
-        }}
-      >
-        <Box sx={{ display: 'flex', gap: 0.6 }}>
-          {REACTION_OPTIONS.map((emoji) => (
-            <Box
-              key={emoji}
-              onClick={() => {
-                if (!openReactionFor || !selectedContact || !currentUserId) return
-                dispatch(toggleReaction({ peerId: selectedContact.id, messageId: openReactionFor, emoji, userId: currentUserId }))
-              }}
-              sx={{
-                width: 28,
-                height: 28,
-                borderRadius: 999,
-                display: 'grid',
-                placeItems: 'center',
-                cursor: 'pointer',
-                fontSize: 16,
-                border: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
-                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
-              }}
-            >
-              {emoji}
-            </Box>
-          ))}
-        </Box>
-      </Popover>
 
       <Dialog open={showCallHistory} onClose={() => setShowCallHistory(false)} maxWidth="sm" fullWidth>
         <DialogTitle>

@@ -1,48 +1,67 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { Box, Typography, alpha, useTheme } from '@mui/material'
 import {
-  format, startOfDay, startOfWeek, startOfMonth,
+  format, startOfDay, endOfDay, startOfWeek, startOfMonth,
   addDays, addWeeks, addMonths, isWithinInterval,
+  differenceInCalendarDays, differenceInCalendarWeeks, differenceInCalendarMonths,
 } from 'date-fns'
 import type { Incident } from '../../incidents/slices/incidentsSlice'
 
 type Period = 'day' | 'week' | 'month'
+type SeriesKey = 'total' | 'critical' | 'resolved'
 
 interface Props {
   incidents: Incident[]
   period: Period
+  /** Selected filter range (yyyy-MM-dd). When provided, the x-axis spans exactly this
+   *  range so the chart matches the filtered data instead of a fixed rolling window. */
+  from?: string
+  to?: string
 }
 
-function getBuckets(period: Period): { start: Date; label: string }[] {
-  const now = new Date()
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
+
+function safeDate(value?: string): Date | null {
+  if (!value) return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+// Buckets span the selected range (from → to) at the chosen granularity. Falls back to a
+// rolling window when no range is given. Counts are bounded to keep the axis readable.
+function getBuckets(period: Period, from?: string, to?: string): { start: Date; label: string }[] {
+  const toDate = safeDate(to) ?? new Date()
+  const fromDate = safeDate(from)
+
   if (period === 'day') {
-    return Array.from({ length: 14 }, (_, i) => {
-      const d = addDays(startOfDay(now), -(13 - i))
+    const start = startOfDay(fromDate ?? addDays(startOfDay(toDate), -13))
+    const count = clamp(differenceInCalendarDays(toDate, start) + 1, 1, 120)
+    return Array.from({ length: count }, (_, i) => {
+      const d = addDays(start, i)
       return { start: d, label: format(d, 'MMM d') }
     })
   }
   if (period === 'week') {
-    return Array.from({ length: 8 }, (_, i) => {
-      const d = addWeeks(startOfWeek(now), -(7 - i))
+    const start = startOfWeek(fromDate ?? addWeeks(startOfWeek(toDate), -7))
+    const count = clamp(differenceInCalendarWeeks(toDate, start) + 1, 1, 60)
+    return Array.from({ length: count }, (_, i) => {
+      const d = addWeeks(start, i)
       return { start: d, label: format(d, 'MMM d') }
     })
   }
-  return Array.from({ length: 6 }, (_, i) => {
-    const d = addMonths(startOfMonth(now), -(5 - i))
+  const start = startOfMonth(fromDate ?? addMonths(startOfMonth(toDate), -5))
+  const count = clamp(differenceInCalendarMonths(toDate, start) + 1, 1, 36)
+  return Array.from({ length: count }, (_, i) => {
+    const d = addMonths(start, i)
     return { start: d, label: format(d, 'MMM yyyy') }
   })
 }
 
-function countInBucket(
-  incidents: Incident[],
-  start: Date,
-  end: Date,
-  key: 'total' | 'critical' | 'resolved'
-): number {
+function countInBucket(incidents: Incident[], start: Date, end: Date, key: SeriesKey): number {
   return incidents.filter((inc) => {
     const d = inc.timestamp ? new Date(inc.timestamp) : new Date(inc.time)
     if (Number.isNaN(d.getTime())) return false
@@ -53,14 +72,22 @@ function countInBucket(
   }).length
 }
 
-export default function TrendChart({ incidents, period }: Props) {
+export default function TrendChart({ incidents, period, from, to }: Props) {
   const theme = useTheme()
-  const buckets = getBuckets(period)
+  const [hidden, setHidden] = useState<Record<SeriesKey, boolean>>({
+    total: false, critical: false, resolved: false,
+  })
+
+  const buckets = useMemo(() => getBuckets(period, from, to), [period, from, to])
+  const rangeEnd = useMemo(() => {
+    const t = safeDate(to)
+    return t ? endOfDay(t) : new Date()
+  }, [to])
 
   const data = useMemo(() => {
     return buckets.map((bucket, idx) => {
       const nextBucket = buckets[idx + 1]
-      const end = nextBucket ? new Date(nextBucket.start.getTime() - 1) : new Date()
+      const end = nextBucket ? new Date(nextBucket.start.getTime() - 1) : rangeEnd
       return {
         label: bucket.label,
         total: countInBucket(incidents, bucket.start, end, 'total'),
@@ -68,31 +95,61 @@ export default function TrendChart({ incidents, period }: Props) {
         resolved: countInBucket(incidents, bucket.start, end, 'resolved'),
       }
     })
-  }, [incidents, period])
+  }, [incidents, buckets, rangeEnd])
+
+  const hasData = incidents.length > 0 && data.some((d) => d.total > 0)
+
+  const toggle = (key?: string | number) => {
+    if (key !== 'total' && key !== 'critical' && key !== 'resolved') return
+    setHidden((p) => ({ ...p, [key]: !p[key as SeriesKey] }))
+  }
+
+  if (!hasData) {
+    return (
+      <Box sx={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
+          No incidents in the selected range.
+        </Typography>
+      </Box>
+    )
+  }
 
   return (
-    <Box>
-      <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
-        Incident Trend
-      </Typography>
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={data} margin={{ top: 4, right: 16, left: -16, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.6)} />
-          <XAxis dataKey="label" tick={{ fontSize: 11, fill: theme.palette.text.secondary }} />
-          <YAxis tick={{ fontSize: 11, fill: theme.palette.text.secondary }} allowDecimals={false} />
-          <Tooltip
-            contentStyle={{
-              borderRadius: 8,
-              border: `1px solid ${theme.palette.divider}`,
-              background: theme.palette.background.paper,
-            }}
-          />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Line type="monotone" dataKey="total" stroke={theme.palette.primary.main} strokeWidth={2} dot={false} name="Total" />
-          <Line type="monotone" dataKey="critical" stroke={theme.palette.error.main} strokeWidth={2} dot={false} name="Critical" />
-          <Line type="monotone" dataKey="resolved" stroke={theme.palette.success.main} strokeWidth={2} dot={false} name="Resolved" />
-        </LineChart>
-      </ResponsiveContainer>
-    </Box>
+    <ResponsiveContainer width="100%" height={240}>
+      <ComposedChart data={data} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.6)} />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: theme.palette.text.secondary }} minTickGap={16} />
+        <YAxis tick={{ fontSize: 11, fill: theme.palette.text.secondary }} allowDecimals={false} />
+        <Tooltip
+          contentStyle={{
+            borderRadius: 8,
+            border: `1px solid ${theme.palette.divider}`,
+            background: theme.palette.background.paper,
+          }}
+        />
+        <Legend
+          wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+          onClick={(o) => toggle(o.dataKey as string)}
+        />
+        {/* Total drawn as a filled area so it reads as the envelope; Critical/Resolved
+            are subsets shown as lines on top. Click a legend item to show/hide it. */}
+        <Area
+          type="monotone" dataKey="total" name="Total"
+          stroke={theme.palette.primary.main} strokeWidth={2}
+          fill={alpha(theme.palette.primary.main, 0.12)}
+          activeDot={{ r: 4 }} hide={hidden.total}
+        />
+        <Line
+          type="monotone" dataKey="critical" name="Critical"
+          stroke={theme.palette.error.main} strokeWidth={2}
+          dot={{ r: 2 }} activeDot={{ r: 4 }} hide={hidden.critical}
+        />
+        <Line
+          type="monotone" dataKey="resolved" name="Resolved"
+          stroke={theme.palette.success.main} strokeWidth={2}
+          dot={{ r: 2 }} activeDot={{ r: 4 }} hide={hidden.resolved}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
   )
 }

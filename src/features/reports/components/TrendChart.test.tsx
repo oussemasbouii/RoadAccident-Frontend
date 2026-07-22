@@ -11,21 +11,21 @@ const incidents: Partial<Incident>[] = [
 ]
 
 describe('TrendChart', () => {
-  it('renders without crashing', () => {
+  it('renders without crashing for the selected range', () => {
     const { container } = render(
       <ThemeModeProvider>
-        <TrendChart incidents={incidents as Incident[]} period="week" />
+        <TrendChart incidents={incidents as Incident[]} period="week" from="2026-05-01" to="2026-05-31" />
       </ThemeModeProvider>
     )
     expect(container.firstChild).not.toBeNull()
   })
 
-  it('renders a heading', () => {
+  it('shows an empty state when there are no incidents', () => {
     render(
       <ThemeModeProvider>
-        <TrendChart incidents={incidents as Incident[]} period="week" />
+        <TrendChart incidents={[]} period="week" from="2026-05-01" to="2026-05-31" />
       </ThemeModeProvider>
     )
-    expect(screen.getByText(/incident trend/i)).toBeDefined()
+    expect(screen.getByText(/no incidents in the selected range/i)).toBeDefined()
   })
 })

@@ -75,6 +75,41 @@ const createIncidentMarkerElement = (severity: IncidentMapItem['severity']): HTM
   return el
 }
 
+// Fan out markers that share (near-)identical coordinates so overlapping pins are all
+// visible and clickable. Returns a per-incident pixel offset for the MapLibre Marker;
+// pixel offsets are zoom-independent, so the pins stay separated at every zoom level.
+const buildSpreadOffsets = (
+  items: { incident: { id: string }; coords?: { lng: number; lat: number } | null }[]
+): Record<string, [number, number]> => {
+  const keyFor = (c: { lng: number; lat: number }) => `${c.lng.toFixed(5)},${c.lat.toFixed(5)}`
+  const counts = new Map<string, number>()
+  items.forEach(({ coords }) => {
+    if (!coords) return
+    const k = keyFor(coords)
+    counts.set(k, (counts.get(k) ?? 0) + 1)
+  })
+  const seen = new Map<string, number>()
+  const offsets: Record<string, [number, number]> = {}
+  items.forEach(({ incident, coords }) => {
+    if (!coords) return
+    const k = keyFor(coords)
+    const total = counts.get(k) ?? 1
+    if (total <= 1) {
+      offsets[incident.id] = [0, 0]
+      return
+    }
+    const idx = seen.get(k) ?? 0
+    seen.set(k, idx + 1)
+    const radius = 16 + Math.min(total, 8) * 3
+    const angle = (2 * Math.PI * idx) / total - Math.PI / 2 // start at top
+    offsets[incident.id] = [
+      Math.round(radius * Math.cos(angle)),
+      Math.round(radius * Math.sin(angle)),
+    ]
+  })
+  return offsets
+}
+
 export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapProps) {
   const theme = useTheme()
   const { t } = useTranslation()
@@ -210,6 +245,7 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
     if (incidentsWithCoordinates.length === 0) return
 
     const bounds = new maplibregl.LngLatBounds()
+    const spreadOffsets = buildSpreadOffsets(incidentsWithCoordinates)
 
     incidentsWithCoordinates.forEach(({ incident, coords }) => {
       if (!coords) return
@@ -264,6 +300,7 @@ export default function IncidentsMap({ incidents, height = 420 }: IncidentsMapPr
 
       const marker = new maplibregl.Marker({
         element: createIncidentMarkerElement(incident.severity),
+        offset: spreadOffsets[incident.id] ?? [0, 0],
       })
         .setLngLat([coords.lng, coords.lat])
         .setPopup(popup)
