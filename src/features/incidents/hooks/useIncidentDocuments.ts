@@ -12,6 +12,7 @@ type IncidentDocumentMetadata = {
   documentType: IncidentDocumentTypeCode | string
   description?: string
   tags?: string[]
+  restricted?: boolean
 }
 
 type UploadDocResult = {
@@ -65,6 +66,7 @@ const normalizeDocument = (raw: any, accidentId: string): IncidentDocument => {
     previewUrl: raw?.previewUrl ?? raw?.preview_url,
     extractedText: raw?.extractedText ?? raw?.ocrText,
     ocrStatus: raw?.ocrStatus ?? raw?.ocr_status,
+    restricted: Boolean(raw?.restricted),
   }
 }
 
@@ -132,6 +134,7 @@ const buildLocalDocument = (
   description: metadata.description || '',
   tags: metadata.tags || [],
   status: 'available',
+  restricted: metadata.restricted,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   downloadUrl,
@@ -246,6 +249,7 @@ export function useIncidentDocuments(accidentId?: string | null, storageKey?: st
         documentType: metadata.documentType,
         description: metadata.description,
         tags: metadata.tags,
+        restricted: metadata.restricted,
       })
 
       const requestData = unwrapPayload(requestResp.data)
@@ -270,6 +274,7 @@ export function useIncidentDocuments(accidentId?: string | null, storageKey?: st
         documentType: metadata.documentType,
         description: metadata.description,
         tags: metadata.tags,
+        restricted: metadata.restricted,
       })
 
       const confirmData = unwrapPayload(confirmResp.data)
@@ -337,6 +342,7 @@ export function useIncidentDocuments(accidentId?: string | null, storageKey?: st
                   description: patch.description ?? document.description,
                   tags: patch.tags ?? document.tags,
                   status: patch.status ?? document.status,
+                  restricted: patch.restricted ?? document.restricted,
                   archivedAt: patch.status === 'archived' ? new Date().toISOString() : document.archivedAt,
                   updatedAt: new Date().toISOString(),
                 }
@@ -417,6 +423,7 @@ export function useIncidentDocuments(accidentId?: string | null, storageKey?: st
                   documentType: metadata.documentType,
                   description: metadata.description || '',
                   tags: metadata.tags || [],
+                  restricted: metadata.restricted,
                   downloadUrl: undefined,
                   previewUrl: createPreviewUrl(file),
                   updatedAt: new Date().toISOString(),
@@ -434,6 +441,7 @@ export function useIncidentDocuments(accidentId?: string | null, storageKey?: st
           documentType: metadata.documentType,
           description: metadata.description,
           tags: metadata.tags,
+          restricted: metadata.restricted,
         })
 
         const requestData = unwrapPayload(requestResp.data)
@@ -458,6 +466,7 @@ export function useIncidentDocuments(accidentId?: string | null, storageKey?: st
           documentType: metadata.documentType,
           description: metadata.description,
           tags: metadata.tags,
+          restricted: metadata.restricted,
         })
 
         const confirmData = unwrapPayload(confirmResp.data)
@@ -476,6 +485,7 @@ export function useIncidentDocuments(accidentId?: string | null, storageKey?: st
                   documentType: metadata.documentType,
                   description: metadata.description || '',
                   tags: metadata.tags || [],
+                  restricted: metadata.restricted,
                   downloadUrl,
                   previewUrl: downloadUrl,
                   updatedAt: new Date().toISOString(),

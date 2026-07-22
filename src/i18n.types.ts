@@ -35,6 +35,7 @@ export type TranslationMessages = {
     no_results_found: string
     loading_text: string
     edit: string
+    delete: string
     open: string
     close_label: string
     error: string
@@ -45,6 +46,7 @@ export type TranslationMessages = {
     alerts: string
     reports: string
     communications: string
+    documents: string
     user_accounts: string
     officer_tracking: string
     archived_incidents: string
@@ -497,11 +499,21 @@ export type TranslationMessages = {
     complete_required_fields: string
     add_photos_or_pdfs: string
     upload_files: string
+    upload_failed_generic: string
+    upload_partial_failure: string
     fill_required_report_fields: string
     drop_files_here: string
-    images_and_pdfs_only: string
+    upload_hint: string
     choose_files: string
     photo: string
+    file_too_large: string
+    file_type_not_allowed: string
+    category_accident: string
+    category_legal: string
+    category_administrative: string
+    category_financial: string
+    category_report: string
+    category_other: string
     pdf: string
     scanned_document: string
     sketch: string
@@ -516,6 +528,7 @@ export type TranslationMessages = {
     tags: string
     linked_files: string
     search_documents: string
+    search_documents_hint: string
     loading_incident_documents: string
     no_files_added_yet: string
     preview: string
@@ -526,6 +539,9 @@ export type TranslationMessages = {
     download: string
     no_note: string
     preview_unavailable_for_this_file_type: string
+    zoom_in: string
+    zoom_out: string
+    reset_zoom: string
     open_file: string
     uploaded_at: string
     ocr_status: string
@@ -541,6 +557,133 @@ export type TranslationMessages = {
     save_changes: string
     metadata: string
     replace: string
+    center_title: string
+    center_subtitle: string
+    all_types: string
+    owner_type: string
+    all_owners: string
+    owner_accident: string
+    owner_officer: string
+    search_accident: string
+    date_from: string
+    date_to: string
+    date_range: string
+    date_range_all: string
+    date_range_yesterday: string
+    date_range_custom: string
+    no_documents_found: string
+    results_count: string
+    view_incident: string
+    ocr_pending: string
+    ocr_processing: string
+    ocr_completed: string
+    ocr_failed: string
+    total_documents: string
+    pending_ocr: string
+    completed_ocr: string
+    failed_ocr: string
+    all_statuses: string
+    across_all_pages: string
+    on_this_page: string
+    filters: string
+    clear_filters: string
+    upload_document: string
+    select_accident: string
+    select_officer: string
+    language: string
+    language_fra: string
+    language_ara: string
+    language_eng: string
+    mark_restricted: string
+    restricted: string
+    restricted_document: string
+    restricted_admin_only: string
+    public: string
+    archived: string
+    show_archived: string
+    manage_permission: string
+    col_file: string
+    col_category: string
+    col_note: string
+    col_accident: string
+    col_created_by: string
+    col_creation_date: string
+    col_created: string
+    col_permission: string
+    col_version: string
+    col_archived: string
+    edit_document: string
+    delete_document_title: string
+    delete_warning: string
+    delete_confirm_prompt: string
+    delete_failed: string
+    file_name: string
+    file_name_multi_hint: string
+    category: string
+    replace_file_optional: string
+    add_version: string
+    add_version_failed: string
+    retry_ocr: string
+    retry_ocr_success: string
+    version_note: string
+    version_note_placeholder: string
+    proceed_anyway: string
+    extension_mismatch_warning: string
+    col_file_type: string
+    expand_versions: string
+    collapse_versions: string
+    delete_version_title: string
+    delete_version_warning: string
+    delete_version_confirm_prompt: string
+    delete_version_1_warning: string
+    delete_version_failed: string
+    edit_failed: string
+    n_selected: string
+    add_tag: string
+    archive_selected: string
+    bulk_action_failed: string
+    save_current_filters: string
+    view_name: string
+    preset_today: string
+    preset_this_week: string
+    preset_my_uploads: string
+    details: string
+    history: string
+    audit_unavailable: string
+    no_audit_events: string
+    unknown_actor: string
+    audit_action_uploaded: string
+    audit_action_replaced: string
+    audit_action_archived: string
+    audit_action_restored: string
+    audit_action_restricted_changed: string
+    audit_action_downloaded: string
+    audit_action_ocr_completed: string
+    audit_action_ocr_failed: string
+    audit_action_edited: string
+    audit_action_version_deleted: string
+    audit_action_tagged: string
+    audit_action_ocr_language_retry: string
+    audit_action_ocr_retry: string
+    permission_all: string
+    accident_link_required: string
+    updated_at: string
+    keywords: string
+    word_count: string
+    rollback_to_version: string
+    restore_selected: string
+    upload_success: string
+    cancel_upload: string
+    uploading: string
+    action_success: string
+    action_failed: string
+    rollback_success: string
+    restored_success: string
+    archived_success: string
+    deleted_success: string
+    download_failed: string
+    no_documents_hint: string
+    page: string
   }
   maps: {
     failed_to_load_alerts_map: string

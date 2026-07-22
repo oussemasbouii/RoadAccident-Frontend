@@ -4,15 +4,16 @@ import {
   alpha,
   Box,
   Button,
+  Checkbox,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
+  FormControlLabel,
   GridLegacy as Grid,
   IconButton,
-  LinearProgress,
   MenuItem,
   Paper,
   Stack,
@@ -22,19 +23,23 @@ import {
   useTheme,
 } from '@mui/material'
 import ArchiveRoundedIcon from '@mui/icons-material/ArchiveRounded'
-import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
 import EditRoundedIcon from '@mui/icons-material/EditRounded'
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
+import LockRoundedIcon from '@mui/icons-material/LockRounded'
 import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded'
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded'
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
 import { useIncidentDocuments } from '../hooks/useIncidentDocuments'
+import DocumentPreview from '@/components/documents/DocumentPreview'
+import FileDropZone from '@/components/documents/FileDropZone'
+import { getDocumentTypeOptions } from '@/features/documents/documentTypeOptions'
+import { useAppSelector } from '@/store/store'
 import { useTranslation } from '@/themeMode'
 import type {
   IncidentDocument,
@@ -47,6 +52,8 @@ type Props = {
   scopeKey?: string | null
   enabled?: boolean
 }
+
+const RESTRICTED_BY_DEFAULT: (IncidentDocumentTypeCode | string)[] = ['IDENTITY_DOCUMENT', 'INSURANCE_DOCUMENT']
 
 const STATUS_COLOR: Record<IncidentDocumentLifecycleStatus, 'default' | 'success' | 'warning' | 'info' | 'error'> = {
   uploaded: 'warning',
@@ -74,18 +81,6 @@ const formatDate = (value?: string, unknownLabel = 'Unknown') => {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
 }
 
-const getDocumentTypeOptions = (t: (key: string) => string): { value: IncidentDocumentTypeCode; label: string }[] => [
-  { value: 'PHOTO', label: t('documents.photo') },
-  { value: 'PDF', label: t('documents.pdf') },
-  { value: 'SCANNED_DOCUMENT', label: t('documents.scanned_document') },
-  { value: 'SKETCH', label: t('documents.sketch') },
-  { value: 'REPORT', label: t('documents.report') },
-  { value: 'IDENTITY_DOCUMENT', label: t('documents.identity_document') },
-  { value: 'INSURANCE_DOCUMENT', label: t('documents.insurance_document') },
-  { value: 'VIDEO', label: t('documents.video') },
-  { value: 'OTHER', label: t('documents.other') },
-]
-
 const normalizeTags = (value: string) =>
   value
     .split(',')
@@ -103,7 +98,10 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
   const [documentType, setDocumentType] = useState<IncidentDocumentTypeCode>('PHOTO')
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState('')
+  const [restricted, setRestricted] = useState(false)
+  const [restrictedTouched, setRestrictedTouched] = useState(false)
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
+  const isAdmin = useAppSelector((s) => s.auth.user?.role === 'admin')
   const [editingDocument, setEditingDocument] = useState<IncidentDocument | null>(null)
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null)
   const [busyActionId, setBusyActionId] = useState<string | null>(null)
@@ -155,6 +153,12 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
   }, [documents, selectedDocument])
 
   useEffect(() => {
+    if (!restrictedTouched) {
+      setRestricted(RESTRICTED_BY_DEFAULT.includes(documentType))
+    }
+  }, [documentType, restrictedTouched])
+
+  useEffect(() => {
     if (selectedDocumentId && !documents.some((doc) => doc.id === selectedDocumentId)) {
       setSelectedDocumentId(documents[0]?.id || null)
     }
@@ -183,6 +187,7 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
         documentType,
         description: description.trim() || undefined,
         tags: normalizeTags(tags),
+        restricted,
       })
       const firstCreated = result.documents[0]
       if (firstCreated?.id) {
@@ -208,6 +213,7 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
         documentType,
         description: description.trim() || undefined,
         tags: normalizeTags(tags),
+        restricted,
       })
     } catch (err) {
       setPreviewError((err as any)?.message || t('documents.replace_file'))
@@ -251,6 +257,7 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
         description: editingDocument.description,
         tags: editingDocument.tags,
         status: editingDocument.status,
+        restricted: editingDocument.restricted,
       })
       setEditingDocument(null)
     } catch (err) {
@@ -261,9 +268,6 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
   }
 
   const selectedPreviewUrl = selectedDocument ? buildPreviewUrl(selectedDocument) : ''
-  const isImagePreview = Boolean(selectedDocument?.mimeType?.startsWith('image/'))
-  const isPdfPreview =
-    Boolean(selectedDocument?.mimeType?.includes('pdf')) || String(selectedDocument?.filename || '').toLowerCase().endsWith('.pdf')
 
   useEffect(() => {
     if (!selectedDocument || selectedDocument.downloadUrl || !accidentId) return
@@ -347,67 +351,12 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
         <Grid container spacing={2}>
           <Grid item xs={12} lg={7}>
             <Stack spacing={1.5}>
-              <Paper
-                variant="outlined"
+              <FileDropZone
+                canInteract={canInteract}
+                uploading={uploading}
                 onClick={handleUploadClick}
-                onDragOver={(event) => {
-                  if (!canInteract) return
-                  event.preventDefault()
-                }}
-                onDrop={async (event) => {
-                  if (!canInteract) return
-                  event.preventDefault()
-                  const dropped = event.dataTransfer.files
-                  if (dropped?.length) {
-                    await handleFilesUpload(dropped)
-                  }
-                }}
-                sx={{
-                  p: 2,
-                  borderRadius: 3,
-                  cursor: canInteract ? 'pointer' : 'not-allowed',
-                  borderStyle: 'dashed',
-                  borderColor: canInteract ? alpha(theme.palette.primary.main, 0.4) : alpha(theme.palette.divider, 0.7),
-                  bgcolor: canInteract ? alpha(theme.palette.primary.main, 0.04) : alpha(theme.palette.action.disabledBackground, 0.35),
-                  transition: 'all 0.2s ease',
-                  '&:hover': canInteract
-                    ? {
-                        borderColor: alpha(theme.palette.primary.main, 0.65),
-                        bgcolor: alpha(theme.palette.primary.main, 0.06),
-                      }
-                    : {},
-                }}
-              >
-                <Stack direction="row" alignItems="center" spacing={1.5}>
-                  <Box
-                    sx={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: '50%',
-                      display: 'grid',
-                      placeItems: 'center',
-                      bgcolor: alpha(theme.palette.primary.main, 0.12),
-                      color: theme.palette.primary.main,
-                    }}
-                  >
-                    <AttachFileRoundedIcon />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography sx={{ fontWeight: 700 }}>{t('documents.drop_files_here')}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {t('documents.images_and_pdfs_only')}
-                    </Typography>
-                  </Box>
-                  <Button size="small" variant="outlined" disabled={!canInteract} startIcon={<UploadFileRoundedIcon />}>
-                    {t('documents.choose_files')}
-                  </Button>
-                </Stack>
-                {uploading && (
-                  <Box sx={{ mt: 1.5 }}>
-                    <LinearProgress />
-                  </Box>
-                )}
-              </Paper>
+                onFilesDropped={(files) => void handleFilesUpload(files)}
+              />
 
               <Paper
                 variant="outlined"
@@ -452,6 +401,21 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
                       placeholder="scene, witness, insurance"
                       value={tags}
                       onChange={(e) => setTags(e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={restricted}
+                          onChange={(e) => {
+                            setRestrictedTouched(true)
+                            setRestricted(e.target.checked)
+                          }}
+                        />
+                      }
+                      label={t('documents.mark_restricted')}
                     />
                   </Grid>
                 </Grid>
@@ -542,6 +506,9 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
                                 </Typography>
                                 <Chip size="small" label={doc.status} color={STATUS_COLOR[doc.status]} />
                                 <Chip size="small" variant="outlined" label={doc.documentType} />
+                                {doc.restricted && (
+                                  <Chip size="small" color="warning" icon={<LockRoundedIcon sx={{ fontSize: 14 }} />} label={t('documents.restricted')} />
+                                )}
                               </Stack>
                               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
                                 {doc.description || t('documents.no_note')} · {formatBytes(doc.size)}
@@ -612,17 +579,19 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
                                   <DeleteOutlineRoundedIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title={t('documents.download')}>
-                                <IconButton
-                                  size="small"
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    void handleDownload(doc)
-                                  }}
-                                  disabled={busy}
-                                >
-                                  <DownloadRoundedIcon fontSize="small" />
-                                </IconButton>
+                              <Tooltip title={doc.restricted && !isAdmin ? t('documents.restricted_admin_only') : t('documents.download')}>
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      void handleDownload(doc)
+                                    }}
+                                    disabled={busy || (doc.restricted && !isAdmin)}
+                                  >
+                                    <DownloadRoundedIcon fontSize="small" />
+                                  </IconButton>
+                                </span>
                               </Tooltip>
                             </Stack>
                           </Stack>
@@ -674,53 +643,15 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
 
                   <Divider />
 
-                  <Box
-                    sx={{
-                      position: 'relative',
-                      borderRadius: 2.5,
-                      overflow: 'hidden',
-                      minHeight: 260,
-                      bgcolor: alpha(theme.palette.action.active, 0.04),
-                      border: `1px solid ${alpha(theme.palette.divider, 0.78)}`,
-                    }}
-                  >
-                    {isImagePreview && selectedPreviewUrl ? (
-                      <Box
-                        component="img"
-                        src={selectedPreviewUrl}
-                        alt={selectedDocument.filename}
-                        sx={{
-                          display: 'block',
-                          width: '100%',
-                          height: 320,
-                          objectFit: 'contain',
-                          bgcolor: alpha(theme.palette.common.black, 0.04),
-                        }}
-                      />
-                    ) : isPdfPreview && selectedPreviewUrl ? (
-                      <Box
-                        component="iframe"
-                        title={selectedDocument.filename}
-                        src={selectedPreviewUrl}
-                        sx={{
-                          width: '100%',
-                          height: 320,
-                          border: 'none',
-                          bgcolor: 'background.paper',
-                        }}
-                      />
-                    ) : (
-                      <Stack sx={{ height: 320 }} alignItems="center" justifyContent="center" spacing={1}>
-                        <DescriptionOutlinedIcon sx={{ fontSize: 48, color: theme.palette.text.secondary }} />
-                        <Typography color="text.secondary">{t('documents.preview_unavailable_for_this_file_type')}</Typography>
-                        {selectedPreviewUrl && (
-                          <Button variant="outlined" size="small" onClick={() => void handleDownload(selectedDocument)}>
-                            {t('documents.open_file')}
-                          </Button>
-                        )}
-                      </Stack>
-                    )}
-                  </Box>
+                  <DocumentPreview
+                    filename={selectedDocument.filename}
+                    mimeType={selectedDocument.mimeType}
+                    previewUrl={selectedPreviewUrl}
+                    onOpenFile={() => void handleDownload(selectedDocument)}
+                    height={320}
+                    restricted={selectedDocument.restricted}
+                    canView={!selectedDocument.restricted || isAdmin}
+                  />
 
                   <Grid container spacing={1.5}>
                     <Grid item xs={12} sm={6}>
@@ -755,7 +686,7 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
                         </Stack>
                       </Paper>
                     </Grid>
-                    {selectedDocument.extractedText && (
+                    {selectedDocument.extractedText && (!selectedDocument.restricted || isAdmin) && (
                       <Grid item xs={12}>
                         <Paper variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
                           <Typography variant="caption" color="text.secondary">
@@ -868,6 +799,19 @@ export default function IncidentDocumentsPanel({ accidentId, scopeKey, enabled =
                     </MenuItem>
                   ))}
                 </TextField>
+                {isAdmin && (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={Boolean(editingDocument.restricted)}
+                        onChange={(event) =>
+                          setEditingDocument((prev) => (prev ? { ...prev, restricted: event.target.checked } : prev))
+                        }
+                      />
+                    }
+                    label={t('documents.mark_restricted')}
+                  />
+                )}
               </Stack>
             )}
           </DialogContent>

@@ -18,6 +18,7 @@ import SettingsPage from './features/settings/pages/SettingsPage'
 import AdminAccountsPage from './features/settings/pages/AdminAccountsPage'
 import OfficerTrackingPage from './features/admin/pages/OfficerTrackingPage'
 import CommsHubPage from './features/communications/pages/CommsHubPage'
+import DocumentsPage from './features/documents/pages/DocumentsPage'
 import OfficerLocationPublisher from './components/OfficerLocationPublisher'
 import RealtimeSync from './components/RealtimeSync'
 import ChatRealtimeManager from './components/ChatRealtimeManager'
@@ -174,6 +175,7 @@ function App() {
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="communications" element={<CommsHubPage />} />
+            <Route path="documents" element={<DocumentsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="admin/accounts" element={<AdminRoute><AdminAccountsPage /></AdminRoute>} />
             <Route path="admin/new-account" element={<AdminRoute><AdminSignupPage /></AdminRoute>} />

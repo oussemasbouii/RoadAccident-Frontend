@@ -7,6 +7,7 @@ import reportsReducer from '../features/reports/slices/reportsSlice'
 import chatReducer from '../features/chat/slices/chatSlice'
 import callReducer from '../features/calls/slices/callSlice'
 import notificationsReducer from '../features/notifications/slices/notificationsSlice'
+import documentsReducer from '../features/documents/slices/documentsSlice'
 
 const store = configureStore({
   reducer: {
@@ -17,6 +18,7 @@ const store = configureStore({
     chat: chatReducer,
     call: callReducer,
     notifications: notificationsReducer,
+    documents: documentsReducer,
   },
 })
 

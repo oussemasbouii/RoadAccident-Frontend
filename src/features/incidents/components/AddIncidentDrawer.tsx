@@ -532,11 +532,21 @@ export default function AddIncidentDrawer({
     Number.isFinite(form.latitude) &&
     Number.isFinite(form.longitude) &&
     form.infoDetails.summary.trim() &&
+    // Governorate is required by the backend to assign the accident reference
+    // number — without it, submit fails server-side with a 400. Enforce it here
+    // so the form blocks before the round-trip.
+    form.infoDetails.governorate.trim() &&
     form.roadConditions.roadName.trim()
   ), [form])
 
   const stepIsValid = useMemo(() => {
-    if (step === 0) return !!(form.accidentDate && form.infoDetails.accidentTime && form.infoDetails.summary.trim())
+    if (step === 0)
+      return !!(
+        form.accidentDate &&
+        form.infoDetails.accidentTime &&
+        form.infoDetails.summary.trim() &&
+        form.infoDetails.governorate.trim()
+      )
     if (step === 1) return !!form.roadConditions.roadName.trim()
     return true
   }, [form, step])
@@ -547,10 +557,20 @@ export default function AddIncidentDrawer({
       fields.push({ label: `${t('add_incident.accident_date')} / ${t('add_incident.accident_time')}`, step: 0 })
     if (!form.infoDetails.summary.trim())
       fields.push({ label: t('add_incident.summary'), step: 0 })
+    if (!form.infoDetails.governorate.trim())
+      fields.push({ label: t('add_incident.governorate'), step: 0 })
     if (!form.roadConditions.roadName.trim())
       fields.push({ label: t('add_incident.road_name'), step: 1 })
     return fields
   }, [form, t])
+
+  // What's missing on the current step (drives the always-visible hint next to
+  // the Continue button). On the last step we surface everything still missing
+  // across all steps, since Submit checks the whole form.
+  const visibleMissingFields = useMemo(
+    () => (step === steps.length - 1 ? missingRequiredFields : missingRequiredFields.filter((f) => f.step === step)),
+    [missingRequiredFields, step, steps.length],
+  )
 
   // Auto-reset validation errors once the user fixes the blocking field
   useEffect(() => {
@@ -698,8 +718,17 @@ export default function AddIncidentDrawer({
       }
       if (!keepOpen) onClose()
     } catch (err: any) {
-      const raw = err?.response?.data?.message || err?.response?.data?.error || err?.message
-      setSubmitError(typeof raw === 'string' ? raw : t('add_incident.submit_error_generic'))
+      // onSubmit typically dispatches a redux thunk and calls .unwrap(), which
+      // (for rejectWithValue) throws the payload directly — here a plain string
+      // message from the backend (e.g. "Governorate is required…"). Handle that
+      // string form first; otherwise fall back to the axios-error shape. Only
+      // use the generic "check your connection" text when there's genuinely no
+      // server message (i.e. a real network failure).
+      const raw =
+        typeof err === 'string'
+          ? err
+          : err?.response?.data?.message || err?.response?.data?.error || err?.message
+      setSubmitError(typeof raw === 'string' && raw.trim() ? raw : t('add_incident.submit_error_generic'))
     } finally {
       setSubmitting(false)
     }
@@ -1235,7 +1264,16 @@ export default function AddIncidentDrawer({
                       <SectionHeader label={t('add_incident.section_location')} />
                       <Grid container spacing={1.5}>
                         <Grid item xs={6}>
-                          <TextField size="small" label={t('add_incident.governorate')} value={form.infoDetails.governorate} onChange={(e) => setValue('infoDetails.governorate', e.target.value)} fullWidth />
+                          <TextField
+                            size="small"
+                            label={t('add_incident.governorate')}
+                            value={form.infoDetails.governorate}
+                            onChange={(e) => setValue('infoDetails.governorate', e.target.value)}
+                            fullWidth
+                            required
+                            error={showErrors && !form.infoDetails.governorate.trim()}
+                            helperText={showErrors && !form.infoDetails.governorate.trim() ? t('add_incident.field_required') : undefined}
+                          />
                         </Grid>
                         <Grid item xs={6}>
                           <TextField size="small" label={t('add_incident.delegation')} value={form.infoDetails.delegation} onChange={(e) => setValue('infoDetails.delegation', e.target.value)} fullWidth />
@@ -2308,9 +2346,12 @@ export default function AddIncidentDrawer({
           )}
         </AnimatePresence>
 
-        {/* Missing required fields hint when submit is disabled on last step */}
+        {/* Always-visible "what's still required" hint: on each step it lists
+            the fields blocking Continue for THAT step; on the last step it lists
+            everything still blocking Submit across all steps. Clicking a field
+            jumps to its step. */}
         <AnimatePresence>
-          {step === steps.length - 1 && !canSubmit && missingRequiredFields.length > 0 && (
+          {visibleMissingFields.length > 0 && (
             <motion.div
               key="missing-fields"
               initial={{ opacity: 0, height: 0 }}
@@ -2334,14 +2375,14 @@ export default function AddIncidentDrawer({
                     {t('add_incident.required_fields_missing')}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    {missingRequiredFields.map((f, i) => (
+                    {visibleMissingFields.map((f, i) => (
                       <Box
                         key={f.label}
                         component="span"
-                        onClick={() => { setStepDirection(-1); setStep(f.step) }}
+                        onClick={() => { setStepDirection(f.step < step ? -1 : 1); setStep(f.step) }}
                         sx={{ cursor: 'pointer', textDecoration: 'underline', '&:hover': { color: 'warning.main' } }}
                       >
-                        {f.label}{i < missingRequiredFields.length - 1 ? ', ' : ''}
+                        {f.label}{i < visibleMissingFields.length - 1 ? ', ' : ''}
                       </Box>
                     ))}
                   </Typography>

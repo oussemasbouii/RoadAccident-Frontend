@@ -10,6 +10,7 @@ import {
   GenerateReportRequest,
   GenerateReportResponse,
 } from '@/types/accident'
+import type { DocumentEditRequest, DocumentSearchParams, DocumentUploadConfirmRequest, DocumentUploadRequest } from '@/types/document'
 import { clearAuthStorage } from '@/utils/authSecurity'
 import { getAccessToken, getDeviceId, getRefreshToken, setAccessToken, setRefreshToken } from '@/utils/tokenStore'
 
@@ -274,6 +275,10 @@ export const apiService = {
   chat: {
     status: (userIds: string[]) =>
       api.get('/chat/status', { params: { userIds: userIds.join(',') } }),
+    // Paginated 1:1 conversation history (newest first). Omit `before` for the newest page;
+    // pass the oldest loaded message's timestamp as `before` to page backwards.
+    messages: (peerId: string, params?: { before?: string; limit?: number }) =>
+      api.get('/chat/messages', { params: { peerId, ...(params || {}) } }),
   },
 
   // Calls
@@ -334,6 +339,32 @@ export const apiService = {
       documentId: string,
       data: IncidentDocumentUploadConfirmRequest & { replacedByDocumentId?: string }
     ) => api.post(`/accidents/${accidentId}/documents/${documentId}/replace`, data),
+  },
+
+  // Cross-entity document center (GED)
+  documents: {
+    search: (params: DocumentSearchParams) => api.get('/documents/search', { params }),
+    getDownload: (documentId: string) => api.get(`/documents/${documentId}/download`),
+    getPreviewImage: (documentId: string) => api.get(`/documents/${documentId}/preview-image`),
+    getPreviewPages: (documentId: string) => api.get(`/documents/${documentId}/preview-pages`),
+    requestUpload: (data: DocumentUploadRequest) => api.post('/documents/request-upload', data),
+    confirmUpload: (data: DocumentUploadConfirmRequest) => api.post('/documents/confirm-upload', data),
+    update: (documentId: string, data: DocumentEditRequest) => api.patch(`/documents/${documentId}`, data),
+    delete: (documentId: string, reason?: string) => api.delete(`/documents/${documentId}`, { data: { reason } }),
+    getAuditLog: (documentId: string) => api.get(`/documents/${documentId}/audit`),
+    getVersions: (documentId: string) => api.get(`/documents/${documentId}/versions`),
+    addVersion: (documentId: string, data: { key: string; filename: string; mimeType: string; size: number; note?: string }) =>
+      api.post(`/documents/${documentId}/replace`, data),
+    getVersionDownload: (documentId: string, versionId: string) => api.get(`/documents/${documentId}/versions/${versionId}/download`),
+    deleteVersion: (documentId: string, versionId: string, reason?: string) =>
+      api.delete(`/documents/${documentId}/versions/${versionId}`, { data: { reason } }),
+    restoreVersion: (documentId: string, versionId: string) =>
+      api.post(`/documents/${documentId}/versions/${versionId}/restore`),
+    retryOcr: (documentId: string) => api.post(`/documents/${documentId}/retry-ocr`),
+    bulkArchive: (ids: string[], reason?: string) => api.post('/documents/bulk-archive', { ids, reason }),
+    bulkUnarchive: (ids: string[], reason?: string) => api.post('/documents/bulk-unarchive', { ids, reason }),
+    bulkAddTag: (ids: string[], tag: string) => api.post('/documents/bulk-tag', { ids, tag }),
+    bulkSetVisibleToRole: (ids: string[], visibleToRole: string) => api.post('/documents/bulk-set-visible-to-role', { ids, visibleToRole }),
   },
 }
 

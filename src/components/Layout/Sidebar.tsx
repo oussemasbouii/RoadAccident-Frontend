@@ -27,6 +27,7 @@ import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSetting
 import LocationSearchingRoundedIcon from '@mui/icons-material/LocationSearchingRounded'
 import InventoryRoundedIcon from '@mui/icons-material/InventoryRounded'
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded'
+import FolderRoundedIcon from '@mui/icons-material/FolderRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 
@@ -60,6 +61,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
     { path: '/alerts', label: t('nav.alerts'), icon: <NotificationsActiveRoundedIcon /> },
     { path: '/reports', label: t('nav.reports'), icon: <BarChartRoundedIcon /> },
     { path: '/communications', label: t('nav.communications'), icon: <ForumRoundedIcon />, badge: totalUnreadMessages, badgeColor: 'primary' as const },
+    { path: '/documents', label: t('nav.documents'), icon: <FolderRoundedIcon /> },
     { path: '/admin/accounts', label: t('nav.user_accounts'), icon: <AdminPanelSettingsRoundedIcon />, role: 'admin', badge: pendingAccountsCount, badgeColor: 'warning' as const },
     { path: '/admin/officer-tracking', label: t('nav.officer_tracking'), icon: <LocationSearchingRoundedIcon />, role: 'admin' },
     { path: '/admin/archived-incidents', label: t('nav.archived_incidents'), icon: <InventoryRoundedIcon />, role: 'admin' },

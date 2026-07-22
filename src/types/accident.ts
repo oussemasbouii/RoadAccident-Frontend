@@ -559,6 +559,7 @@ export interface IncidentDocument {
   previewUrl?: string
   extractedText?: string
   ocrStatus?: 'pending' | 'processing' | 'completed' | 'failed'
+  restricted?: boolean
 }
 
 export interface IncidentDocumentUploadRequest {
@@ -568,6 +569,7 @@ export interface IncidentDocumentUploadRequest {
   documentType: IncidentDocumentTypeCode | string
   description?: string
   tags?: string[]
+  restricted?: boolean
 }
 
 export interface IncidentDocumentUploadConfirmRequest extends IncidentDocumentUploadRequest {
@@ -580,6 +582,7 @@ export interface IncidentDocumentUpdateRequest {
   description?: string
   tags?: string[]
   status?: IncidentDocumentLifecycleStatus
+  restricted?: boolean
 }
 
 export interface AccidentReport {
